@@ -1,8 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import {
-  GetExampleUseCase,
-  GetExampleOutput,
-} from './application/get-example.use-case';
+import { GetExampleUseCase, GetExampleOutput } from './application/get-example.use-case';
 
 @Controller('example')
 export class ExampleController {

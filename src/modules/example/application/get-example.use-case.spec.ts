@@ -4,9 +4,7 @@ import { GetExampleUseCase } from './get-example.use-case';
 
 class FakeExampleRepository extends ExampleRepository {
   get(): Promise<Example> {
-    return Promise.resolve(
-      new Example({ message: 'Example module is working' }),
-    );
+    return Promise.resolve(new Example({ message: 'Example module is working' }));
   }
 }
 
