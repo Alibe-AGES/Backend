@@ -22,8 +22,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
+    "test:integration": "jest --config ./test/jest-integration.json --runInBand",
     "typecheck": "tsc --noEmit --incremental false",
-    "validate": "npm run prisma:generate && npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run test:e2e && npm run build"
+    "validate": "npm run prisma:generate && npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run test:integration && npm run test:e2e && npm run build"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

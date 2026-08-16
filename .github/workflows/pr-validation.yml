@@ -20,7 +20,8 @@ concurrency:
 
 env:
   NODE_ENV: test
-  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/alibe_test
+  # Prisma generate requires the variable to exist but does not connect to this database.
+  DATABASE_URL: postgresql://unused:unused@localhost:5432/unused
 
 jobs:
   lint-and-format:
@@ -41,6 +42,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
       - name: Generate Prisma client
         run: npm run prisma:generate
 
@@ -53,8 +57,8 @@ jobs:
       - name: Run TypeScript check
         run: npm run typecheck
 
-  unit-and-e2e-tests:
-    name: Unit & E2E Tests
+  tests:
+    name: Unit, Integration & E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -74,11 +78,20 @@ jobs:
       - name: Generate Prisma client
         run: npm run prisma:generate
 
-      - name: Run unit tests
-        run: npm run test:unit
+      - name: Run unit tests with coverage
+        run: npm run test:cov
+
+      - name: Run integration tests
+        run: npm run test:integration
 
       - name: Run E2E tests
         run: npm run test:e2e
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
 
   build-check:
     name: Production Build Check
@@ -103,3 +116,30 @@ jobs:
 
       - name: Run production build
         run: npm run build
+
+  sonar:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    needs:
+      - lint-and-format
+      - tests
+      - build-check
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+
+      - name: Run SonarQube analysis
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
