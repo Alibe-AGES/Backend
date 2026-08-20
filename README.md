@@ -1,99 +1,1078 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Alibe Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API do projeto Alibe construída com NestJS, TypeScript, Prisma e PostgreSQL.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID, mantendo as convenções e o sistema de injeção de dependências do NestJS. O objetivo é separar regras de negócio, casos de uso, entrada HTTP e persistência sem transformar cada funcionalidade em um conjunto desnecessário de camadas.
 
-## Description
+## Sumário
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- [Tecnologias](#tecnologias)
+- [Requisitos](#requisitos)
+- [Configuração inicial](#configuração-inicial)
+- [Executando com Docker](#executando-com-docker)
+- [Executando a API localmente](#executando-a-api-localmente)
+- [Banco de dados e Prisma](#banco-de-dados-e-prisma)
+- [Scripts disponíveis](#scripts-disponíveis)
+- [Arquitetura](#arquitetura)
+- [Como criar um módulo](#como-criar-um-módulo)
+- [Testes](#testes)
+- [Integração contínua](#integração-contínua)
+- [Checklist antes de abrir um Pull Request](#checklist-antes-de-abrir-um-pull-request)
+- [Referências](#referências)
+- [Entrega contínua planejada](#entrega-contínua-planejada)
 
-## Project setup
+## Tecnologias
 
-```bash
-$ npm install
-```
+- Node.js 22
+- npm
+- NestJS 11
+- TypeScript
+- Prisma ORM
+- PostgreSQL 17
+- Jest e Supertest
+- ESLint e Prettier
+- Docker e Docker Compose
+- GitHub Actions
+- SonarQube Cloud
 
-## Compile and run the project
+## Requisitos
 
-```bash
-# development
-$ npm run start
+### Desenvolvimento completo com Docker
 
-# watch mode
-$ npm run start:dev
+- Git
+- Docker Engine ou Docker Desktop
+- Docker Compose v2, disponível pelo comando `docker compose`
 
-# production mode
-$ npm run start:prod
-```
+### Desenvolvimento executando a API fora do Docker
 
-## Run tests
+- Git
+- Node.js 22
+- npm
+- Docker, recomendado para iniciar o PostgreSQL e o Adminer
 
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+O Node.js 22 é o padrão do projeto porque também é utilizado no `Dockerfile` e na pipeline. Verifique as versões instaladas:
 
 ```bash
-$ npm install -g mau
-$ mau deploy
+node --version
+npm --version
+docker --version
+docker compose version
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Configuração inicial
 
-## Resources
+Depois de clonar o repositório, entre na pasta do Backend:
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+cd Backend
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Crie o arquivo local de variáveis de ambiente:
 
-## Support
+```bash
+cp .env.template .env
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+O `.env` não deve ser enviado ao Git. O arquivo `.env.template` contém somente valores de exemplo e deve permanecer atualizado quando uma nova variável obrigatória for adicionada.
 
-## Stay in touch
+Variáveis atuais:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+| Variável            | Responsabilidade                                             |
+| ------------------- | ------------------------------------------------------------ |
+| `DATABASE_USER`     | Usuário criado no PostgreSQL pelo Docker Compose.            |
+| `DATABASE_PASSWORD` | Senha do usuário do PostgreSQL.                              |
+| `DATABASE_NAME`     | Nome do banco da aplicação.                                  |
+| `APP_PORT`          | Porta exposta pela API quando executada pelo Docker Compose. |
+| `DATABASE_URL`      | URL de conexão utilizada pelo Prisma.                        |
 
-## License
+Nunca coloque tokens, senhas reais ou credenciais de produção no `.env.template`.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## Executando com Docker
+
+Esta é a maneira recomendada para começar, porque API, PostgreSQL e Adminer utilizam a mesma rede do Docker.
+
+### 1. Criar o `.env`
+
+```bash
+cp .env.template .env
+```
+
+Na execução completamente pelo Docker, esta URL está correta:
+
+```dotenv
+DATABASE_URL=postgres://postgres:postgres@alibe-db:5432/alibe
+```
+
+Cada parte significa:
+
+```text
+postgres:// usuario : senha    @ host     : porta / banco
+postgres:// postgres: postgres @ alibe-db : 5432  / alibe
+```
+
+`alibe-db` é o nome do serviço PostgreSQL no `docker-compose.yml`. O Docker fornece DNS interno entre os containers, então o container `backend` encontra o banco por esse nome. Essa URL só é correta para processos dentro da rede do Compose; ao executar a API diretamente no computador, use `localhost` como host. O Prisma aceita os protocolos `postgres://` e `postgresql://`.
+
+### 2. Construir e iniciar os serviços
+
+```bash
+docker compose up --build
+```
+
+Para executar em segundo plano:
+
+```bash
+docker compose up --build -d
+```
+
+Serviços disponíveis:
+
+| Serviço    | Endereço                | Responsabilidade                        |
+| ---------- | ----------------------- | --------------------------------------- |
+| Backend    | `http://localhost:3000` | API NestJS.                             |
+| PostgreSQL | `localhost:5432`        | Banco de dados de desenvolvimento.      |
+| Adminer    | `http://localhost:8080` | Interface web para inspecionar o banco. |
+
+No Adminer, use `alibe-db` como servidor quando estiver acessando o PostgreSQL criado pelo Compose.
+
+### 3. Testar a API
+
+```bash
+curl http://localhost:3000/example
+```
+
+Resposta esperada:
+
+```json
+{
+  "message": "Example module is working"
+}
+```
+
+### Comandos úteis do Docker Compose
+
+```bash
+# Ver os logs do Backend
+docker compose logs -f backend
+
+# Parar os containers preservando o volume do banco
+docker compose down
+
+# Recriar os serviços depois de alterar dependências ou o Dockerfile
+docker compose up --build
+
+# Remover containers e também os dados locais do PostgreSQL
+docker compose down --volumes
+```
+
+O último comando apaga o volume local do banco. Use-o somente quando a perda dos dados de desenvolvimento for intencional.
+
+## Executando a API localmente
+
+Use esta opção quando quiser executar o NestJS diretamente no computador e manter apenas o PostgreSQL no Docker.
+
+### 1. Instalar as dependências
+
+```bash
+npm ci
+```
+
+`npm ci` utiliza exatamente as versões registradas no `package-lock.json` e é o comando utilizado pela CI. Use `npm install <pacote>` apenas quando estiver adicionando ou atualizando uma dependência.
+
+### 2. Ajustar a conexão local
+
+Crie o `.env` e troque o host da `DATABASE_URL` de `alibe-db` para `localhost`:
+
+```dotenv
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/alibe
+```
+
+O nome `alibe-db` funciona dentro da rede do Docker. O nome `localhost` é necessário quando a API roda diretamente no computador.
+
+### 3. Iniciar somente o banco
+
+```bash
+docker compose up -d alibe-db adminer
+```
+
+### 4. Gerar o Prisma Client
+
+```bash
+npm run prisma:generate
+```
+
+Esse comando lê o `prisma/schema.prisma` e gera o cliente TypeScript tipado em `generated/prisma`.
+
+> **Importante:** `prisma generate` não precisa que o PostgreSQL esteja rodando, não cria o banco, não cria tabelas e não executa migrations. Execute-o depois de `npm ci` e sempre que o `schema.prisma` mudar. O banco é criado pelo PostgreSQL/Docker; as tabelas são criadas ou alteradas por migrations.
+
+Fluxo correto quando alguém adicionar ou alterar um model:
+
+```text
+Editar schema.prisma
+        ↓
+npx prisma migrate dev --name nome_da_alteracao
+        ↓
+Migration altera o banco de desenvolvimento
+        ↓
+Prisma Client é regenerado
+```
+
+Quando não houver alteração no schema, `npm run prisma:generate` apenas garante que o cliente local esteja disponível e sincronizado com o schema versionado.
+
+### 5. Iniciar a API em modo de desenvolvimento
+
+```bash
+npm run start:dev
+```
+
+A API ficará disponível em `http://localhost:3000`. Para usar outra porta:
+
+```bash
+PORT=3100 npm run start:dev
+```
+
+## Banco de dados e Prisma
+
+### Responsabilidade de cada local
+
+| Local                                  | Responsabilidade                                                                       |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| `prisma/schema.prisma`                 | Define datasource, generator e modelos persistidos.                                    |
+| `prisma/migrations/`                   | Guarda o histórico versionado das alterações do banco quando migrations forem criadas. |
+| `prisma.config.ts`                     | Informa ao Prisma onde estão schema, migrations e `DATABASE_URL`.                      |
+| `generated/prisma/`                    | Prisma Client gerado automaticamente; não deve ser editado manualmente.                |
+| `src/infrastructure/prisma.service.ts` | Mantém a conexão compartilhada do NestJS com o Prisma.                                 |
+| `src/infrastructure/prisma.module.ts`  | Exporta o `PrismaService` para os módulos que precisam de banco.                       |
+| `src/modules/<módulo>/persistence/`    | Implementa os repositories daquele módulo usando o `PrismaService`.                    |
+
+O `PrismaService` é compartilhado porque representa uma conexão técnica com o banco. Já cada repository permanece no seu módulo porque traduz dados para o domínio específico daquele módulo.
+
+### Comandos do Prisma
+
+```bash
+# Gerar ou atualizar o Prisma Client sem alterar o banco
+npm run prisma:generate
+
+# Criar uma migration durante o desenvolvimento
+npx prisma migrate dev --name nome_da_alteracao
+
+# Aplicar migrations já existentes, sem criar uma nova
+npx prisma migrate deploy
+
+# Abrir a interface visual do Prisma
+npx prisma studio
+```
+
+Não crie migrations vazias apenas como exemplo. Uma migration deve representar uma alteração real do schema e deve ser versionada junto com o código que depende dela.
+
+Atualmente os testes do módulo `example` utilizam memória e, portanto, não precisam executar migration. Quando um teste de integração utilizar um repository Prisma real, ele deverá usar um banco exclusivo de teste e a pipeline deverá aplicar `prisma migrate deploy` antes desses testes.
+
+Seeds devem ficar em `prisma/seed.ts` quando forem implementados. O seed deve ser idempotente sempre que possível, ou seja, poder ser executado novamente sem duplicar dados indevidamente. Dados de seed não substituem migrations.
+
+## Scripts disponíveis
+
+| Comando                    | Responsabilidade                                                             |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| `npm run start`            | Inicia a aplicação uma vez em modo normal.                                   |
+| `npm run start:dev`        | Inicia em modo watch e reinicia após alterações.                             |
+| `npm run start:debug`      | Inicia em modo watch com suporte ao debugger.                                |
+| `npm run build`            | Compila o projeto para `dist/`.                                              |
+| `npm run start:prod`       | Executa o build compilado em `dist/src/main.js`.                             |
+| `npm run prisma:generate`  | Gera o Prisma Client.                                                        |
+| `npm run format`           | Formata os arquivos com Prettier.                                            |
+| `npm run format:check`     | Verifica a formatação sem alterar arquivos.                                  |
+| `npm run lint`             | Verifica o código TypeScript com ESLint.                                     |
+| `npm run lint:fix`         | Corrige automaticamente problemas permitidos pelo ESLint.                    |
+| `npm run typecheck`        | Verifica os tipos sem gerar build.                                           |
+| `npm run test`             | Executa os testes unitários.                                                 |
+| `npm run test:unit`        | Executa explicitamente os testes unitários.                                  |
+| `npm run test:watch`       | Executa unitários em modo watch.                                             |
+| `npm run test:integration` | Executa testes de integração.                                                |
+| `npm run test:e2e`         | Executa testes ponta a ponta.                                                |
+| `npm run test:cov`         | Executa os unitários e gera `coverage/lcov.info` para o Sonar.               |
+| `npm run validate`         | Executa geração do Prisma, formatação, lint, tipos, todos os testes e build. |
+
+Antes de abrir um Pull Request, execute:
+
+```bash
+npm run validate
+```
+
+## Arquitetura
+
+### Princípios adotados
+
+- Organização vertical por módulo de negócio.
+- Regras de negócio independentes de HTTP e Prisma.
+- Casos de uso pequenos, com uma intenção de negócio clara.
+- Repository definido pelo domínio e implementado pela persistência.
+- Controllers responsáveis somente pelo protocolo HTTP.
+- `*.module.ts` responsável por conectar as dependências do NestJS.
+- Dependências apontando para dentro: HTTP e persistência dependem da aplicação ou domínio, e não o contrário.
+- Criação de camadas e services somente quando existe uma responsabilidade real.
+
+Esta é uma aplicação pragmática de Clean Architecture. Continuamos utilizando decorators, módulos e injeção de dependência do NestJS, mas evitamos colocar regras de negócio em controllers ou em adapters do Prisma.
+
+### Estrutura do repositório
+
+```text
+Backend/
+├── .github/
+│   ├── CODEOWNERS
+│   ├── pull_request_template.md
+│   └── workflows/
+│       └── pr-validation.yml
+├── docs/
+│   ├── architecture/
+│   │   └── deployment.md
+│   └── diagrams/
+│       ├── cd.drawio
+│       ├── cd.svg
+│       ├── ci.drawio
+│       ├── ci.svg
+│       ├── push-notifications.drawio
+│       └── push-notifications.svg
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/                 # Criada quando existirem migrations
+├── src/
+│   ├── infrastructure/
+│   │   ├── prisma.module.ts
+│   │   └── prisma.service.ts
+│   ├── modules/
+│   │   └── example/
+│   │       ├── application/
+│   │       ├── domain/
+│   │       ├── http/
+│   │       ├── persistence/
+│   │       └── example.module.ts
+│   ├── app.module.ts
+│   └── main.ts
+├── test/
+│   ├── unit/modules/
+│   ├── integration/modules/
+│   ├── e2e/modules/
+│   ├── jest-unit.json
+│   ├── jest-integration.json
+│   └── jest-e2e.json
+├── .env.template
+├── docker-compose.yml
+├── Dockerfile
+├── nest-cli.json
+├── package.json
+├── prisma.config.ts
+├── sonar-project.properties
+├── tsconfig.json
+└── tsconfig.build.json
+```
+
+### Raiz do projeto
+
+| Arquivo ou pasta           | Responsabilidade                                                                |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| `.github/`                 | Regras de contribuição, template de Pull Request e workflows do GitHub Actions. |
+| `docs/`                    | Documentação complementar e diagramas editáveis.                                |
+| `prisma/`                  | Schema e histórico de migrations do banco.                                      |
+| `src/`                     | Código-fonte da aplicação.                                                      |
+| `test/`                    | Testes centralizados e separados por tipo e módulo.                             |
+| `.env.template`            | Contrato das variáveis de ambiente necessárias.                                 |
+| `docker-compose.yml`       | Ambiente de desenvolvimento com Backend, PostgreSQL e Adminer.                  |
+| `Dockerfile`               | Etapas de build e imagem de produção da API.                                    |
+| `nest-cli.json`            | Configuração da CLI e do compilador NestJS.                                     |
+| `package.json`             | Dependências e scripts npm.                                                     |
+| `prisma.config.ts`         | Configuração da CLI Prisma.                                                     |
+| `sonar-project.properties` | Escopo de análise, testes e coverage do Sonar.                                  |
+| `tsconfig.json`            | Regras TypeScript do desenvolvimento.                                           |
+| `tsconfig.build.json`      | Exclusões e ajustes específicos do build de produção.                           |
+
+### `src/main.ts`
+
+É o ponto de entrada da aplicação. Cria a instância do NestJS e abre a porta HTTP. Configurações globais de protocolo, como CORS, prefixo global, Swagger e filtros HTTP, podem ser aplicadas aqui ou em uma função de setup chamada por ele.
+
+Não coloque regras de negócio em `main.ts`.
+
+### `src/app.module.ts`
+
+É o módulo raiz do NestJS. Ele importa os módulos funcionais da aplicação e registra providers verdadeiramente globais, como o pipe de validação.
+
+Não registre manualmente todos os repositories da aplicação aqui. Cada módulo deve conectar suas próprias dependências.
+
+### `src/infrastructure/`
+
+Guarda recursos técnicos compartilhados por vários módulos, como conexão Prisma, envio de e-mail, armazenamento, filas ou clientes de APIs externas.
+
+Um recurso deve ir para `infrastructure/` quando representa uma tecnologia compartilhada. Regras de negócio não pertencem a essa pasta.
+
+### `src/modules/`
+
+Cada pasta representa um módulo funcional ou contexto de negócio. O módulo deve manter junto seu domínio, seus casos de uso, sua entrada HTTP e seus adapters de persistência.
+
+Estrutura de um módulo:
+
+```text
+src/modules/users/
+├── domain/
+│   ├── user.entity.ts
+│   ├── user.repository.ts
+│   ├── errors/                     # Opcional
+│   └── services/                   # Opcional
+├── application/
+│   ├── create-user.use-case.ts
+│   └── list-users.use-case.ts
+├── http/
+│   ├── dto/
+│   │   ├── create-user.dto.ts
+│   │   └── user-response.dto.ts
+│   └── users.controller.ts
+├── persistence/
+│   └── prisma-user.repository.ts
+└── users.module.ts
+```
+
+Pastas opcionais só devem ser criadas quando tiverem arquivos e responsabilidades reais.
+
+#### `domain/`
+
+Contém o núcleo de negócio do módulo:
+
+- Entidades e value objects.
+- Regras e invariantes de negócio.
+- Contratos de repository.
+- Erros específicos do domínio.
+- Domain services, quando uma regra não pertence naturalmente a uma única entidade.
+
+O domínio não deve conhecer controllers, DTOs HTTP, Prisma ou detalhes de banco.
+
+O contrato de repository pode ser uma classe abstrata porque interfaces TypeScript não existem em runtime. A classe abstrata também pode ser utilizada como token pela injeção de dependências do NestJS:
+
+```ts
+export abstract class UserRepository {
+  abstract create(user: User): Promise<User>;
+  abstract findById(id: string): Promise<User | null>;
+}
+```
+
+#### Services de domínio
+
+Services continuam existindo, mas não ficam soltos na raiz do módulo. Quando representam uma regra de domínio, ficam em `domain/services/`:
+
+```text
+domain/services/calculate-compatibility.service.ts
+```
+
+Use um domain service quando a regra:
+
+- Envolve mais de uma entidade ou value object.
+- Não pertence naturalmente a uma entidade específica.
+- Continua sendo regra de negócio pura, sem HTTP ou Prisma.
+
+Não crie um service apenas para encaminhar a chamada para outro arquivo.
+
+#### `application/`
+
+Contém os casos de uso da aplicação. Cada use case representa uma intenção de negócio, como `CreateUserUseCase`, `UpdateUserUseCase` ou `ListUsersUseCase`.
+
+Um use case não é obrigatoriamente um endpoint: ele também pode ser chamado por HTTP, fila, tarefa agendada ou outro protocolo. No NestJS, o use case pode receber `@Injectable()` e já funciona como um provider; tecnicamente, ele exerce o papel de um service de aplicação com uma única responsabilidade.
+
+Existem dois estilos válidos, mas não devemos misturá-los sem uma responsabilidade adicional:
+
+```text
+# Padrão adotado neste projeto
+Controller -> CreateUserUseCase -> UserRepository
+
+# Padrão convencional do Nest, usado quando não há use cases separados
+Controller -> UsersService -> UserRepository
+```
+
+Não adote `Controller -> UsersService -> UseCase` quando o service apenas repassa a chamada. Isso cria duas classes para a mesma responsabilidade.
+
+O use case não acessa o banco diretamente. Ele depende somente do contrato abstrato definido no domínio:
+
+```text
+CreateUserUseCase -> UserRepository (contrato)
+PrismaUserRepository -> implementa UserRepository -> PrismaService
+```
+
+Domain services continuam disponíveis para regras que não pertencem naturalmente a uma entidade. Nesse caso, o use case orquestra as duas dependências, sem transformá-las obrigatoriamente em uma cadeia:
+
+```text
+CreateUserUseCase -> UserPolicyService
+CreateUserUseCase -> UserRepository
+```
+
+O padrão deste projeto é `Controller -> UseCase -> Repository`, com domain services adicionados somente quando houver regra real para eles.
+
+#### `http/`
+
+É o adapter de entrada HTTP. Contém:
+
+- Controllers.
+- DTOs de entrada e saída.
+- Validação específica do protocolo.
+- Decorators, guards e interceptors específicos daquele módulo, quando necessários.
+
+O controller converte a requisição para a entrada do use case e converte o resultado para a resposta. Ele não deve implementar regra de negócio nem acessar Prisma diretamente.
+
+DTOs ligados a HTTP ficam em `http/dto/`. Eles descrevem body, parâmetros, query e resposta do protocolo, podendo utilizar Zod ou decorators HTTP. Já `CreateUserInput`, `CreateUserCommand` ou tipos semelhantes pertencem a `application/` porque representam a entrada do caso de uso sem depender de HTTP. Não reutilize automaticamente um DTO HTTP como entidade de domínio.
+
+#### `persistence/`
+
+Contém adapters que implementam os contratos definidos em `domain/`. Exemplos:
+
+- `prisma-user.repository.ts` para PostgreSQL com Prisma.
+- `in-memory-user.repository.ts` para um adapter simples ou teste.
+
+O repository Prisma pode importar o `PrismaService` compartilhado de `src/infrastructure/`, mas deve devolver entidades ou resultados compreendidos pelo domínio e pela aplicação.
+
+#### `<nome>.module.ts`
+
+É o ponto de composição do módulo. Registra controllers, use cases e o adapter escolhido para cada contrato:
+
+```ts
+@Module({
+  imports: [PrismaModule],
+  controllers: [UsersController],
+  providers: [
+    CreateUserUseCase,
+    {
+      provide: UserRepository,
+      useClass: PrismaUserRepository,
+    },
+  ],
+})
+export class UsersModule {}
+```
+
+Esse arquivo deve configurar as dependências, não conter regras de negócio.
+
+### Fluxo de uma requisição
+
+```mermaid
+flowchart LR
+    Client[Cliente HTTP] --> Controller[Controller em http/]
+    Controller --> UseCase[Use case em application/]
+    UseCase --> Contract[Contrato em domain/]
+    UseCase -. quando necessário .-> DomainService[Service em domain/services/]
+    Adapter[Repository em persistence/] -. implementa .-> Contract
+    Adapter --> Prisma[PrismaService em infrastructure/]
+    Prisma --> Database[(PostgreSQL)]
+```
+
+O use case depende do contrato abstrato. O módulo NestJS escolhe qual implementação será injetada. Isso aplica inversão de dependência e permite substituir Prisma por um fake sem alterar o caso de uso.
+
+### Exemplo completo: módulo `users`
+
+Os exemplos abaixo mostram como as peças se conectam. Eles são ilustrativos e só passam a compilar quando o model `User` for realmente adicionado ao `schema.prisma` e sua migration for criada.
+
+#### Entidade de domínio
+
+Arquivo `src/modules/users/domain/user.entity.ts`:
+
+```ts
+export interface UserProps {
+  id?: string;
+  name: string;
+  age: number;
+}
+
+export class User {
+  readonly id?: string;
+  readonly name: string;
+  readonly age: number;
+
+  constructor(props: UserProps) {
+    if (props.age < 0) {
+      throw new Error('Age cannot be negative');
+    }
+
+    this.id = props.id;
+    this.name = props.name;
+    this.age = props.age;
+  }
+}
+```
+
+Em TypeScript, esta forma mais curta também salvaria `props` no objeto:
+
+```ts
+constructor(private readonly props: UserProps) {}
+```
+
+Ela é uma _parameter property_ e equivale a declarar `private readonly props: UserProps` na classe e executar `this.props = props` no construtor. Neste guia usamos campos explícitos (`this.id`, `this.name` e `this.age`) porque são mais fáceis de ler para quem está começando. `readonly` impede reatribuir o campo; não congela automaticamente um objeto inteiro.
+
+#### Contrato do repository
+
+Arquivo `src/modules/users/domain/user.repository.ts`:
+
+```ts
+import { User } from './user.entity';
+
+export abstract class UserRepository {
+  abstract create(user: User): Promise<User>;
+  abstract findById(id: string): Promise<User | null>;
+}
+```
+
+O contrato pertence ao domínio. Ele descreve o que a aplicação precisa, mas não conhece Prisma ou PostgreSQL.
+
+#### Implementação Prisma do repository
+
+Arquivo `src/modules/users/persistence/prisma-user.repository.ts`:
+
+```ts
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../../infrastructure/prisma.service';
+import { User } from '../domain/user.entity';
+import { UserRepository } from '../domain/user.repository';
+
+@Injectable()
+export class PrismaUserRepository extends UserRepository {
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
+
+  async create(user: User): Promise<User> {
+    const record = await this.prisma.user.create({
+      data: {
+        name: user.name,
+        age: user.age,
+      },
+    });
+
+    return new User(record);
+  }
+
+  async findById(id: string): Promise<User | null> {
+    const record = await this.prisma.user.findUnique({ where: { id } });
+    return record ? new User(record) : null;
+  }
+}
+```
+
+Somente essa implementação conhece Prisma. Trocar PostgreSQL por outro adapter não exige alterar o domínio nem o use case.
+
+#### Use case
+
+Arquivo `src/modules/users/application/create-user.use-case.ts`:
+
+```ts
+import { Injectable } from '@nestjs/common';
+import { User } from '../domain/user.entity';
+import { UserRepository } from '../domain/user.repository';
+
+export interface CreateUserInput {
+  name: string;
+  age: number;
+}
+
+@Injectable()
+export class CreateUserUseCase {
+  constructor(private readonly users: UserRepository) {}
+
+  execute(input: CreateUserInput): Promise<User> {
+    const user = new User(input);
+    return this.users.create(user);
+  }
+}
+```
+
+O use case conversa com `UserRepository`, não com `PrismaService`. A implementação concreta será escolhida pelo módulo.
+
+#### DTO e controller HTTP
+
+Arquivo `src/modules/users/http/dto/create-user.dto.ts`:
+
+```ts
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+
+const createUserSchema = z.object({
+  name: z.string().min(1),
+  age: z.number().int().nonnegative(),
+});
+
+export class CreateUserDto extends createZodDto(createUserSchema) {}
+```
+
+Arquivo `src/modules/users/http/users.controller.ts`:
+
+```ts
+import { Body, Controller, Post } from '@nestjs/common';
+import { CreateUserUseCase } from '../application/create-user.use-case';
+import { CreateUserDto } from './dto/create-user.dto';
+
+@Controller('users')
+export class UsersController {
+  constructor(private readonly createUserUseCase: CreateUserUseCase) {}
+
+  @Post()
+  create(@Body() body: CreateUserDto) {
+    return this.createUserUseCase.execute(body);
+  }
+}
+```
+
+#### Configuração do módulo
+
+Arquivo `src/modules/users/users.module.ts`:
+
+```ts
+import { Module } from '@nestjs/common';
+import { PrismaModule } from '../../infrastructure/prisma.module';
+import { CreateUserUseCase } from './application/create-user.use-case';
+import { UserRepository } from './domain/user.repository';
+import { UsersController } from './http/users.controller';
+import { PrismaUserRepository } from './persistence/prisma-user.repository';
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [UsersController],
+  providers: [
+    CreateUserUseCase,
+    {
+      provide: UserRepository,
+      useClass: PrismaUserRepository,
+    },
+  ],
+})
+export class UsersModule {}
+```
+
+Esse é o ponto em que o contrato `UserRepository` é ligado à implementação `PrismaUserRepository`.
+
+## Como criar um módulo
+
+Execute os comandos na raiz do Backend.
+
+### Opção recomendada: gerar cada parte no destino correto
+
+Exemplo para um módulo `users`:
+
+```bash
+# Cria o módulo e o registra no AppModule
+npx nest g module modules/users
+
+# Entrada HTTP
+npx nest g controller modules/users/http/users --flat --no-spec
+npx nest g class modules/users/http/dto/create-user.dto --flat --no-spec
+
+# Domínio
+npx nest g class modules/users/domain/user.entity --flat --no-spec
+npx nest g class modules/users/domain/user.repository --flat --no-spec
+
+# Casos de uso
+npx nest g class modules/users/application/create-user.use-case --flat --no-spec
+npx nest g class modules/users/application/list-users.use-case --flat --no-spec
+
+# Persistência
+npx nest g class modules/users/persistence/prisma-user.repository --flat --no-spec
+```
+
+Se houver uma regra que realmente precise de um domain service:
+
+```bash
+npx nest g service modules/users/domain/services/user-policy --flat --no-spec
+```
+
+Utilizamos `--no-spec` porque os testes ficam centralizados em `test/`, e não ao lado dos arquivos em `src/`.
+
+Depois da geração:
+
+1. Implemente entidade e regras de domínio.
+2. Transforme `user.repository.ts` em contrato abstrato.
+3. Implemente cada ação em um use case.
+4. Implemente o contrato em `persistence/`.
+5. Deixe o controller apenas adaptar HTTP para os use cases.
+6. Registre controller, use cases e repositories no `users.module.ts`.
+7. Crie os testes nas pastas correspondentes em `test/`.
+8. Execute `npm run validate`.
+
+Antes de gerar arquivos de verdade, adicione `--dry-run` ao comando para visualizar o resultado:
+
+```bash
+npx nest g module modules/users --dry-run
+```
+
+### Opção rápida: gerar um CRUD completo e reorganizar
+
+A CLI do NestJS também consegue gerar um resource REST completo:
+
+```bash
+npx nest g resource modules/users --type rest --crud true --no-spec
+```
+
+Esse comando gera a arquitetura convencional do NestJS, não a arquitetura final deste projeto. Ele normalmente cria:
+
+```text
+src/modules/users/
+├── dto/
+├── entities/
+├── users.controller.ts
+├── users.service.ts
+└── users.module.ts
+```
+
+Reorganize da seguinte forma:
+
+| Gerado pela CLI           | Destino ou ação                                                              |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| `users.controller.ts`     | Mover para `http/users.controller.ts`.                                       |
+| `dto/`                    | Mover para `http/dto/`.                                                      |
+| `entities/user.entity.ts` | Adaptar para `domain/user.entity.ts`.                                        |
+| `users.service.ts`        | Separar cada ação em um use case em `application/` e remover o pass-through. |
+| Acesso direto ao Prisma   | Mover para `persistence/prisma-user.repository.ts`.                          |
+| Contrato do repository    | Criar em `domain/user.repository.ts`.                                        |
+| `users.module.ts`         | Manter na raiz e configurar a injeção de dependências.                       |
+
+O `users.service.ts` gerado pela CLI representa a camada de aplicação convencional do Nest. Como este projeto separa as ações em use cases, distribua seus métodos entre os use cases e remova o service que apenas repassaria chamadas. Services com regras puras que envolvem entidades ficam em `domain/services/`.
+
+A geração de um resource pode atualizar dependências do `package.json`. Sempre confira o diff e execute `npm install` se a CLI adicionar alguma dependência.
+
+### Criar a estrutura dos testes do módulo
+
+```bash
+mkdir -p test/unit/modules/users
+mkdir -p test/integration/modules/users
+mkdir -p test/e2e/modules/users
+```
+
+Crie os arquivos seguindo o padrão:
+
+```text
+test/unit/modules/users/create-user.use-case.spec.ts
+test/integration/modules/users/prisma-user.repository.integration-spec.ts
+test/e2e/modules/users/create-user.e2e-spec.ts
+```
+
+## Testes
+
+O projeto mantém três tipos de testes. Eles possuem objetivos diferentes e não devem ser tratados como três cópias do mesmo teste.
+
+### Testes unitários
+
+Local:
+
+```text
+test/unit/modules/<módulo>/*.spec.ts
+```
+
+Testam uma unidade isolada, normalmente entidade, domain service ou use case. Dependências são substituídas por fakes ou mocks. Não inicializam a API, não fazem HTTP e não precisam de banco.
+
+Exemplo atual:
+
+```text
+test/unit/modules/example/get-example.use-case.spec.ts
+```
+
+Executar:
+
+```bash
+npm run test:unit
+```
+
+#### Exemplo de teste unitário
+
+Arquivo `test/unit/modules/users/create-user.use-case.spec.ts`:
+
+```ts
+import { User } from '../../../../src/modules/users/domain/user.entity';
+import { UserRepository } from '../../../../src/modules/users/domain/user.repository';
+import { CreateUserUseCase } from '../../../../src/modules/users/application/create-user.use-case';
+
+class FakeUserRepository extends UserRepository {
+  create(user: User): Promise<User> {
+    return Promise.resolve(user);
+  }
+
+  findById(): Promise<User | null> {
+    return Promise.resolve(null);
+  }
+}
+
+describe('CreateUserUseCase', () => {
+  it('creates a valid user', async () => {
+    const useCase = new CreateUserUseCase(new FakeUserRepository());
+
+    const user = await useCase.execute({ name: 'Ana', age: 24 });
+
+    expect(user.name).toBe('Ana');
+    expect(user.age).toBe(24);
+  });
+});
+```
+
+O teste não inicializa NestJS, HTTP ou PostgreSQL. Ele verifica somente o use case e utiliza uma implementação fake do contrato.
+
+### Testes de integração
+
+Local:
+
+```text
+test/integration/modules/<módulo>/*.integration-spec.ts
+```
+
+Verificam componentes trabalhando juntos. Podem compilar um módulo NestJS para validar a injeção de dependências ou testar um repository Prisma contra um banco de teste. Normalmente chamam use case, service ou repository diretamente, sem requisição HTTP.
+
+Exemplo atual:
+
+```text
+ExampleModule -> GetExampleUseCase -> InMemoryExampleRepository
+```
+
+#### Exemplo de teste de integração
+
+O módulo `example` demonstra a integração entre providers sem banco real:
+
+```ts
+const moduleFixture = await Test.createTestingModule({
+  imports: [ExampleModule],
+}).compile();
+
+const useCase = moduleFixture.get(GetExampleUseCase);
+
+await expect(useCase.execute()).resolves.toEqual({
+  message: 'Example module is working',
+});
+```
+
+Esse teste confirma que o NestJS conseguiu montar `GetExampleUseCase` e `InMemoryExampleRepository` usando a configuração do módulo.
+
+Executar:
+
+```bash
+npm run test:integration
+```
+
+### Testes E2E
+
+E2E significa End to End, ou ponta a ponta.
+
+Local:
+
+```text
+test/e2e/modules/<módulo>/*.e2e-spec.ts
+```
+
+Inicializam a aplicação NestJS e fazem uma requisição HTTP com Supertest. Validam rota, controller, validação, use case, providers e resposta HTTP como um fluxo completo.
+
+Exemplo atual:
+
+```text
+GET /example -> ExampleController -> GetExampleUseCase -> Repository -> HTTP 200
+```
+
+#### Exemplo de teste E2E
+
+```ts
+const moduleFixture = await Test.createTestingModule({
+  imports: [AppModule],
+}).compile();
+
+app = moduleFixture.createNestApplication();
+await app.init();
+
+await request(app.getHttpServer())
+  .get('/example')
+  .expect(200)
+  .expect({ message: 'Example module is working' });
+```
+
+Esse teste entra pela API HTTP e percorre controller, use case e repository até validar a resposta.
+
+Executar:
+
+```bash
+npm run test:e2e
+```
+
+### Quando criar cada teste
+
+| Alteração                                      | Teste esperado                                   |
+| ---------------------------------------------- | ------------------------------------------------ |
+| Nova regra de entidade ou domain service       | Unitário.                                        |
+| Novo use case ou mudança de regra              | Unitário.                                        |
+| Novo repository Prisma ou integração externa   | Integração.                                      |
+| Mudança na configuração de providers do módulo | Integração.                                      |
+| Novo endpoint ou fluxo HTTP importante         | E2E.                                             |
+| Correção de bug                                | Teste no nível mais próximo que reproduza o bug. |
+
+Não é obrigatório repetir todas as condições em todos os níveis. O unitário cobre detalhes da regra; a integração cobre conexões importantes; o E2E cobre o fluxo HTTP principal.
+
+### Coverage
+
+```bash
+npm run test:cov
+```
+
+O Jest mede quais linhas de `src/` foram executadas e gera o relatório em `coverage/`, incluindo `coverage/lcov.info`. A localização dos testes em `test/` não impede a medição do código-fonte.
+
+Atualmente o relatório enviado ao Sonar é gerado pelos testes unitários. Integração e E2E são executados separadamente pela pipeline e precisam passar, mas não entram no cálculo atual do LCOV.
+
+## Integração contínua
+
+O workflow `.github/workflows/pr-validation.yml` executa CI em:
+
+- Pull Requests direcionados a `develop` ou `main`.
+- Pushes realizados em `develop` ou `main`.
+
+Os jobs de qualidade, testes e build podem executar em paralelo. O Sonar só inicia depois que os três terminam com sucesso.
+
+![Diagrama da integração contínua do Backend](docs/diagrams/ci.svg)
+
+A versão SVG é adequada para visualização no GitHub e pode ser reutilizada posteriormente na Wiki.
+
+O arquivo editável do diagrama está em [`docs/diagrams/ci.drawio`](docs/diagrams/ci.drawio).
+
+Para editá-lo:
+
+1. Acesse [diagrams.net](https://app.diagrams.net/).
+2. Escolha **File > Open From > Device**.
+3. Selecione `docs/diagrams/ci.drawio`.
+4. Edite e salve novamente no mesmo formato.
+
+O workflow atual implementa somente CI. Ele valida o código, mas não publica ou implanta a aplicação.
+
+### SonarQube
+
+O job do Sonar utiliza o secret `SONAR_TOKEN` configurado no GitHub. Tokens nunca devem ser colocados no workflow, no README ou no repositório.
+
+O Sonar recebe o relatório `coverage/lcov.info` produzido pelo Jest e usa `sonar-project.properties` para identificar código-fonte e testes.
+
+## Checklist antes de abrir um Pull Request
+
+- [ ] O código respeita as responsabilidades das camadas.
+- [ ] Controllers não possuem regras de negócio ou acesso direto ao Prisma.
+- [ ] Use cases dependem de contratos, não de implementações Prisma concretas.
+- [ ] Novas variáveis foram adicionadas ao `.env.template` sem valores secretos.
+- [ ] Migrations reais foram incluídas quando o schema mudou.
+- [ ] Testes adequados foram criados ou atualizados.
+- [ ] `npm run validate` passou localmente.
+- [ ] O Pull Request explica o que foi feito, como foi feito e como testar.
+
+## Referências
+
+- [Documentação do NestJS](https://docs.nestjs.com/)
+- [NestJS CLI](https://docs.nestjs.com/cli/overview)
+- [Testes no NestJS](https://docs.nestjs.com/fundamentals/testing)
+- [Documentação do Prisma](https://www.prisma.io/docs)
+- [Docker Compose](https://docs.docker.com/compose/)
+- [GitHub Actions](https://docs.github.com/actions)
+
+## Entrega contínua planejada
+
+> [!WARNING]
+> **EM DESENVOLVIMENTO:** esta arquitetura ainda está sendo definida. Os diagramas representam uma proposta inicial e não significam que a infraestrutura ou o CD já estejam configurados na AWS.
+
+O CD ainda não está implementado. O desenho abaixo é uma proposta de arquitetura-alvo para orientar a criação da infraestrutura e do futuro workflow, sem representar recursos AWS já existentes.
+
+![Arquitetura-alvo de CD e infraestrutura AWS](docs/diagrams/cd.svg)
+
+Arquivos editáveis no diagrams.net:
+
+- [`docs/diagrams/cd.drawio`](docs/diagrams/cd.drawio)
+- [`docs/diagrams/push-notifications.drawio`](docs/diagrams/push-notifications.drawio)
+
+O fluxo de notificações proposto também está disponível para visualização:
+
+![Fluxo assíncrono de notificações push](docs/diagrams/push-notifications.svg)
+
+A proposta simples e a responsabilidade de cada componente estão explicadas em [`docs/architecture/deployment.md`](docs/architecture/deployment.md). A documentação pode ser reutilizada posteriormente na Wiki do projeto.

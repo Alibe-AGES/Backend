@@ -3,9 +3,9 @@ export interface ExampleProps {
 }
 
 export class Example {
-  constructor(private readonly props: ExampleProps) {}
+  readonly message: string;
 
-  get message(): string {
-    return this.props.message;
+  constructor(props: ExampleProps) {
+    this.message = props.message;
   }
 }
