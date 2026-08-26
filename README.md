@@ -10,7 +10,9 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 - [Requisitos](#requisitos)
 - [Configuração inicial](#configuração-inicial)
 - [Executando com Docker](#executando-com-docker)
+- [URLs importantes](#urls-importantes)
 - [Observabilidade local](#observabilidade-local)
+- [Documentação da API com Swagger](#documentação-da-api-com-swagger)
 - [Executando a API localmente](#executando-a-api-localmente)
 - [Banco de dados e Prisma](#banco-de-dados-e-prisma)
 - [Scripts disponíveis](#scripts-disponíveis)
@@ -125,19 +127,6 @@ Para executar em segundo plano:
 docker compose up --build -d
 ```
 
-Serviços disponíveis:
-
-| Serviço    | Endereço                                           | Responsabilidade                        |
-| ---------- | -------------------------------------------------- | --------------------------------------- |
-| Backend    | `http://localhost:3000`                            | API NestJS.                             |
-| Métricas   | `http://localhost:3000/metrics`                    | Métricas expostas pelo Backend.         |
-| PostgreSQL | `localhost:5432`                                   | Banco de dados de desenvolvimento.      |
-| Adminer    | `http://localhost:8080`                            | Interface web para inspecionar o banco. |
-| Prometheus | `http://localhost:9090`                            | Coleta e consulta das métricas.         |
-| Grafana    | `http://localhost:3001/d/alibe-backend-monitoring` | Dashboard de monitoramento do Backend.  |
-
-No Adminer, use `alibe-db` como servidor quando estiver acessando o PostgreSQL criado pelo Compose.
-
 ### 3. Testar a API
 
 ```bash
@@ -167,6 +156,32 @@ docker compose up --build
 
 Não utilize `docker compose down -v` ou `docker compose down --volumes` na rotina do projeto. Esses comandos apagam os dados locais do PostgreSQL, o histórico do Prometheus e o estado do Grafana.
 
+## URLs importantes
+
+Os endereços abaixo consideram o ambiente local com `docker compose up` em execução:
+
+| Recurso              | Endereço                                           | Finalidade                                          |
+| -------------------- | -------------------------------------------------- | --------------------------------------------------- |
+| API                  | <http://localhost:3000>                            | URL base do Backend.                                |
+| Endpoint de exemplo  | <http://localhost:3000/example>                    | Verificação rápida da API.                          |
+| Swagger UI           | <http://localhost:3000/docs>                       | Documentação interativa e teste dos endpoints.      |
+| OpenAPI JSON         | <http://localhost:3000/docs-json>                  | Contrato OpenAPI consumível por outras ferramentas. |
+| Métricas do Backend  | <http://localhost:3000/metrics>                    | Métricas brutas no formato Prometheus.              |
+| Prometheus           | <http://localhost:9090>                            | Consulta e inspeção das métricas coletadas.         |
+| Grafana              | <http://localhost:3001>                            | Página inicial do Grafana.                          |
+| Dashboard do Backend | <http://localhost:3001/d/alibe-backend-monitoring> | Monitoramento do Backend.                           |
+| Adminer              | <http://localhost:8080>                            | Interface para inspecionar o PostgreSQL.            |
+| PostgreSQL           | `localhost:5432`                                   | Conexão ao banco a partir do computador.            |
+| Prisma Studio        | <http://localhost:5555>                            | Interface do Prisma, quando iniciada manualmente.   |
+
+Para iniciar o Prisma Studio pelo container do Backend:
+
+```bash
+docker compose exec backend npx prisma studio --hostname 0.0.0.0 --port 5555
+```
+
+No Adminer, use `alibe-db` como servidor. Dentro da rede do Compose, containers utilizam nomes de serviços como `alibe-db`, `backend` e `prometheus`; no navegador e em programas executados diretamente no computador, utilize `localhost` e a porta publicada.
+
 ## Observabilidade local
 
 Com o Docker Compose em execução, acesse:
@@ -190,6 +205,40 @@ O trecho `/d/` da URL é uma rota interna do Grafana que significa “dashboard�
 O dashboard apresenta total e quantidade de requisições ao longo do tempo, total de erros, gráfico temporal da taxa de erros, latência p95, CPU, heap, event loop lag e uptime. Enquanto nenhum endpoint real tiver produzido erro, os painéis de erro mostram zero.
 
 A estrutura dos arquivos, a persistência dos volumes e o processo de exportação do dashboard estão documentados em [`grafana/README.md`](grafana/README.md).
+
+## Documentação da API com Swagger
+
+Com a aplicação em execução:
+
+- interface Swagger UI: <http://localhost:3000/docs>;
+- especificação OpenAPI em JSON: <http://localhost:3000/docs-json>.
+
+A configuração global fica em `src/app.setup.ts` e é chamada pelo `main.ts`. Os detalhes de cada endpoint devem permanecer na camada HTTP do respectivo módulo.
+
+Exemplo:
+
+```ts
+@ApiTags('Users')
+@Controller('users')
+export class UsersController {
+  @Post()
+  @ApiOperation({ summary: 'Cria um usuário' })
+  @ApiCreatedResponse({ type: UserResponseDto })
+  create(@Body() input: CreateUserDto): Promise<UserResponseDto> {
+    return this.createUserUseCase.execute(input);
+  }
+}
+```
+
+Para os schemas de entrada e saída aparecerem corretamente, use classes de DTO com `@ApiProperty()` quando necessário. Decorators do Swagger pertencem a controllers e DTOs HTTP; entidades, services de domínio, repositories e use cases não devem depender de `@nestjs/swagger`.
+
+Ao criar um endpoint:
+
+1. adicione uma tag com `@ApiTags()` no controller;
+2. descreva a operação com `@ApiOperation()`;
+3. documente as respostas com `@ApiOkResponse()`, `@ApiCreatedResponse()` ou o decorator correspondente;
+4. abra `/docs` e confira o contrato gerado;
+5. mantenha o teste E2E de `/docs-json` passando.
 
 ## Executando a API localmente
 
@@ -375,6 +424,7 @@ Backend/
 │   │       ├── persistence/
 │   │       └── example.module.ts
 │   ├── app.module.ts
+│   ├── app.setup.ts
 │   └── main.ts
 ├── test/
 │   ├── unit/modules/
@@ -418,6 +468,10 @@ Backend/
 É o ponto de entrada da aplicação. Cria a instância do NestJS e abre a porta HTTP. Configurações globais de protocolo, como CORS, prefixo global, Swagger e filtros HTTP, podem ser aplicadas aqui ou em uma função de setup chamada por ele.
 
 Não coloque regras de negócio em `main.ts`.
+
+### `src/app.setup.ts`
+
+Centraliza configurações HTTP globais da aplicação, como Swagger, CORS, filtros e interceptors de protocolo. Não deve conter regras de negócio.
 
 ### `src/app.module.ts`
 
