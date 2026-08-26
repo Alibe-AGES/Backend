@@ -1,0 +1,60 @@
+name: Mirror Backend to AGES GitLab
+
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitlab-mirror-main
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Mirror main to GitLab
+    if: ${{ vars.GITLAB_MIRROR_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      GITLAB_REPOSITORY_URL: ${{ vars.GITLAB_REPOSITORY_URL }}
+
+    steps:
+      - name: Checkout main with complete history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate mirror configuration
+        env:
+          GITLAB_USERNAME: ${{ secrets.GITLAB_USERNAME }}
+          GITLAB_PASSWORD: ${{ secrets.GITLAB_PASSWORD }}
+        run: |
+          if [ -z "$GITLAB_REPOSITORY_URL" ]; then
+            echo "GITLAB_REPOSITORY_URL is not configured."
+            exit 1
+          fi
+
+          if [ -z "$GITLAB_USERNAME" ] || [ -z "$GITLAB_PASSWORD" ]; then
+            echo "GITLAB_USERNAME and GITLAB_PASSWORD must be configured."
+            exit 1
+          fi
+
+          case "$GITLAB_REPOSITORY_URL" in
+            https://*) ;;
+            *) echo "GITLAB_REPOSITORY_URL must use HTTPS."; exit 1 ;;
+          esac
+
+      - name: Push main to GitLab
+        env:
+          GITLAB_USERNAME: ${{ secrets.GITLAB_USERNAME }}
+          GITLAB_PASSWORD: ${{ secrets.GITLAB_PASSWORD }}
+        run: |
+          repository_path="${GITLAB_REPOSITORY_URL#https://}"
+          authenticated_url="https://${GITLAB_USERNAME}:${GITLAB_PASSWORD}@${repository_path}"
+          git push "$authenticated_url" main:main

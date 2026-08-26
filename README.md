@@ -1114,6 +1114,60 @@ Para editá-lo:
 
 O workflow atual implementa somente CI. Ele valida o código, mas não publica ou implanta a aplicação.
 
+### Espelhamento da `main` no GitLab AGES
+
+O workflow `.github/workflows/mirror-to-gitlab-backend.yml` está preparado para replicar a branch `main` do GitHub no GitLab AGES. Ele possui os mesmos gatilhos do Frontend — push em `main` e execução manual — mas permanece **desabilitado por padrão**.
+
+```text
+Merge aprovado na main do GitHub
+    → workflow Mirror Backend to AGES GitLab
+    → checkout completo da main
+    → push de main:main
+    → GitLab AGES atualizado
+```
+
+O job somente executa quando a variável `GITLAB_MIRROR_ENABLED` possuir exatamente o valor `true`. Enquanto a variável estiver ausente ou com `false`, nenhum contato ou push para o GitLab será realizado.
+
+#### Configuração necessária no GitHub
+
+No repositório **Backend**, acesse **Settings > Secrets and variables > Actions**.
+
+Em **Secrets**, cadastre:
+
+| Secret            | Conteúdo                                                               |
+| ----------------- | ---------------------------------------------------------------------- |
+| `GITLAB_USERNAME` | Usuário com permissão de escrita no repositório Backend do GitLab.     |
+| `GITLAB_PASSWORD` | Token do GitLab com permissão `write_repository`, não a senha pessoal. |
+
+Em **Variables**, cadastre:
+
+| Variable                | Conteúdo                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `GITLAB_REPOSITORY_URL` | URL HTTPS exata do repositório Backend, terminando em `.git`.                                    |
+| `GITLAB_MIRROR_ENABLED` | Comece com `false`. Altere para `true` somente quando estiver pronto para ativar o espelhamento. |
+
+A URL esperada pela organização atual deve ser confirmada no próprio GitLab antes da ativação. Não copie automaticamente a URL do Frontend: abra o projeto Backend no GitLab, selecione **Code > Clone with HTTPS** e copie o endereço exibido.
+
+#### Preparação necessária no GitLab
+
+1. Confirme que o projeto Backend pertence ao grupo correto da disciplina.
+2. Gere um Project Access Token ou Personal Access Token com `write_repository`.
+3. Garanta que o usuário ou token tenha permissão para enviar commits à `main`.
+4. Compare a `main` do GitLab com a `main` do GitHub antes do primeiro teste.
+
+#### Ativação e primeiro teste
+
+1. Mantenha `GITLAB_MIRROR_ENABLED=false` enquanto cadastra URL e secrets.
+2. Confirme que não existem commits importantes somente no GitLab.
+3. Altere `GITLAB_MIRROR_ENABLED` para `true`.
+4. Acesse **Actions > Mirror Backend to AGES GitLab > Run workflow**.
+5. Verifique o log do job e confirme no GitLab se o SHA da `main` coincide com o GitHub.
+6. Depois do teste, mantenha `true` para espelhar automaticamente cada novo push em `main`, ou retorne para `false` para pausar.
+
+Diferentemente do workflow atual do Frontend, esta configuração inicial não utiliza `git push --force`. Se os históricos forem incompatíveis, o job falhará sem sobrescrever o GitLab. A decisão de alinhar históricos ou habilitar force push deve ser feita conscientemente por um arquiteto depois de revisar o repositório remoto.
+
+Esse espelhamento apenas replica código-fonte. Ele não publica imagem, não faz deploy e não representa CD.
+
 ### SonarQube
 
 O job do Sonar utiliza o secret `SONAR_TOKEN` configurado no GitHub. Tokens nunca devem ser colocados no workflow, no README ou no repositório.
