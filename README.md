@@ -10,6 +10,7 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 - [Requisitos](#requisitos)
 - [Configuração inicial](#configuração-inicial)
 - [Executando com Docker](#executando-com-docker)
+- [Observabilidade local](#observabilidade-local)
 - [Executando a API localmente](#executando-a-api-localmente)
 - [Banco de dados e Prisma](#banco-de-dados-e-prisma)
 - [Scripts disponíveis](#scripts-disponíveis)
@@ -27,7 +28,7 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 - npm
 - NestJS 11
 - TypeScript
-- Prisma ORM
+- Prisma ORM 7
 - PostgreSQL 17
 - Jest e Supertest
 - ESLint e Prettier
@@ -46,11 +47,11 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 ### Desenvolvimento executando a API fora do Docker
 
 - Git
-- Node.js 22
+- Node.js 22.13 ou superior
 - npm
 - Docker, recomendado para iniciar o PostgreSQL e o Adminer
 
-O Node.js 22 é o padrão do projeto porque também é utilizado no `Dockerfile` e na pipeline. Verifique as versões instaladas:
+O Node.js 22.13 ou superior é o padrão do projeto porque também é utilizado no `Dockerfile` e na pipeline. Verifique as versões instaladas:
 
 ```bash
 node --version
@@ -126,11 +127,14 @@ docker compose up --build -d
 
 Serviços disponíveis:
 
-| Serviço    | Endereço                | Responsabilidade                        |
-| ---------- | ----------------------- | --------------------------------------- |
-| Backend    | `http://localhost:3000` | API NestJS.                             |
-| PostgreSQL | `localhost:5432`        | Banco de dados de desenvolvimento.      |
-| Adminer    | `http://localhost:8080` | Interface web para inspecionar o banco. |
+| Serviço    | Endereço                                           | Responsabilidade                        |
+| ---------- | -------------------------------------------------- | --------------------------------------- |
+| Backend    | `http://localhost:3000`                            | API NestJS.                             |
+| Métricas   | `http://localhost:3000/metrics`                    | Métricas expostas pelo Backend.         |
+| PostgreSQL | `localhost:5432`                                   | Banco de dados de desenvolvimento.      |
+| Adminer    | `http://localhost:8080`                            | Interface web para inspecionar o banco. |
+| Prometheus | `http://localhost:9090`                            | Coleta e consulta das métricas.         |
+| Grafana    | `http://localhost:3001/d/alibe-backend-monitoring` | Dashboard de monitoramento do Backend.  |
 
 No Adminer, use `alibe-db` como servidor quando estiver acessando o PostgreSQL criado pelo Compose.
 
@@ -159,12 +163,33 @@ docker compose down
 
 # Recriar os serviços depois de alterar dependências ou o Dockerfile
 docker compose up --build
-
-# Remover containers e também os dados locais do PostgreSQL
-docker compose down --volumes
 ```
 
-O último comando apaga o volume local do banco. Use-o somente quando a perda dos dados de desenvolvimento for intencional.
+Não utilize `docker compose down -v` ou `docker compose down --volumes` na rotina do projeto. Esses comandos apagam os dados locais do PostgreSQL, o histórico do Prometheus e o estado do Grafana.
+
+## Observabilidade local
+
+Com o Docker Compose em execução, acesse:
+
+- métricas brutas do Backend: <http://localhost:3000/metrics>;
+- Prometheus: <http://localhost:9090>;
+- página inicial do Grafana: <http://localhost:3001>;
+- dashboard direto: <http://localhost:3001/d/alibe-backend-monitoring>.
+
+No primeiro acesso local, use:
+
+```text
+Usuário: admin
+Senha: admin
+```
+
+O Grafana solicitará a definição de uma nova senha. Para navegar manualmente, abra **Dashboards > Browse > Alibe > Alibe Backend Monitoring**. O indicador **Recent dashboards** pode mostrar zero antes que o dashboard seja aberto pela primeira vez.
+
+O trecho `/d/` da URL é uma rota interna do Grafana que significa “dashboard”. O valor seguinte, `alibe-backend-monitoring`, é o UID versionado do dashboard, não uma pasta do projeto.
+
+O dashboard apresenta total e quantidade de requisições ao longo do tempo, total de erros, gráfico temporal da taxa de erros, latência p95, CPU, heap, event loop lag e uptime. Enquanto nenhum endpoint real tiver produzido erro, os painéis de erro mostram zero.
+
+A estrutura dos arquivos, a persistência dos volumes e o processo de exportação do dashboard estão documentados em [`grafana/README.md`](grafana/README.md).
 
 ## Executando a API localmente
 
@@ -245,6 +270,10 @@ PORT=3100 npm run start:dev
 | `src/modules/<módulo>/persistence/`    | Implementa os repositories daquele módulo usando o `PrismaService`.                    |
 
 O `PrismaService` é compartilhado porque representa uma conexão técnica com o banco. Já cada repository permanece no seu módulo porque traduz dados para o domínio específico daquele módulo.
+
+No Prisma 7, a conexão PostgreSQL em tempo de execução utiliza o driver oficial
+`@prisma/adapter-pg`. A `DATABASE_URL` permanece centralizada no ambiente e no
+`prisma.config.ts`; o `schema.prisma` define apenas o provider do banco.
 
 ### Comandos do Prisma
 
