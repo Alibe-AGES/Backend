@@ -8,7 +8,8 @@ services:
       target: build
 
     depends_on:
-      - alibe-db
+      alibe-db:
+        condition: service_healthy
 
     env_file:
       - .env
@@ -25,7 +26,7 @@ services:
       - '${APP_PORT}:${APP_PORT}'
       - '5555:5555'
 
-    command: npm run start:dev
+    command: sh -c "npm run prisma:generate && npx prisma migrate deploy && exec npm run start:dev"
 
   alibe-db:
     container_name: alibe-db
@@ -37,6 +38,13 @@ services:
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
       PGDATA: /var/lib/postgresql/data/pgdata
+
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
     ports:
       - '5432:5432'
