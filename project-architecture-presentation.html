@@ -1480,11 +1480,15 @@ git push -u origin 123
 
         <h2>Validação automática antes do merge</h2>
         <div class="ci-layout">
-          <img
-            class="ci-image"
-            src="docs/diagrams/ci.svg"
-            alt="Diagrama da integração contínua do Backend"
-          />
+          <div class="panel">
+            <h3>Fluxo da CI</h3>
+            <div class="compact-code">
+              PR ou push<br />
+              → qualidade, testes e build<br />
+              → análise do Sonar<br />
+              → checks concluídos
+            </div>
+          </div>
           <div class="panel">
             <ol class="compact-list">
               <li>Abrir PR para <strong>develop</strong>.</li>

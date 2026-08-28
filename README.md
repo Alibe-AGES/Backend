@@ -22,7 +22,6 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 - [Integração contínua](#integração-contínua)
 - [Checklist antes de abrir um Pull Request](#checklist-antes-de-abrir-um-pull-request)
 - [Referências](#referências)
-- [Entrega contínua planejada](#entrega-contínua-planejada)
 
 ## Tecnologias
 
@@ -402,16 +401,6 @@ Backend/
 │   ├── pull_request_template.md
 │   └── workflows/
 │       └── pr-validation.yml
-├── docs/
-│   ├── architecture/
-│   │   └── deployment.md
-│   └── diagrams/
-│       ├── cd.drawio
-│       ├── cd.svg
-│       ├── ci.drawio
-│       ├── ci.svg
-│       ├── push-notifications.drawio
-│       └── push-notifications.svg
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/                 # Criada quando existirem migrations
@@ -1102,18 +1091,12 @@ O workflow `.github/workflows/pr-validation.yml` executa CI em:
 
 Os jobs de qualidade, testes e build podem executar em paralelo. O Sonar só inicia depois que os três terminam com sucesso.
 
-![Diagrama da integração contínua do Backend](docs/diagrams/ci.svg)
-
-A versão SVG é adequada para visualização no GitHub e pode ser reutilizada posteriormente na Wiki.
-
-O arquivo editável do diagrama está em [`docs/diagrams/ci.drawio`](docs/diagrams/ci.drawio).
-
-Para editá-lo:
-
-1. Acesse [diagrams.net](https://app.diagrams.net/).
-2. Escolha **File > Open From > Device**.
-3. Selecione `docs/diagrams/ci.drawio`.
-4. Edite e salve novamente no mesmo formato.
+```text
+PR ou push em develop/main
+    → qualidade, testes e build
+    → análise do Sonar
+    → checks concluídos
+```
 
 O workflow atual implementa somente CI. Ele valida o código, mas não publica ou implanta a aplicação.
 
@@ -1196,23 +1179,3 @@ O Sonar recebe os relatórios LCOV produzidos pelos testes unitários, de integr
 - [Documentação do Prisma](https://www.prisma.io/docs)
 - [Docker Compose](https://docs.docker.com/compose/)
 - [GitHub Actions](https://docs.github.com/actions)
-
-## Entrega contínua planejada
-
-> [!WARNING]
-> **EM DESENVOLVIMENTO:** esta arquitetura ainda está sendo definida. Os diagramas representam uma proposta inicial e não significam que a infraestrutura ou o CD já estejam configurados na AWS.
-
-O CD ainda não está implementado. O desenho abaixo é uma proposta de arquitetura-alvo para orientar a criação da infraestrutura e do futuro workflow, sem representar recursos AWS já existentes.
-
-![Arquitetura-alvo de CD e infraestrutura AWS](docs/diagrams/cd.svg)
-
-Arquivos editáveis no diagrams.net:
-
-- [`docs/diagrams/cd.drawio`](docs/diagrams/cd.drawio)
-- [`docs/diagrams/push-notifications.drawio`](docs/diagrams/push-notifications.drawio)
-
-O fluxo de notificações proposto também está disponível para visualização:
-
-![Fluxo assíncrono de notificações push](docs/diagrams/push-notifications.svg)
-
-A proposta simples e a responsabilidade de cada componente estão explicadas em [`docs/architecture/deployment.md`](docs/architecture/deployment.md). A documentação pode ser reutilizada posteriormente na Wiki do projeto.
