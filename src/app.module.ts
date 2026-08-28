@@ -3,9 +3,10 @@ import { APP_PIPE } from '@nestjs/core';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { ExampleModule } from './modules/example/example.module';
 import { MonitoringModule } from './infrastructure/monitoring/monitoring.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
-  imports: [ExampleModule, MonitoringModule],
+  imports: [ExampleModule, MonitoringModule, UsersModule],
   providers: [
     {
       provide: APP_PIPE,

@@ -140,20 +140,92 @@ Resposta esperada:
 }
 ```
 
-### Comandos úteis do Docker Compose
+### Operação e diagnóstico dos containers
+
+Antes de investigar um problema, confira quais serviços estão em execução:
 
 ```bash
-# Ver os logs do Backend
-docker compose logs -f backend
+docker compose ps
+```
 
-# Parar os containers preservando o volume do banco
+#### Ver os logs da aplicação
+
+```bash
+# Mostrar as 100 linhas mais recentes do Backend
+docker compose logs --tail=100 backend
+
+# Acompanhar os novos logs do Backend em tempo real
+docker compose logs -f --tail=100 backend
+
+# Acompanhar os logs de todos os serviços
+docker compose logs -f --tail=100
+```
+
+Use `Ctrl+C` para sair do acompanhamento. Isso não encerra os containers.
+
+Para investigar especificamente o banco, o Prometheus ou o Grafana, troque o nome do serviço:
+
+```bash
+docker compose logs -f --tail=100 alibe-db
+docker compose logs -f --tail=100 prometheus
+docker compose logs -f --tail=100 grafana
+```
+
+#### Entrar no container do Backend
+
+```bash
+docker compose exec backend sh
+```
+
+O terminal aberto está dentro do container. Alguns comandos úteis são `pwd`, `ls` e
+`npm run test`. Para voltar ao terminal do computador, execute:
+
+```bash
+exit
+```
+
+#### Entrar no PostgreSQL pelo terminal
+
+Com o serviço `alibe-db` em execução:
+
+```bash
+docker compose exec alibe-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+O comando usa o usuário e o banco configurados no próprio container. Dentro do `psql`, os
+comandos mais úteis para uma inspeção rápida são:
+
+```text
+\conninfo              mostra a conexão atual
+\dt                    lista as tabelas
+\d nome_da_tabela      descreve uma tabela
+SELECT * FROM nome_da_tabela;
+\q                     sai do PostgreSQL
+```
+
+O ponto e vírgula é obrigatório nas consultas SQL, mas não nos comandos iniciados por `\`.
+Para uma interface visual, utilize o Adminer em <http://localhost:8080> e informe
+`alibe-db` no campo de servidor.
+
+#### Reiniciar ou parar os serviços
+
+```bash
+# Reiniciar somente o Backend
+docker compose restart backend
+
+# Parar os containers preservando os volumes e os dados
 docker compose down
 
 # Recriar os serviços depois de alterar dependências ou o Dockerfile
 docker compose up --build
 ```
 
-Não utilize `docker compose down -v` ou `docker compose down --volumes` na rotina do projeto. Esses comandos apagam os dados locais do PostgreSQL, o histórico do Prometheus e o estado do Grafana.
+Se `docker compose exec` informar que o serviço não está em execução, inicie o ambiente com
+`docker compose up -d` e tente novamente.
+
+Não utilize `docker compose down -v` ou `docker compose down --volumes` na rotina do projeto.
+Esses comandos apagam os dados locais do PostgreSQL, o histórico do Prometheus e o estado do
+Grafana.
 
 ## URLs importantes
 
