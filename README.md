@@ -126,6 +126,26 @@ Para executar em segundo plano:
 docker compose up --build -d
 ```
 
+Ao iniciar o ambiente pelo Docker Compose, o Backend aguarda o PostgreSQL ficar saudável e
+executa automaticamente:
+
+```text
+prisma generate
+        ↓
+prisma migrate deploy
+        ↓
+nest start --watch
+```
+
+`prisma generate` sincroniza o cliente tipado dentro do container. `prisma migrate deploy`
+aplica somente as migrations versionadas que ainda estiverem pendentes; ele não cria uma nova
+migration e não reaplica migrations concluídas.
+
+Assim, quem apenas clona ou atualiza o projeto precisa somente executar
+`docker compose up --build`. Quem altera o `schema.prisma` continua responsável por criar uma
+nova migration com `prisma migrate dev`, validar o SQL gerado e versionar a pasta criada em
+`prisma/migrations/` junto com o código correspondente.
+
 ### 3. Testar a API
 
 ```bash
@@ -275,7 +295,11 @@ npm run prisma:generate
 
 Esse comando lê o `prisma/schema.prisma` e gera o cliente TypeScript tipado em `generated/prisma`.
 
-> **Importante:** `prisma generate` não precisa que o PostgreSQL esteja rodando, não cria o banco, não cria tabelas e não executa migrations. Execute-o depois de `npm ci` e sempre que o `schema.prisma` mudar. O banco é criado pelo PostgreSQL/Docker; as tabelas são criadas ou alteradas por migrations.
+> **Importante:** `prisma generate` não precisa que o PostgreSQL esteja rodando, não cria o banco,
+> não cria tabelas e não executa migrations. Execute-o depois de `npm ci` e sempre que o
+> `schema.prisma` mudar ao trabalhar diretamente no computador. Na execução pelo Docker Compose,
+> esse comando e o `prisma migrate deploy` são executados automaticamente antes da API. O banco é
+> criado pelo PostgreSQL/Docker; as tabelas são criadas ou alteradas por migrations.
 
 Fluxo correto quando alguém adicionar ou alterar um model:
 
