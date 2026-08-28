@@ -1147,10 +1147,21 @@ A URL esperada pela organização atual deve ser confirmada no próprio GitLab a
 2. Confirme que não existem commits importantes somente no GitLab.
 3. Altere `GITLAB_MIRROR_ENABLED` para `true`.
 4. Acesse **Actions > Mirror Backend to AGES GitLab > Run workflow**.
-5. Verifique o log do job e confirme no GitLab se o SHA da `main` coincide com o GitHub.
-6. Depois do teste, mantenha `true` para espelhar automaticamente cada novo push em `main`, ou retorne para `false` para pausar.
+5. Na primeira tentativa, mantenha **force_initial_sync** desmarcado.
+6. Verifique o log do job e confirme no GitLab se o SHA da `main` coincide com o GitHub.
+7. Depois do teste, mantenha `true` para espelhar automaticamente cada novo push em `main`, ou retorne para `false` para pausar.
 
-Diferentemente do workflow atual do Frontend, esta configuração inicial não utiliza `git push --force`. Se os históricos forem incompatíveis, o job falhará sem sobrescrever o GitLab. A decisão de alinhar históricos ou habilitar force push deve ser feita conscientemente por um arquiteto depois de revisar o repositório remoto.
+Se a primeira tentativa falhar com `fetch first` ou `non-fast-forward`, os históricos são diferentes. Depois de confirmar que os commits exclusivos do GitLab podem ser descartados:
+
+1. No GitLab, habilite temporariamente force push para a regra da branch `main`.
+2. No GitHub, abra **Actions > Mirror Backend to AGES GitLab > Run workflow**.
+3. Marque **force_initial_sync** e execute o workflow.
+4. Confirme que a `main` possui o mesmo SHA nas duas plataformas.
+5. Desabilite novamente o force push da `main` no GitLab.
+
+A opção manual usa `--force-with-lease` com o SHA obtido imediatamente antes do envio. Se outra alteração chegar ao GitLab nesse intervalo, a operação é recusada em vez de sobrescrevê-la. Pushes automáticos nunca usam force.
+
+O workflow executa `git fetch` para conhecer o estado remoto, mas não executa `git pull`. Como o GitHub é a fonte oficial, trazer e mesclar commits do GitLab durante o espelhamento criaria históricos diferentes.
 
 Esse espelhamento apenas replica código-fonte. Ele não publica imagem, não faz deploy e não representa CD.
 

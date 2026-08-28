@@ -4,6 +4,12 @@ on:
   push:
     branches: ['main']
   workflow_dispatch:
+    inputs:
+      force_initial_sync:
+        description: 'Sobrescrever a main do GitLab uma única vez após revisar os commits remotos'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -50,11 +56,25 @@ jobs:
             *) echo "GITLAB_REPOSITORY_URL must use HTTPS."; exit 1 ;;
           esac
 
-      - name: Push main to GitLab
+      - name: Configure and fetch GitLab remote
         env:
           GITLAB_USERNAME: ${{ secrets.GITLAB_USERNAME }}
           GITLAB_PASSWORD: ${{ secrets.GITLAB_PASSWORD }}
         run: |
           repository_path="${GITLAB_REPOSITORY_URL#https://}"
           authenticated_url="https://${GITLAB_USERNAME}:${GITLAB_PASSWORD}@${repository_path}"
-          git push "$authenticated_url" main:main
+          git remote add gitlab "$authenticated_url"
+          git fetch gitlab main
+
+      - name: Run one-time initial synchronization
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.force_initial_sync == true }}
+        run: |
+          expected_sha="$(git rev-parse refs/remotes/gitlab/main)"
+          git push \
+            --force-with-lease="refs/heads/main:${expected_sha}" \
+            gitlab \
+            main:main
+
+      - name: Run regular synchronization
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.force_initial_sync != true }}
+        run: git push gitlab main:main
