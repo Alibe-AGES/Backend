@@ -348,26 +348,29 @@ Seeds devem ficar em `prisma/seed.ts` quando forem implementados. O seed deve se
 
 ## Scripts disponíveis
 
-| Comando                    | Responsabilidade                                                             |
-| -------------------------- | ---------------------------------------------------------------------------- |
-| `npm run start`            | Inicia a aplicação uma vez em modo normal.                                   |
-| `npm run start:dev`        | Inicia em modo watch e reinicia após alterações.                             |
-| `npm run start:debug`      | Inicia em modo watch com suporte ao debugger.                                |
-| `npm run build`            | Compila o projeto para `dist/`.                                              |
-| `npm run start:prod`       | Executa o build compilado em `dist/src/main.js`.                             |
-| `npm run prisma:generate`  | Gera o Prisma Client.                                                        |
-| `npm run format`           | Formata os arquivos com Prettier.                                            |
-| `npm run format:check`     | Verifica a formatação sem alterar arquivos.                                  |
-| `npm run lint`             | Verifica o código TypeScript com ESLint.                                     |
-| `npm run lint:fix`         | Corrige automaticamente problemas permitidos pelo ESLint.                    |
-| `npm run typecheck`        | Verifica os tipos sem gerar build.                                           |
-| `npm run test`             | Executa os testes unitários.                                                 |
-| `npm run test:unit`        | Executa explicitamente os testes unitários.                                  |
-| `npm run test:watch`       | Executa unitários em modo watch.                                             |
-| `npm run test:integration` | Executa testes de integração.                                                |
-| `npm run test:e2e`         | Executa testes ponta a ponta.                                                |
-| `npm run test:cov`         | Executa os unitários e gera `coverage/lcov.info` para o Sonar.               |
-| `npm run validate`         | Executa geração do Prisma, formatação, lint, tipos, todos os testes e build. |
+| Comando                        | Responsabilidade                                                             |
+| ------------------------------ | ---------------------------------------------------------------------------- |
+| `npm run start`                | Inicia a aplicação uma vez em modo normal.                                   |
+| `npm run start:dev`            | Inicia em modo watch e reinicia após alterações.                             |
+| `npm run start:debug`          | Inicia em modo watch com suporte ao debugger.                                |
+| `npm run build`                | Compila o projeto para `dist/`.                                              |
+| `npm run start:prod`           | Executa o build compilado em `dist/src/main.js`.                             |
+| `npm run prisma:generate`      | Gera o Prisma Client.                                                        |
+| `npm run format`               | Formata os arquivos com Prettier.                                            |
+| `npm run format:check`         | Verifica a formatação sem alterar arquivos.                                  |
+| `npm run lint`                 | Verifica o código TypeScript com ESLint.                                     |
+| `npm run lint:fix`             | Corrige automaticamente problemas permitidos pelo ESLint.                    |
+| `npm run typecheck`            | Verifica os tipos sem gerar build.                                           |
+| `npm run test`                 | Executa os testes unitários.                                                 |
+| `npm run test:unit`            | Executa explicitamente os testes unitários.                                  |
+| `npm run test:watch`           | Executa unitários em modo watch.                                             |
+| `npm run test:integration`     | Executa testes de integração.                                                |
+| `npm run test:e2e`             | Executa testes ponta a ponta.                                                |
+| `npm run test:cov`             | Executa unitários, integração e E2E com coverage para o Sonar.               |
+| `npm run test:cov:unit`        | Executa unitários e gera `coverage/unit/lcov.info`.                          |
+| `npm run test:cov:integration` | Executa integração e gera `coverage/integration/lcov.info`.                  |
+| `npm run test:cov:e2e`         | Executa E2E e gera `coverage/e2e/lcov.info`.                                 |
+| `npm run validate`             | Executa geração do Prisma, formatação, lint, tipos, todos os testes e build. |
 
 Antes de abrir um Pull Request, execute:
 
@@ -1086,9 +1089,9 @@ Não é obrigatório repetir todas as condições em todos os níveis. O unitár
 npm run test:cov
 ```
 
-O Jest mede quais linhas de `src/` foram executadas e gera o relatório em `coverage/`, incluindo `coverage/lcov.info`. A localização dos testes em `test/` não impede a medição do código-fonte.
+O Jest mede quais linhas de `src/` foram executadas e gera relatórios LCOV separados em `coverage/unit/`, `coverage/integration/` e `coverage/e2e/`. A localização dos testes em `test/` não impede a medição do código-fonte.
 
-Atualmente o relatório enviado ao Sonar é gerado pelos testes unitários. Integração e E2E são executados separadamente pela pipeline e precisam passar, mas não entram no cálculo atual do LCOV.
+O Sonar combina os três relatórios. Assim, código exercitado apenas por integração ou E2E — como controllers e configuração HTTP — também entra no cálculo. Arquivos puramente declarativos (`main.ts`, `*.module.ts` e `*.dto.ts`) ficam fora da métrica de coverage, mas continuam sendo analisados pelas demais regras de qualidade.
 
 ## Integração contínua
 
@@ -1172,7 +1175,7 @@ Esse espelhamento apenas replica código-fonte. Ele não publica imagem, não fa
 
 O job do Sonar utiliza o secret `SONAR_TOKEN` configurado no GitHub. Tokens nunca devem ser colocados no workflow, no README ou no repositório.
 
-O Sonar recebe o relatório `coverage/lcov.info` produzido pelo Jest e usa `sonar-project.properties` para identificar código-fonte e testes.
+O Sonar recebe os relatórios LCOV produzidos pelos testes unitários, de integração e E2E e usa `sonar-project.properties` para identificar código-fonte, testes e exclusões justificadas de coverage.
 
 ## Checklist antes de abrir um Pull Request
 

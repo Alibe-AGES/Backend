@@ -79,13 +79,13 @@ jobs:
         run: npm run prisma:generate
 
       - name: Run unit tests with coverage
-        run: npm run test:cov
+        run: npm run test:cov:unit
 
-      - name: Run integration tests
-        run: npm run test:integration
+      - name: Run integration tests with coverage
+        run: npm run test:cov:integration
 
-      - name: Run E2E tests
-        run: npm run test:e2e
+      - name: Run E2E tests with coverage
+        run: npm run test:cov:e2e
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

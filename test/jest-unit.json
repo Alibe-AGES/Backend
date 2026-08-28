@@ -7,5 +7,6 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "collectCoverageFrom": ["src/**/*.ts"],
-  "coverageDirectory": "<rootDir>/coverage"
+  "coverageDirectory": "<rootDir>/coverage/unit",
+  "coveragePathIgnorePatterns": ["<rootDir>/src/main.ts", "\\.module\\.ts$", "\\.dto\\.ts$"]
 }

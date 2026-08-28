@@ -5,5 +5,7 @@
   "testMatch": ["<rootDir>/test/e2e/**/*.e2e-spec.ts"],
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "coverageDirectory": "<rootDir>/coverage/e2e",
+  "coveragePathIgnorePatterns": ["<rootDir>/src/main.ts", "\\.module\\.ts$", "\\.dto\\.ts$"]
 }
