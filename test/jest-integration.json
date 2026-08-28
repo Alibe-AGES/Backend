@@ -2,10 +2,10 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": "..",
   "testEnvironment": "node",
-  "testMatch": ["<rootDir>/test/e2e/**/*.e2e-spec.ts"],
+  "testMatch": ["<rootDir>/test/integration/**/*.integration-spec.ts"],
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
-  "coverageDirectory": "<rootDir>/coverage/e2e",
+  "coverageDirectory": "<rootDir>/coverage/integration",
   "coveragePathIgnorePatterns": ["<rootDir>/src/main.ts", "\\.module\\.ts$", "\\.dto\\.ts$"]
 }

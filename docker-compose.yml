@@ -1,0 +1,86 @@
+services:
+  backend:
+    container_name: alibe-backend
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+
+    depends_on:
+      - alibe-db
+
+    env_file:
+      - .env
+
+    environment:
+      PORT: ${APP_PORT}
+
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/generated
+
+    ports:
+      - '${APP_PORT}:${APP_PORT}'
+      - '5555:5555'
+
+    command: npm run start:dev
+
+  alibe-db:
+    container_name: alibe-db
+
+    image: postgres:17
+
+    environment:
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    ports:
+      - '5432:5432'
+
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  adminer:
+    container_name: alibe-adminer
+
+    image: adminer
+
+    ports:
+      - '8080:8080'
+
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    container_name: alibe-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:13.2.0
+    container_name: alibe-grafana
+    environment:
+      GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+    ports:
+      - '3001:3000'
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+volumes:
+  db-data:
+  prometheus-data:
+  grafana-data:

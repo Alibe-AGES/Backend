@@ -1,0 +1,1604 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alibe — Project Architecture</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: #111827;
+        --panel-2: #1f2937;
+        --accent: #60a5fa;
+        --accent-2: #a78bfa;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --success: #34d399;
+        --warning: #fbbf24;
+        --danger: #f87171;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: linear-gradient(135deg, var(--bg), #111827 40%, #0f172a);
+        color: var(--text);
+        font-family: Inter, 'Segoe UI', Arial, sans-serif;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .deck {
+        position: relative;
+        width: min(1200px, 94vw);
+        height: min(720px, 88vh);
+        background: rgba(17, 24, 39, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 22px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+        overflow: hidden;
+      }
+
+      .slide {
+        display: none;
+        width: 100%;
+        height: 100%;
+        padding: 56px 72px 36px;
+        position: relative;
+      }
+
+      .slide.active {
+        display: block;
+      }
+
+      .slide-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        color: var(--muted);
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 8px 12px;
+        border: 1px solid rgba(96, 165, 250, 0.45);
+        border-radius: 999px;
+        background: rgba(96, 165, 250, 0.08);
+        color: var(--accent);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0 0 18px;
+        line-height: 1.1;
+      }
+
+      h1 {
+        font-size: clamp(2.5rem, 3vw, 4rem);
+      }
+
+      h2 {
+        font-size: clamp(2rem, 2.3vw, 3rem);
+      }
+
+      h3 {
+        font-size: clamp(1.2rem, 1.5vw, 1.8rem);
+        color: var(--accent);
+      }
+
+      p,
+      li {
+        font-size: 1.04rem;
+        line-height: 1.7;
+        color: var(--text);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+
+      .hero {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        height: 100%;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 28px;
+        align-items: center;
+      }
+
+      .panel {
+        background: rgba(31, 41, 55, 0.82);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 18px;
+        padding: 22px 24px;
+      }
+
+      .code {
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 0.9rem;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 12px;
+        padding: 18px 20px;
+        white-space: pre-wrap;
+        text-align: left;
+        color: #dbeafe;
+      }
+
+      pre.code {
+        margin: 0;
+      }
+
+      .code-lines {
+        white-space: normal;
+      }
+
+      .code-lines > div + div {
+        margin-top: 5px;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+      }
+
+      .stack-list {
+        list-style: none;
+        padding: 0;
+      }
+
+      .stack-list li {
+        background: rgba(31, 41, 55, 0.8);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+      }
+
+      .legend {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+      }
+
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(17, 24, 39, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .dot.blue {
+        background: var(--accent);
+      }
+      .dot.purple {
+        background: var(--accent-2);
+      }
+      .dot.green {
+        background: var(--success);
+      }
+      .dot.orange {
+        background: var(--warning);
+      }
+
+      .footer {
+        position: absolute;
+        left: 72px;
+        right: 350px;
+        bottom: 28px;
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 18px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .footer span:last-child {
+        white-space: nowrap;
+      }
+
+      .controls {
+        position: absolute;
+        right: 22px;
+        bottom: 18px;
+        display: flex;
+        gap: 10px;
+        z-index: 20;
+      }
+
+      button {
+        background: rgba(148, 163, 184, 0.12);
+        color: var(--text);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 12px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      button:hover {
+        background: rgba(148, 163, 184, 0.18);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 14px;
+        font-size: 0.96rem;
+      }
+
+      th,
+      td {
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        padding: 12px 14px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: rgba(96, 165, 250, 0.08);
+        color: var(--accent);
+      }
+
+      .mini {
+        font-size: 0.96rem;
+        color: var(--muted);
+      }
+
+      .repo-grid,
+      .tech-grid,
+      .future-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+
+      .repo-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .repo-card,
+      .tech-card,
+      .future-card {
+        background: rgba(31, 41, 55, 0.82);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 16px;
+        padding: 18px 20px;
+      }
+
+      .repo-card strong,
+      .tech-card strong,
+      .future-card strong {
+        display: block;
+        color: var(--accent);
+        font-size: 1.05rem;
+        margin-bottom: 8px;
+      }
+
+      .repo-card p,
+      .tech-card p,
+      .future-card p {
+        margin: 0;
+        font-size: 0.98rem;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+
+      .callout {
+        margin-top: 18px;
+        padding: 14px 18px;
+        border-left: 4px solid var(--accent);
+        border-radius: 10px;
+        background: rgba(96, 165, 250, 0.08);
+        color: var(--text);
+      }
+
+      .callout.warning {
+        border-left-color: var(--warning);
+        background: rgba(251, 191, 36, 0.08);
+      }
+
+      .callout p {
+        margin: 0;
+        font-size: 0.98rem;
+        line-height: 1.5;
+      }
+
+      .workflow {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 22px;
+        align-items: stretch;
+        margin: 26px 0 16px;
+      }
+
+      .workflow-step {
+        position: relative;
+        min-height: 105px;
+        border: 1px solid rgba(96, 165, 250, 0.32);
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.82);
+        padding: 14px 10px;
+        text-align: center;
+      }
+
+      .workflow-step:not(:last-child)::after {
+        content: '→';
+        position: absolute;
+        right: -20px;
+        top: 42px;
+        color: var(--accent);
+        font-size: 1.35rem;
+        font-weight: 800;
+      }
+
+      .workflow-step b {
+        display: block;
+        color: var(--accent);
+        margin-bottom: 7px;
+        font-size: 0.93rem;
+      }
+
+      .workflow-step span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.35;
+      }
+
+      .release-flow {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 30px;
+        margin: 0 120px 18px;
+      }
+
+      .release-step {
+        position: relative;
+        min-height: 66px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 12px;
+        border-radius: 13px;
+        border: 1px solid rgba(52, 211, 153, 0.42);
+        background: rgba(52, 211, 153, 0.08);
+        text-align: center;
+      }
+
+      .release-step:not(:last-child)::after {
+        content: '→';
+        position: absolute;
+        right: -22px;
+        color: var(--success);
+        font-size: 1.25rem;
+        font-weight: 800;
+      }
+
+      .release-step b {
+        color: var(--success);
+        font-size: 0.88rem;
+      }
+
+      .release-step span {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.25;
+      }
+
+      .compact-list li {
+        font-size: 0.97rem;
+        line-height: 1.5;
+        margin-bottom: 5px;
+      }
+
+      .compact-code {
+        font-size: 0.84rem;
+        line-height: 1.5;
+        padding: 14px 16px;
+      }
+
+      .architecture-flow {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 42px;
+        margin: 32px 0 28px;
+      }
+
+      .architecture-node {
+        position: relative;
+        padding: 18px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(167, 139, 250, 0.45);
+        background: rgba(167, 139, 250, 0.08);
+        text-align: center;
+        font-size: 0.91rem;
+        font-weight: 700;
+      }
+
+      .architecture-node:not(:last-child)::after {
+        content: '→';
+        position: absolute;
+        right: -30px;
+        color: var(--accent-2);
+        font-size: 1.4rem;
+      }
+
+      .architecture-flow.five-nodes {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 30px;
+      }
+
+      .architecture-flow.five-nodes .architecture-node:not(:last-child)::after {
+        right: -23px;
+      }
+
+      .folder-window {
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 14px;
+        overflow: hidden;
+        background: #0f172a;
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.25);
+      }
+
+      .folder-window-bar {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        height: 34px;
+        padding: 0 13px;
+        background: #1f2937;
+      }
+
+      .window-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }
+
+      .folder-tree {
+        margin: 0;
+        padding: 15px 20px 17px;
+        font:
+          0.73rem/1.38 'SFMono-Regular',
+          Consolas,
+          monospace;
+        color: #dbeafe;
+        white-space: pre;
+      }
+
+      .folder-tree .folder {
+        color: #60a5fa;
+        font-weight: 700;
+      }
+
+      .folder-tree .file {
+        color: #c4b5fd;
+      }
+
+      .compact-table {
+        font-size: 0.82rem;
+      }
+
+      .compact-table th,
+      .compact-table td {
+        padding: 9px 10px;
+      }
+
+      .ci-layout {
+        display: grid;
+        grid-template-columns: 1.45fr 0.75fr;
+        gap: 20px;
+        align-items: center;
+      }
+
+      .ci-image {
+        width: 100%;
+        height: 350px;
+        object-fit: contain;
+        border-radius: 14px;
+        background: #05070d;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      .status-flag {
+        display: inline-block;
+        margin-bottom: 12px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(251, 191, 36, 0.45);
+        background: rgba(251, 191, 36, 0.1);
+        color: var(--warning);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .command-line {
+        color: var(--success);
+      }
+
+      .global-counter {
+        min-width: 62px;
+        text-align: center;
+        padding: 10px 12px;
+        border-radius: 12px;
+        color: var(--muted);
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+
+      @media (max-width: 900px) {
+        .deck {
+          height: auto;
+          min-height: 100vh;
+          border-radius: 0;
+          width: 100vw;
+        }
+
+        .slide {
+          padding: 40px 32px 70px;
+        }
+
+        .hero-grid,
+        .two-col,
+        .repo-grid,
+        .tech-grid,
+        .future-grid,
+        .ci-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .workflow,
+        .release-flow,
+        .architecture-flow {
+          grid-template-columns: 1fr;
+        }
+
+        .workflow-step:not(:last-child)::after,
+        .release-step:not(:last-child)::after,
+        .architecture-node:not(:last-child)::after {
+          display: none;
+        }
+
+        .footer {
+          left: 32px;
+          right: 32px;
+          bottom: 76px;
+          justify-content: space-between;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="deck">
+      <section class="slide active">
+        <div class="slide-header">
+          <span>Alibe — Padrões do projeto</span>
+          <span class="badge">Visão geral</span>
+        </div>
+
+        <div class="hero">
+          <div>
+            <h1>Como organizamos o desenvolvimento</h1>
+            <p>
+              Repositórios separados, trabalho rastreável por task e alterações revisadas antes de
+              chegar às branches compartilhadas.
+            </p>
+
+            <div class="repo-grid">
+              <div class="repo-card">
+                <strong>Frontend</strong>
+                <p>
+                  Aplicação mobile em repositório próprio, com pipeline e histórico independentes.
+                </p>
+              </div>
+              <div class="repo-card">
+                <strong>Backend</strong>
+                <p>
+                  API e persistência em repositório próprio, com validações específicas do servidor.
+                </p>
+              </div>
+            </div>
+
+            <div class="callout">
+              <p>
+                <strong>GitHub e GitLab:</strong> as mesmas regras de branch, revisão e
+                rastreabilidade devem ser respeitadas nas duas plataformas.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Padrões 1/5</span>
+          <span>Organização dos repositórios</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe — Padrões do projeto</span>
+          <span class="badge">Branches e commits</span>
+        </div>
+
+        <h2>Uma task deve ser fácil de rastrear</h2>
+        <div class="two-col">
+          <div class="panel">
+            <h3>Nomenclatura obrigatória</h3>
+            <div class="code code-lines">
+              <div><strong>Nome da branch:</strong> <span class="command-line">TASKID</span></div>
+              <div>
+                <strong>Nome da MR/PR:</strong>
+                <span class="command-line">TASKID- Nome_da_Task</span>
+              </div>
+            </div>
+            <ul class="compact-list">
+              <li>A branch contém somente o ID da task.</li>
+              <li>A MR/PR combina o ID com o nome da task.</li>
+              <li>
+                A branch nasce de <strong>develop</strong> e a MR/PR retorna para
+                <strong>develop</strong>.
+              </li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Conventional Commits</h3>
+            <div class="code compact-code code-lines">
+              <div><span class="command-line">feat:</span> adiciona criação de grupo</div>
+              <div><span class="command-line">fix:</span> corrige validação de login</div>
+              <div><span class="command-line">chore:</span> configura pipeline</div>
+            </div>
+            <ul class="compact-list">
+              <li><strong>feat</strong>: nova funcionalidade.</li>
+              <li><strong>fix</strong>: correção de bug.</li>
+              <li><strong>chore</strong>: configuração ou manutenção.</li>
+              <li>Referenciar a task quando ajudar na rastreabilidade.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Padrões 2/5</span>
+          <span>Branch + commit</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe — Padrões do projeto</span>
+          <span class="badge">MR / PR e review</span>
+        </div>
+
+        <h2>Da task à entrega da sprint</h2>
+        <div class="workflow">
+          <div class="workflow-step">
+            <b>1. Task</b><span>Entender escopo e critérios de aceite</span>
+          </div>
+          <div class="workflow-step">
+            <b>2. Branch</b><span>Nome: TASKID<br />Criada da develop</span>
+          </div>
+          <div class="workflow-step">
+            <b>3. Commits</b><span>feat, fix ou chore com mensagens claras</span>
+          </div>
+          <div class="workflow-step">
+            <b>4. MR / PR</b><span>Nome: TASKID- Nome_da_Task<br />Destino: develop</span>
+          </div>
+          <div class="workflow-step">
+            <b>5. Reviewer</b><span>Selecionar integrante AGES III</span>
+          </div>
+          <div class="workflow-step">
+            <b>6. Checks</b><span>CI e validações obrigatórias aprovadas</span>
+          </div>
+          <div class="workflow-step"><b>7. Merge</b><span>Merge autorizado na develop</span></div>
+        </div>
+
+        <div class="release-flow" aria-label="Fluxo de encerramento da sprint">
+          <div class="release-step"><b>Fim da sprint</b><span>develop estabilizada</span></div>
+          <div class="release-step"><b>PR de release</b><span>develop → main</span></div>
+          <div class="release-step"><b>Review + CI</b><span>aprovação e checks</span></div>
+          <div class="release-step"><b>Merge na main</b><span>versão da entrega</span></div>
+        </div>
+
+        <div class="repo-grid">
+          <div class="callout">
+            <p>
+              <strong>Template obrigatório:</strong> explicar task, o que foi feito, como foi feito
+              e como testar. A padronização entre repositórios está em andamento.
+            </p>
+          </div>
+          <div class="callout warning">
+            <p>
+              <strong>Frontend visual:</strong> toda alteração de tela ou componente deve incluir um
+              print na MR/PR.
+            </p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Padrões 3/5</span>
+          <span>Task → develop → main</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe — Padrões do projeto</span>
+          <span class="badge">Descrição da MR / PR</span>
+        </div>
+
+        <h2>Como descrever uma MR/PR</h2>
+        <div class="two-col">
+          <div class="panel">
+            <h3>Estrutura do template</h3>
+            <pre class="code compact-code">
+## Task
+Closes #123
+
+## Tipo de alteração
+[x] feature  [ ] enhancement  [ ] bugfix
+
+## O que foi feito?
+Resumo objetivo da alteração.
+
+## Como foi feito?
+Decisões técnicas e componentes alterados.
+
+## Como testar?
+Comandos e passos para validar.</pre>
+          </div>
+
+          <div>
+            <div class="panel">
+              <h3>Confirmações obrigatórias</h3>
+              <ul class="compact-list">
+                <li>Informar testes unitários e de integração executados.</li>
+                <li>Explicar migrations e alterações de seed.</li>
+                <li>Confirmar destino <strong>develop</strong>.</li>
+                <li>Para <strong>main</strong>, a origem deve ser <strong>develop</strong>.</li>
+                <li>Não incluir segredos, credenciais ou <code>.env</code>.</li>
+                <li>Atualizar documentação quando necessário.</li>
+              </ul>
+            </div>
+            <div class="callout">
+              <p>
+                O GitHub carrega esse modelo a partir de
+                <code>.github/pull_request_template.md</code>. Preencha o template; não apague as
+                seções.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Padrões 4/5</span>
+          <span>Template de MR/PR</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe — Padrões do projeto</span>
+          <span class="badge">Qualidade e code freeze</span>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <h2>Qualidade contínua</h2>
+            <ul class="stack-list">
+              <li>Testes automatizados e de integração</li>
+              <li>SonarQube e SonarLint</li>
+              <li>GitHub Copilot como ferramenta de apoio</li>
+              <li>Checks obrigatórios antes do merge</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Code Freeze — domingo</h3>
+            <p class="mini">
+              Evitar novas funcionalidades relacionadas à entrega atual e priorizar:
+            </p>
+            <ul class="compact-list">
+              <li>Correção de bugs.</li>
+              <li>Testes e ajustes.</li>
+              <li>Integração Frontend/Backend.</li>
+              <li>Estabilização da versão.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout">
+          <p>
+            <strong>Mais informações:</strong> cada repositório mantém um README com setup,
+            comandos, arquitetura e orientações específicas para contribuição.
+          </p>
+        </div>
+
+        <div class="footer">
+          <span>Padrões 5/5</span>
+          <span>Qualidade e estabilidade</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe Frontend</span>
+          <span class="badge">Architecture Guide</span>
+        </div>
+
+        <div class="hero">
+          <div class="hero-grid">
+            <div>
+              <h1>Expo + React Native Application Architecture</h1>
+              <p>
+                A modern UI architecture built around file-based routes, reusable view components,
+                NativeWind styling, and a clean separation between screens, hooks, and API access.
+              </p>
+              <div class="legend">
+                <span><i class="dot blue"></i> Route layer</span>
+                <span><i class="dot purple"></i> Screen layer</span>
+                <span><i class="dot green"></i> UI primitives</span>
+                <span><i class="dot orange"></i> Infra / tooling</span>
+              </div>
+            </div>
+
+            <div class="panel">
+              <h3>Core stack</h3>
+              <ul class="stack-list">
+                <li>Expo SDK 57</li>
+                <li>React Native 0.86</li>
+                <li>TypeScript 6</li>
+                <li>Expo Router</li>
+                <li>NativeWind 4</li>
+                <li>Jest + React Native Testing Library</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Slide 1/7</span>
+          <span>Alibe Frontend</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Project Layers</span>
+          <span class="badge">Overview</span>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <h2>Application structure</h2>
+            <pre class="code">
+src/
+├── app/
+│   ├── _layout.tsx
+│   ├── index.tsx
+│   └── __tests__/
+├── screens/
+├── components/
+├── hooks/
+├── server/
+├── utils/
+├── theme.ts
+├── constants.ts
+├── global.css
+└── ...</pre>
+          </div>
+
+          <div>
+            <h3>Responsibility split</h3>
+            <ul>
+              <li><strong>src/app</strong>: route files and navigation boundary</li>
+              <li><strong>src/screens</strong>: page-level composition and screen state</li>
+              <li><strong>src/components</strong>: reusable UI atoms and controls</li>
+              <li><strong>src/hooks</strong>: reusable stateful behavior</li>
+              <li><strong>src/server</strong>: typed API client and request error handling</li>
+              <li><strong>src/theme.ts</strong>: shared token definitions</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Slide 2/7</span>
+          <span>Structure</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Startup Flow</span>
+          <span class="badge">Runtime</span>
+        </div>
+
+        <h2>How the app boots</h2>
+        <div class="two-col">
+          <div class="panel">
+            <h3>Entry point</h3>
+            <pre class="code">
+package.json
+{
+  "main": "expo-router/entry"
+}</pre>
+            <p>Expo Router becomes the application bootstrap point.</p>
+          </div>
+
+          <div class="panel">
+            <h3>Runtime path</h3>
+            <pre class="code">
+Expo launch
+  → App entry
+  → src/app/_layout.tsx
+  → Stack navigator
+  → src/app/index.tsx
+  → React Native rendering</pre>
+            <p>Each route file in the app folder becomes a navigable screen.</p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Slide 3/7</span>
+          <span>Boot sequence</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Route and Screen Pattern</span>
+          <span class="badge">UI flow</span>
+        </div>
+
+        <h2>Keep routes thin</h2>
+        <pre class="code">
+// src/app/index.tsx
+import { HomeScreen } from '@/screens/HomeScreen';
+
+export default HomeScreen;</pre>
+
+        <div class="two-col">
+          <div class="panel">
+            <h3>Good pattern</h3>
+            <ul>
+              <li>Route file only imports the screen.</li>
+              <li>Screen handles page composition and state.</li>
+              <li>Component library holds reusable UI pieces.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Bad pattern</h3>
+            <ul>
+              <li>Large layouts inside route files.</li>
+              <li>Business logic and UI markup mixed together.</li>
+              <li>Repeated markup copied across screens.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Slide 4/7</span>
+          <span>Architecture pattern</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>NativeWind + Metro</span>
+          <span class="badge">Styling</span>
+        </div>
+
+        <h2>How styling is wired</h2>
+        <div class="two-col">
+          <div>
+            <h3>Key config</h3>
+            <pre class="code">
+babel.config.js
+→ jsxImportSource: 'nativewind'
+→ nativewind/babel
+
+metro.config.ts
+→ withNativeWind(config, { input: './src/global.css' })
+
+src/global.css
+→ Tailwind base + utilities</pre>
+          </div>
+
+          <div>
+            <h3>Usage</h3>
+            <pre class="code">
+&lt;View className="flex-1 bg-white px-6 py-8"&gt;
+  &lt;Text className="text-2xl font-bold text-black"&gt;
+    Profile
+  &lt;/Text&gt;
+&lt;/View&gt;</pre>
+            <p>Static styling should use `className`; dynamic native styling stays in `style`.</p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Slide 5/7</span>
+          <span>Styling layer</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Toolchain</span>
+          <span class="badge">Quality</span>
+        </div>
+
+        <h2>Testing and validation</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Tool</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Type safety</td>
+              <td>TypeScript</td>
+              <td>Strict typing, aliases, component contracts</td>
+            </tr>
+            <tr>
+              <td>Linting</td>
+              <td>ESLint</td>
+              <td>Code health and import validity</td>
+            </tr>
+            <tr>
+              <td>UI testing</td>
+              <td>Jest + RN Testing Library</td>
+              <td>Render and assert component behavior</td>
+            </tr>
+            <tr>
+              <td>Platform checks</td>
+              <td>Expo + emulator/device</td>
+              <td>Run and inspect real UI on mobile or web</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <span>Slide 6/7</span>
+          <span>Validation</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Contributor Model</span>
+          <span class="badge">Workflow</span>
+        </div>
+
+        <h2>How contributors work</h2>
+        <div class="two-col">
+          <div class="panel">
+            <ul>
+              <li>Clone repository and install dependencies.</li>
+              <li>Create a feature branch from <strong>develop</strong>.</li>
+              <li>
+                Build UI in <strong>src/app</strong>, <strong>src/screens</strong>, and
+                <strong>src/components</strong>.
+              </li>
+              <li>Run TypeScript, lint, and focused tests.</li>
+              <li>Open a PR targeting <strong>develop</strong>.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Branching flow</h3>
+            <pre class="code">
+git switch develop
+git pull --ff-only origin develop
+git switch -c 123
+# develop UI work and validate
+git push -u origin 123
+# open pull request to develop</pre>
+            <p class="mini">This keeps feature work isolated and easy to review.</p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Slide 7/7</span>
+          <span>Contribution flow</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe Backend</span>
+          <span class="badge">Architecture Guide</span>
+        </div>
+
+        <div class="hero">
+          <div class="hero-grid">
+            <div>
+              <h1>API modular com NestJS</h1>
+              <p>
+                Arquitetura inspirada em Clean Architecture e SOLID, mantendo módulos, providers e
+                injeção de dependências do NestJS sem criar camadas desnecessárias.
+              </p>
+              <div class="legend">
+                <span><i class="dot blue"></i> HTTP</span>
+                <span><i class="dot purple"></i> Application</span>
+                <span><i class="dot green"></i> Domain</span>
+                <span><i class="dot orange"></i> Persistence</span>
+              </div>
+            </div>
+
+            <div class="panel">
+              <h3>Tecnologias e bibliotecas</h3>
+              <ul class="stack-list compact-list">
+                <li>Node.js 22 + npm</li>
+                <li>NestJS 11 + TypeScript</li>
+                <li>Prisma 7 + PostgreSQL 17</li>
+                <li>ESLint + Prettier</li>
+                <li>Jest + Supertest</li>
+                <li>Docker Compose + GitHub Actions</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Backend 1/8</span>
+          <span>Tecnologias</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe Backend</span>
+          <span class="badge">Setup e execução</span>
+        </div>
+
+        <h2>Do clone à API rodando</h2>
+        <div class="two-col">
+          <div>
+            <h3>Primeira execução</h3>
+            <div class="code compact-code code-lines">
+              <div><span class="command-line">git clone</span> &lt;url-do-backend&gt;</div>
+              <div><span class="command-line">cd</span> Backend</div>
+              <div><span class="command-line">cp</span> .env.template .env</div>
+              <div><span class="command-line">docker compose up --build</span></div>
+              <div># verificar o módulo de exemplo</div>
+              <div><span class="command-line">curl</span> http://localhost:3000/example</div>
+            </div>
+            <p class="mini">
+              Dentro do Compose, a DATABASE_URL usa <strong>alibe-db</strong> como host do
+              PostgreSQL.
+            </p>
+          </div>
+
+          <div>
+            <h3>Serviços locais</h3>
+            <table class="compact-table">
+              <tr>
+                <th>Serviço</th>
+                <th>Endereço</th>
+              </tr>
+              <tr>
+                <td>API NestJS</td>
+                <td>localhost:3000</td>
+              </tr>
+              <tr>
+                <td>PostgreSQL</td>
+                <td>localhost:5432</td>
+              </tr>
+              <tr>
+                <td>Adminer</td>
+                <td>localhost:8080</td>
+              </tr>
+            </table>
+            <div class="code compact-code code-lines">
+              <div><span class="command-line">npm run start:dev</span> # API local</div>
+              <div><span class="command-line">npm run test:unit</span> # unitários</div>
+              <div><span class="command-line">npm run test:integration</span></div>
+              <div><span class="command-line">npm run test:e2e</span></div>
+              <div><span class="command-line">npm run validate</span> # validação completa</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Backend 2/8</span>
+          <span>Clone + Docker + comandos</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe Backend</span>
+          <span class="badge">Nest CLI</span>
+        </div>
+
+        <h2>Gerando a base de um módulo</h2>
+        <div class="two-col">
+          <div class="panel">
+            <h3>Geração por responsabilidade</h3>
+            <div class="code compact-code code-lines">
+              <div>npx nest g module modules/users</div>
+              <div>npx nest g controller modules/users/http/users --flat --no-spec</div>
+              <div>
+                npx nest g class modules/users/application/create-user.use-case --flat --no-spec
+              </div>
+              <div>npx nest g class modules/users/domain/user.entity --flat --no-spec</div>
+              <div>
+                npx nest g class modules/users/persistence/prisma-user.repository --flat --no-spec
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="panel">
+              <h3>Resource completo e prévia</h3>
+              <div class="code compact-code code-lines">
+                <div>npx nest g resource modules/users --type rest --crud true --no-spec</div>
+                <div>npx nest g module modules/users --dry-run</div>
+              </div>
+              <ul class="compact-list">
+                <li><code>--dry-run</code> mostra o que seria criado.</li>
+                <li><code>--no-spec</code> evita testes espalhados em <code>src/</code>.</li>
+                <li>O resource gera uma base, não a arquitetura final.</li>
+              </ul>
+            </div>
+            <div class="callout warning">
+              <p>
+                Depois da geração, reorganize em <strong>domain</strong>,
+                <strong>application</strong>, <strong>http</strong> e <strong>persistence</strong> e
+                revise o diff.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Backend 3/8</span>
+          <span>Comandos da Nest CLI</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe Backend</span>
+          <span class="badge">Clean + modular</span>
+        </div>
+
+        <h2>Arquitetura modular, sem perder o NestJS</h2>
+        <div class="architecture-flow five-nodes">
+          <div class="architecture-node">Controller<br /><span class="mini">HTTP</span></div>
+          <div class="architecture-node">Use Case<br /><span class="mini">Application</span></div>
+          <div class="architecture-node">
+            Domain<br /><span class="mini">Entidades e regras</span>
+          </div>
+          <div class="architecture-node">
+            Repository<br /><span class="mini">Contrato do Domain</span>
+          </div>
+          <div class="architecture-node">Adapter<br /><span class="mini">Persistence</span></div>
+        </div>
+
+        <div class="tech-grid">
+          <div class="tech-card">
+            <strong>Módulos de negócio</strong>
+            <p>Cada contexto agrupa domínio, casos de uso, HTTP e persistência.</p>
+          </div>
+          <div class="tech-card">
+            <strong>Dependências para dentro</strong>
+            <p>Use cases conhecem contratos, nunca o Prisma concreto.</p>
+          </div>
+          <div class="tech-card">
+            <strong>Nest como composição</strong>
+            <p>O arquivo module conecta controller, use case e implementação.</p>
+          </div>
+        </div>
+
+        <div class="callout">
+          <p>
+            <strong>Service não é uma etapa obrigatória:</strong> o use case já exerce o papel de
+            service de aplicação. Domain services aparecem apenas quando existe uma regra real para
+            eles.
+          </p>
+        </div>
+
+        <div class="footer">
+          <span>Backend 4/8</span>
+          <span>Fluxo de dependências</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe Backend</span>
+          <span class="badge">Estrutura de pastas</span>
+        </div>
+
+        <h2>Organização vertical por módulo</h2>
+        <div class="two-col">
+          <div class="folder-window" aria-label="Estrutura de pastas do Backend">
+            <div class="folder-window-bar">
+              <i class="window-dot" style="background: #f87171"></i>
+              <i class="window-dot" style="background: #fbbf24"></i>
+              <i class="window-dot" style="background: #34d399"></i>
+            </div>
+            <pre class="folder-tree"><span class="folder">Backend/</span>
+├── <span class="folder">prisma/</span>
+│   └── <span class="file">schema.prisma</span>
+├── <span class="folder">src/</span>
+│   ├── <span class="folder">infrastructure/</span>
+│   │   ├── <span class="file">prisma.module.ts</span>
+│   │   └── <span class="file">prisma.service.ts</span>
+│   └── <span class="folder">modules/example/</span>
+│       ├── <span class="folder">application/</span>
+│       ├── <span class="folder">domain/</span>
+│       ├── <span class="folder">http/</span>
+│       ├── <span class="folder">persistence/</span>
+│       └── <span class="file">example.module.ts</span>
+└── <span class="folder">test/</span>
+    ├── <span class="folder">unit/modules/</span>
+    ├── <span class="folder">integration/modules/</span>
+    └── <span class="folder">e2e/modules/</span></pre>
+          </div>
+
+          <div class="panel">
+            <ul class="compact-list">
+              <li><strong>domain</strong>: entidades, regras e contratos.</li>
+              <li><strong>application</strong>: intenções do sistema em use cases.</li>
+              <li><strong>http</strong>: controllers e DTOs do protocolo.</li>
+              <li><strong>persistence</strong>: implementação dos repositories.</li>
+              <li><strong>infrastructure</strong>: recursos compartilhados, como Prisma.</li>
+              <li><strong>test</strong>: testes separados por tipo e por módulo.</li>
+            </ul>
+            <div class="callout">
+              <p>
+                O <strong>example</strong> serve como referência mínima para os próximos módulos.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Backend 5/8</span>
+          <span>Pastas e responsabilidades</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe Backend</span>
+          <span class="badge">Estratégia de testes</span>
+        </div>
+
+        <h2>Três níveis, três perguntas diferentes</h2>
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Pergunta</th>
+              <th>Entrada</th>
+              <th>Local e comando</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Unitário</strong></td>
+              <td>A regra isolada funciona?</td>
+              <td>Use case ou domínio com fake/mocks.</td>
+              <td><code>test/unit/modules</code><br /><code>npm run test:unit</code></td>
+            </tr>
+            <tr>
+              <td><strong>Integração</strong></td>
+              <td>Os providers trabalham juntos?</td>
+              <td>Módulo Nest, repository ou integração real.</td>
+              <td>
+                <code>test/integration/modules</code><br /><code>npm run test:integration</code>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>E2E</strong></td>
+              <td>A API responde ponta a ponta?</td>
+              <td>Requisição HTTP com Supertest.</td>
+              <td><code>test/e2e/modules</code><br /><code>npm run test:e2e</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="repo-grid">
+          <div class="callout">
+            <p>
+              <strong>Coverage:</strong> <code>npm run test:cov</code> mede o código de
+              <code>src/</code> exercitado pelos unitários e gera o LCOV usado pelo Sonar.
+            </p>
+          </div>
+          <div class="callout warning">
+            <p>
+              <strong>Regra prática:</strong> testar a regra no nível mais próximo e manter E2E para
+              endpoints e fluxos importantes.
+            </p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Backend 6/8</span>
+          <span>Unitário + integração + E2E</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe Backend</span>
+          <span class="badge">CI e workflow</span>
+        </div>
+
+        <h2>Validação automática antes do merge</h2>
+        <div class="ci-layout">
+          <div class="panel">
+            <h3>Fluxo da CI</h3>
+            <div class="compact-code">
+              PR ou push<br />
+              → qualidade, testes e build<br />
+              → análise do Sonar<br />
+              → checks concluídos
+            </div>
+          </div>
+          <div class="panel">
+            <ol class="compact-list">
+              <li>Abrir PR para <strong>develop</strong>.</li>
+              <li>Qualidade, testes e build executam.</li>
+              <li>Sonar analisa coverage e código.</li>
+              <li>Reviewer AGES III avalia a mudança.</li>
+              <li>Merge somente com checks aprovados.</li>
+            </ol>
+            <div class="callout warning">
+              <p>
+                <strong>Escopo atual:</strong> somente CI. Deploy/CD não faz parte desta
+                apresentação.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>Backend 7/8</span>
+          <span>GitHub Actions + Sonar</span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="slide-header">
+          <span>Alibe Backend</span>
+          <span class="badge">Roadmap técnico</span>
+        </div>
+
+        <span class="status-flag">Ainda em desenvolvimento</span>
+        <h2>Partes ainda em desenvolvimento</h2>
+
+        <div class="future-grid">
+          <div class="future-card">
+            <strong>CD e infraestrutura</strong>
+            <p>
+              A estratégia de deploy e os ambientes na AWS ainda serão definidos. A CI já existe,
+              mas o CD ainda não.
+            </p>
+          </div>
+          <div class="future-card">
+            <strong>Autenticação</strong>
+            <p>
+              Amazon Cognito é um dos serviços em avaliação para identidade, login e autorização.
+            </p>
+          </div>
+          <div class="future-card">
+            <strong>Notificações mobile</strong>
+            <p>
+              Firebase/FCM está em estudo. Lambda ou outro serviço auxiliar poderá ser avaliado se
+              houver necessidade.
+            </p>
+          </div>
+        </div>
+
+        <div class="callout warning" style="margin-top: 34px">
+          <p>
+            <strong>Importante:</strong> estes itens ainda não são decisões finais. Serão definidos
+            conforme os requisitos do produto.
+          </p>
+        </div>
+
+        <div class="footer">
+          <span>Backend 8/8</span>
+          <span>Itens em desenvolvimento</span>
+        </div>
+      </section>
+
+      <div class="controls">
+        <span id="globalCounter" class="global-counter"></span>
+        <button id="prevBtn">← Prev</button>
+        <button id="nextBtn">Next →</button>
+      </div>
+    </div>
+
+    <script>
+      const slides = [...document.querySelectorAll('.slide')];
+      let currentIndex = 0;
+
+      function updateSlides() {
+        slides.forEach((slide, index) => {
+          slide.classList.toggle('active', index === currentIndex);
+        });
+        document.getElementById('globalCounter').textContent =
+          `${currentIndex + 1}/${slides.length}`;
+      }
+
+      function showNext() {
+        currentIndex = (currentIndex + 1) % slides.length;
+        updateSlides();
+      }
+
+      function showPrev() {
+        currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+        updateSlides();
+      }
+
+      updateSlides();
+
+      document.getElementById('nextBtn').addEventListener('click', showNext);
+      document.getElementById('prevBtn').addEventListener('click', showPrev);
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+          showNext();
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+          showPrev();
+        }
+      });
+    </script>
+  </body>
+</html>

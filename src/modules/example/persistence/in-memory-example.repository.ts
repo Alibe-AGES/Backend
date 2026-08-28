@@ -5,8 +5,6 @@ import { ExampleRepository } from '../domain/example.repository';
 @Injectable()
 export class InMemoryExampleRepository extends ExampleRepository {
   get(): Promise<Example> {
-    return Promise.resolve(
-      new Example({ message: 'Example module is working' }),
-    );
+    return Promise.resolve(new Example({ message: 'Example module is working' }));
   }
 }

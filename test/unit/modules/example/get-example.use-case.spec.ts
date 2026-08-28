@@ -1,12 +1,10 @@
-import { Example } from '../domain/example.entity';
-import { ExampleRepository } from '../domain/example.repository';
-import { GetExampleUseCase } from './get-example.use-case';
+import { GetExampleUseCase } from '../../../../src/modules/example/application/get-example.use-case';
+import { Example } from '../../../../src/modules/example/domain/example.entity';
+import { ExampleRepository } from '../../../../src/modules/example/domain/example.repository';
 
 class FakeExampleRepository extends ExampleRepository {
   get(): Promise<Example> {
-    return Promise.resolve(
-      new Example({ message: 'Example module is working' }),
-    );
+    return Promise.resolve(new Example({ message: 'Example module is working' }));
   }
 }
 
