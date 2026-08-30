@@ -12,6 +12,8 @@ services:
         condition: service_healthy
       ministack:
         condition: service_started
+      aws-bootstrap:
+        condition: service_completed_successfully
 
     env_file:
       - .env
@@ -122,8 +124,32 @@ services:
       retries: 5
       start_period: 5s
 
+  aws-bootstrap:
+    image: amazon/aws-cli:2.36.34
+    container_name: alibe-aws-bootstrap
+
+    depends_on:
+      ministack:
+        condition: service_healthy
+
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+
+    volumes:
+      - ./infra:/infra:ro
+
+    entrypoint: ['/bin/sh', '/infra/local/bootstrap.sh']
+
 volumes:
   db-data:
   prometheus-data:
   grafana-data:
   ministack-data:
+
+
+networks:
+  default:
+    name: alibe-network
