@@ -149,7 +149,6 @@ volumes:
   grafana-data:
   ministack-data:
 
-
 networks:
   default:
     name: alibe-network

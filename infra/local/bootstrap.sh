@@ -10,7 +10,7 @@ aws \
   --template-file /infra/cloudformation/alibe.yml \
   --stack-name alibe-local \
   --parameter-overrides \
-    MediaBucketName="${AWS_S3_BUCKET}" \
+    MediaBucketName="${AWS_S3_BUCKET}" \ 
   --region "${AWS_REGION}" \
   --no-fail-on-empty-changeset
 
