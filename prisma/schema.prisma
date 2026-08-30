@@ -13,3 +13,12 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Example {
+  id          String   @id @default(uuid()) @db.Uuid
+  description String
+  imageKey    String   @unique @map("image_key")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("examples")
+}

@@ -10,6 +10,8 @@ services:
     depends_on:
       alibe-db:
         condition: service_healthy
+      ministack:
+        condition: service_started
 
     env_file:
       - .env
@@ -88,7 +90,40 @@ services:
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
 
+  ministack:
+    image: ministackorg/ministack:1.5.3
+    container_name: alibe-ministack
+
+    ports:
+      - '4566:4566'
+
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_REGION}
+      PERSIST_STATE: '1'
+      S3_PERSIST: '1'
+      STATE_DIR: /var/lib/ministack/state
+      S3_DATA_DIR: /var/lib/ministack/s3
+      LOG_LEVEL: INFO
+
+    volumes:
+      - ministack-data:/var/lib/ministack
+      - ./infra/cloudformation:/infra/cloudformation:ro
+
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
 volumes:
   db-data:
   prometheus-data:
   grafana-data:
+  ministack-data:

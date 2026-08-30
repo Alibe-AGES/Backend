@@ -11,6 +11,7 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 - [Configuração inicial](#configuração-inicial)
 - [Executando com Docker](#executando-com-docker)
 - [URLs importantes](#urls-importantes)
+- [Infraestrutura AWS com MiniStack e CloudFormation](#infraestrutura-aws-com-ministack-e-cloudformation)
 - [Observabilidade local](#observabilidade-local)
 - [Documentação da API com Swagger](#documentação-da-api-com-swagger)
 - [Executando a API localmente](#executando-a-api-localmente)
@@ -36,6 +37,9 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 - Docker e Docker Compose
 - GitHub Actions
 - SonarQube Cloud
+- AWS CloudFormation
+- AWS SDK for JavaScript v3 (`@aws-sdk/client-s3`)
+- MiniStack para emulação local de serviços AWS
 
 ## Requisitos
 
@@ -79,13 +83,18 @@ O `.env` não deve ser enviado ao Git. O arquivo `.env.template` contém somente
 
 Variáveis atuais:
 
-| Variável            | Responsabilidade                                             |
-| ------------------- | ------------------------------------------------------------ |
-| `DATABASE_USER`     | Usuário criado no PostgreSQL pelo Docker Compose.            |
-| `DATABASE_PASSWORD` | Senha do usuário do PostgreSQL.                              |
-| `DATABASE_NAME`     | Nome do banco da aplicação.                                  |
-| `APP_PORT`          | Porta exposta pela API quando executada pelo Docker Compose. |
-| `DATABASE_URL`      | URL de conexão utilizada pelo Prisma.                        |
+| Variável                | Responsabilidade                                                |
+| ----------------------- | --------------------------------------------------------------- |
+| `DATABASE_USER`         | Usuário criado no PostgreSQL pelo Docker Compose.               |
+| `DATABASE_PASSWORD`     | Senha do usuário do PostgreSQL.                                 |
+| `DATABASE_NAME`         | Nome do banco da aplicação.                                     |
+| `APP_PORT`              | Porta exposta pela API quando executada pelo Docker Compose.    |
+| `DATABASE_URL`          | URL de conexão utilizada pelo Prisma.                           |
+| `AWS_REGION`            | Região usada pelo MiniStack e pelos comandos da AWS CLI.        |
+| `AWS_S3_BUCKET`         | Nome do bucket utilizado pela aplicação.                        |
+| `AWS_ENDPOINT_URL`      | Endpoint global dos serviços AWS; presente apenas no MiniStack. |
+| `AWS_ACCESS_KEY_ID`     | Credencial fictícia local; em produção, prefira role ou OIDC.   |
+| `AWS_SECRET_ACCESS_KEY` | Segredo fictício local; nunca versionar um valor real.          |
 
 Nunca coloque tokens, senhas reais ou credenciais de produção no `.env.template`.
 
@@ -149,14 +158,19 @@ nova migration com `prisma migrate dev`, validar o SQL gerado e versionar a past
 ### 3. Testar a API
 
 ```bash
-curl http://localhost:3000/example
+curl -X POST http://localhost:3000/example \
+    -F "description=Exemplo com PostgreSQL e S3" \
+    -F "image=@./minha-imagem.png"
 ```
 
 Resposta esperada:
 
 ```json
 {
-  "message": "Example module is working"
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "description": "Exemplo com PostgreSQL e S3",
+  "imageUrl": "/example/550e8400-e29b-41d4-a716-446655440000/image",
+  "createdAt": "2026-08-30T00:00:00.000Z"
 }
 ```
 
@@ -173,7 +187,7 @@ docker compose down
 docker compose up --build
 ```
 
-Não utilize `docker compose down -v` ou `docker compose down --volumes` na rotina do projeto. Esses comandos apagam os dados locais do PostgreSQL, o histórico do Prometheus e o estado do Grafana.
+Não utilize `docker compose down -v` ou `docker compose down --volumes` na rotina do projeto. Esses comandos apagam os dados locais do PostgreSQL, o histórico do Prometheus, o estado do Grafana e os recursos persistidos pelo MiniStack.
 
 ## URLs importantes
 
@@ -190,6 +204,7 @@ Os endereços abaixo consideram o ambiente local com `docker compose up` em exec
 | Grafana              | <http://localhost:3001>                            | Página inicial do Grafana.                          |
 | Dashboard do Backend | <http://localhost:3001/d/alibe-backend-monitoring> | Monitoramento do Backend.                           |
 | Adminer              | <http://localhost:8080>                            | Interface para inspecionar o PostgreSQL.            |
+| MiniStack            | <http://localhost:4566>                            | Endpoint local compatível com APIs da AWS.          |
 | PostgreSQL           | `localhost:5432`                                   | Conexão ao banco a partir do computador.            |
 | Prisma Studio        | <http://localhost:5555>                            | Interface do Prisma, quando iniciada manualmente.   |
 
@@ -200,6 +215,211 @@ docker compose exec backend npx prisma studio --hostname 0.0.0.0 --port 5555
 ```
 
 No Adminer, use `alibe-db` como servidor. Dentro da rede do Compose, containers utilizam nomes de serviços como `alibe-db`, `backend` e `prometheus`; no navegador e em programas executados diretamente no computador, utilize `localhost` e a porta publicada.
+
+## Infraestrutura AWS com MiniStack e CloudFormation
+
+O projeto utiliza o MiniStack para simular serviços da AWS no ambiente local. Ele fica disponível em <http://localhost:4566>, enquanto a infraestrutura é descrita de forma versionável pelo template [`infra/cloudformation/alibe.yml`](infra/cloudformation/alibe.yml).
+
+Atualmente, o template cria um bucket S3 privado para mídias, com versionamento, criptografia AES-256, bloqueio de acesso público, tags de projeto e ambiente e outputs com o nome e o ARN do bucket.
+
+### Pré-requisitos
+
+- Docker Compose em execução;
+- AWS CLI instalada, verificável com `aws --version`;
+- `AWS_REGION=us-east-2` configurada no `.env` a partir do `.env.template`.
+
+### Executar localmente
+
+Suba o MiniStack:
+
+```bash
+docker compose up -d ministack
+docker compose logs -f ministack
+```
+
+Em outro terminal, na raiz do Backend, faça o deploy da stack local:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 cloudformation deploy \
+    --template-file infra/cloudformation/alibe.yml \
+    --stack-name alibe-local \
+    --parameter-overrides MediaBucketName=alibe-local-media \
+    --region us-east-2
+```
+
+As credenciais `test` são fictícias e servem somente para o emulador local. O parâmetro `Environment` não aparece nesse comando porque seu valor padrão no template é `local`.
+
+Para confirmar que a stack foi criada e consultar seus outputs:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 cloudformation describe-stacks \
+    --stack-name alibe-local \
+    --region us-east-2
+```
+
+Para listar os buckets disponíveis no ambiente local:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 s3api list-buckets \
+    --region us-east-2
+```
+
+Para enviar um arquivo local existente ao bucket:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 s3 cp \
+    teste-s3.txt s3://alibe-local-media/teste-s3.txt
+```
+
+Para listar os arquivos armazenados no bucket:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 s3 ls \
+    s3://alibe-local-media/
+```
+
+O volume `ministack-data` preserva o estado local entre reinicializações. `docker compose down` mantém esse volume; `docker compose down -v` o remove.
+
+### Integração do Backend com S3
+
+O SDK oficial `@aws-sdk/client-s3` está encapsulado em `src/infrastructure/storage/`:
+
+```text
+storage/
+├── s3-client.provider.ts    # Monta o S3Client somente com configuração
+├── s3-storage.service.ts    # Upload e download de objetos
+└── storage.module.ts        # Registra e exporta o serviço no NestJS
+```
+
+O código é único para todos os ambientes. Não existe verificação de `NODE_ENV` nem implementação separada para MiniStack: a presença ou ausência das variáveis altera apenas a configuração entregue ao mesmo `S3Client`.
+
+| Execução                        | Endpoint                | Path style | Credenciais                                                |
+| ------------------------------- | ----------------------- | ---------- | ---------------------------------------------------------- |
+| Backend no Docker Compose       | `http://ministack:4566` | `true`     | `test` / `test`, somente local                             |
+| Backend executado no computador | `http://localhost:4566` | `true`     | `test` / `test`, somente local                             |
+| AWS real                        | variável ausente        | ausente    | cadeia padrão do SDK: profile, variáveis, OIDC ou IAM role |
+
+Quando `AWS_ENDPOINT_URL` está configurada, o client S3 ativa path-style internamente porque esse formato é exigido pelo MiniStack. O desenvolvedor não precisa configurar uma segunda variável para esse detalhe do adapter.
+
+Na AWS real, configure `AWS_REGION` e `AWS_S3_BUCKET`, remova `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` do ambiente quando a autenticação vier de role ou OIDC. O SDK passa automaticamente a usar o endpoint e a cadeia de credenciais padrão da AWS, sem mudança no código-fonte.
+
+Um módulo que precise armazenar arquivos importa `StorageModule` e seu caso de uso depende do contrato geral `ObjectStorage`, nunca do SDK ou do `S3StorageService` concreto:
+
+```ts
+constructor(
+  private readonly repository: ExampleRepository,
+  private readonly storage: ObjectStorage,
+) {}
+```
+
+O contrato disponibiliza `save`, `findByKey` e `delete`. O `delete` permite compensar falhas: se a imagem for enviada ao S3, mas o Prisma falhar ao criar o registro, o caso de uso remove o objeto órfão.
+
+Os campos usados pelo armazenamento são:
+
+| Campo         | Significado                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `key`         | Nome único do objeto dentro do bucket, equivalente ao caminho interno do arquivo.               |
+| `bytes`       | Conteúdo binário enviado ao S3. No exemplo, são os bytes da imagem recebida pela API.           |
+| `contentType` | Tipo MIME, como `image/png`. Ele permite que o navegador interprete a resposta como uma imagem. |
+
+No download são devolvidos apenas `bytes` e `contentType`. ETag, versionamento, metadata, tamanho e data da alteração ficam fora do contrato enquanto não houver um caso de uso que precise deles.
+
+### Exemplo com PostgreSQL e S3
+
+O módulo `example` salva a descrição e a chave da imagem no PostgreSQL, enquanto os bytes ficam no S3:
+
+```text
+Controller HTTP
+    -> CreateExampleUseCase
+        -> ObjectStorage
+            -> S3StorageService -> S3 ou MiniStack
+        -> ExampleRepository
+            -> PrismaExampleRepository -> PostgreSQL
+```
+
+O model Prisma possui `id`, `description`, `imageKey` e `createdAt`. Somente a chave, como `examples/{id}/image.png`, é persistida no banco; uma URL do MiniStack ou da AWS não é salva porque pode mudar entre ambientes.
+
+Crie um exemplo pelo Swagger em <http://localhost:3000/docs> ou pelo terminal:
+
+```bash
+curl -X POST http://localhost:3000/example \
+    -F "description=Exemplo com PostgreSQL e S3" \
+    -F "image=@./minha-imagem.png"
+```
+
+Exemplo de resposta:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "description": "Exemplo com PostgreSQL e S3",
+  "imageUrl": "/example/550e8400-e29b-41d4-a716-446655440000/image",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}
+```
+
+Consulte os dados ou baixe a imagem:
+
+```bash
+curl http://localhost:3000/example/550e8400-e29b-41d4-a716-446655440000
+
+curl http://localhost:3000/example/550e8400-e29b-41d4-a716-446655440000/image \
+    --output imagem-baixada.png
+```
+
+O upload utiliza `multipart/form-data`, exige os campos `description` e `image`, aceita apenas MIME `image/*` e limita o arquivo a 5 MB.
+
+### Placeholder para uma AWS remota
+
+Antes do deploy real, autentique a AWS CLI por um perfil, SSO ou role e confirme a conta selecionada:
+
+```bash
+aws sts get-caller-identity \
+    --profile YOUR_AWS_PROFILE \
+    --region YOUR_AWS_REGION
+```
+
+Depois, substitua todos os valores iniciados por `YOUR_` antes de executar:
+
+```bash
+AWS_PROFILE=YOUR_AWS_PROFILE \
+AWS_DEFAULT_REGION=YOUR_AWS_REGION \
+aws cloudformation deploy \
+    --template-file infra/cloudformation/alibe.yml \
+    --stack-name YOUR_REMOTE_STACK_NAME \
+    --parameter-overrides \
+        Environment=production \
+        MediaBucketName=YOUR_GLOBALLY_UNIQUE_BUCKET_NAME \
+    --region YOUR_AWS_REGION
+```
+
+Exemplo de significado dos placeholders:
+
+| Placeholder                        | O que informar                                       |
+| ---------------------------------- | ---------------------------------------------------- |
+| `YOUR_AWS_PROFILE`                 | Perfil local autenticado na conta correta.           |
+| `YOUR_AWS_REGION`                  | Região real escolhida, por exemplo `us-east-2`.      |
+| `YOUR_REMOTE_STACK_NAME`           | Nome da stack, por exemplo `alibe-production`.       |
+| `YOUR_GLOBALLY_UNIQUE_BUCKET_NAME` | Nome globalmente único para o bucket S3 de produção. |
+
+No ambiente remoto, não utilize `--endpoint-url`, pois esse argumento direciona os comandos ao emulador local. Também não coloque `AWS_ACCESS_KEY_ID` ou `AWS_SECRET_ACCESS_KEY` reais no README, no Git ou em comandos compartilhados. Em CI, prefira autenticação por OIDC ou secrets protegidos da plataforma.
+
+> **Atenção:** o comando remoto é apenas um modelo e não deve ser executado sem substituir os placeholders, confirmar conta e região e revisar o template. Um deploy remoto cria recursos reais e pode gerar custos.
 
 ## Observabilidade local
 
@@ -331,15 +551,15 @@ PORT=3100 npm run start:dev
 
 ### Responsabilidade de cada local
 
-| Local                                  | Responsabilidade                                                                       |
-| -------------------------------------- | -------------------------------------------------------------------------------------- |
-| `prisma/schema.prisma`                 | Define datasource, generator e modelos persistidos.                                    |
-| `prisma/migrations/`                   | Guarda o histórico versionado das alterações do banco quando migrations forem criadas. |
-| `prisma.config.ts`                     | Informa ao Prisma onde estão schema, migrations e `DATABASE_URL`.                      |
-| `generated/prisma/`                    | Prisma Client gerado automaticamente; não deve ser editado manualmente.                |
-| `src/infrastructure/prisma.service.ts` | Mantém a conexão compartilhada do NestJS com o Prisma.                                 |
-| `src/infrastructure/prisma.module.ts`  | Exporta o `PrismaService` para os módulos que precisam de banco.                       |
-| `src/modules/<módulo>/persistence/`    | Implementa os repositories daquele módulo usando o `PrismaService`.                    |
+| Local                                         | Responsabilidade                                                                       |
+| --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `prisma/schema.prisma`                        | Define datasource, generator e modelos persistidos.                                    |
+| `prisma/migrations/`                          | Guarda o histórico versionado das alterações do banco quando migrations forem criadas. |
+| `prisma.config.ts`                            | Informa ao Prisma onde estão schema, migrations e `DATABASE_URL`.                      |
+| `generated/prisma/`                           | Prisma Client gerado automaticamente; não deve ser editado manualmente.                |
+| `src/infrastructure/prisma/prisma.service.ts` | Mantém a conexão compartilhada do NestJS com o Prisma.                                 |
+| `src/infrastructure/prisma/prisma.module.ts`  | Exporta o `PrismaService` para os módulos que precisam de banco.                       |
+| `src/modules/<módulo>/persistence/`           | Implementa os repositories daquele módulo usando o `PrismaService`.                    |
 
 O `PrismaService` é compartilhado porque representa uma conexão técnica com o banco. Já cada repository permanece no seu módulo porque traduz dados para o domínio específico daquele módulo.
 
@@ -425,13 +645,21 @@ Backend/
 │   ├── pull_request_template.md
 │   └── workflows/
 │       └── pr-validation.yml
+├── infra/
+│   └── cloudformation/
+│       └── alibe.yml
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/                 # Criada quando existirem migrations
 ├── src/
 │   ├── infrastructure/
-│   │   ├── prisma.module.ts
-│   │   └── prisma.service.ts
+│   │   ├── prisma/
+│   │   │   ├── prisma.module.ts
+│   │   │   └── prisma.service.ts
+│   │   └── storage/
+│   │       ├── s3-client.provider.ts
+│   │       ├── s3-storage.service.ts
+│   │       └── storage.module.ts
 │   ├── modules/
 │   │   └── example/
 │   │       ├── application/
@@ -466,11 +694,12 @@ Backend/
 | -------------------------- | ------------------------------------------------------------------------------- |
 | `.github/`                 | Regras de contribuição, template de Pull Request e workflows do GitHub Actions. |
 | `docs/`                    | Documentação complementar e diagramas editáveis.                                |
+| `infra/`                   | Templates versionados da infraestrutura, atualmente com AWS CloudFormation.     |
 | `prisma/`                  | Schema e histórico de migrations do banco.                                      |
 | `src/`                     | Código-fonte da aplicação.                                                      |
 | `test/`                    | Testes centralizados e separados por tipo e módulo.                             |
 | `.env.template`            | Contrato das variáveis de ambiente necessárias.                                 |
-| `docker-compose.yml`       | Ambiente de desenvolvimento com Backend, PostgreSQL e Adminer.                  |
+| `docker-compose.yml`       | Serviços locais da aplicação, banco, observabilidade e MiniStack.               |
 | `Dockerfile`               | Etapas de build e imagem de produção da API.                                    |
 | `nest-cli.json`            | Configuração da CLI e do compilador NestJS.                                     |
 | `package.json`             | Dependências e scripts npm.                                                     |
@@ -620,7 +849,7 @@ Contém adapters que implementam os contratos definidos em `domain/`. Exemplos:
 - `prisma-user.repository.ts` para PostgreSQL com Prisma.
 - `in-memory-user.repository.ts` para um adapter simples ou teste.
 
-O repository Prisma pode importar o `PrismaService` compartilhado de `src/infrastructure/`, mas deve devolver entidades ou resultados compreendidos pelo domínio e pela aplicação.
+O repository Prisma pode importar o `PrismaService` compartilhado de `src/infrastructure/prisma/`, mas deve devolver entidades ou resultados compreendidos pelo domínio e pela aplicação.
 
 #### `<nome>.module.ts`
 
@@ -719,7 +948,7 @@ Arquivo `src/modules/users/persistence/prisma-user.repository.ts`:
 
 ```ts
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../infrastructure/prisma.service';
+import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { User } from '../domain/user.entity';
 import { UserRepository } from '../domain/user.repository';
 
