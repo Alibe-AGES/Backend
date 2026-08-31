@@ -22,3 +22,195 @@ model Example {
 
   @@map("examples")
 }
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String?
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  profilePic   String?   @map("profile_pic")
+  birthDate    DateTime? @map("birth_date") @db.Date
+
+  groups             UserGroup[]
+  moods               Mood[]
+  ownedProposals      Proposal[]
+  proposalResponses   ProposalResponse[]
+  availabilities      Availability[]
+  folders             Folder[]
+
+  @@map("user")
+}
+
+model Group {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String?
+  profilePic String?  @map("profile_pic")
+  createdAt  DateTime @map("created_at")
+
+  users        UserGroup[]
+  events       Event[]
+  moods        Mood[]
+  availabilities Availability[]
+  inviteLinks  InviteLink[]
+  folders      Folder[]
+
+  @@map("group")
+}
+
+model UserGroup {
+  userId  String @map("user_id") @db.Uuid
+  groupId String @map("group_id") @db.Uuid
+
+  user  User  @relation(fields: [userId], references: [id])
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@id([userId, groupId])
+  @@map("user_group")
+}
+
+model Event {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String?
+  timeslot    DateTime?
+  budgetStart Decimal?   @map("budget_start")
+  budgetEnd   Decimal?   @map("budget_end")
+  status      StatusEnum
+  createdAt   DateTime?  @map("created_at")
+  groupId     String     @map("group_id") @db.Uuid
+  locationId  String     @map("location_id") @db.Uuid
+
+  group    Group     @relation(fields: [groupId], references: [id])
+  location Location  @relation(fields: [locationId], references: [id])
+  memories Memory[]
+  proposals Proposal[]
+
+  @@map("event")
+}
+
+model Memory {
+  id      String @id @default(uuid()) @db.Uuid
+  picture String?
+  eventId String @map("event_id") @db.Uuid
+
+  event Event @relation(fields: [eventId], references: [id])
+
+  @@map("memory")
+}
+
+model Mood {
+  id         String   @id @default(uuid()) @db.Uuid
+  humorScale Int?     @map("humor_scale")
+  date       DateTime? @db.Date
+  userId     String   @map("user_id") @db.Uuid
+  groupId    String   @map("group_id") @db.Uuid
+
+  user  User  @relation(fields: [userId], references: [id])
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@map("mood")
+}
+
+model Proposal {
+  id        String   @id @default(uuid()) @db.Uuid
+  eventId   String   @map("event_id") @db.Uuid
+  ownerId   String   @map("owner_id") @db.Uuid
+  createdAt DateTime @map("created_at")
+
+  event     Event              @relation(fields: [eventId], references: [id])
+  owner     User               @relation(fields: [ownerId], references: [id])
+  responses ProposalResponse[]
+
+  @@map("proposal")
+}
+
+model ProposalResponse {
+  id         String     @id @default(uuid()) @db.Uuid
+  proposalId String     @map("proposal_id") @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  answer     AnswerEnum
+  createdAt  DateTime   @map("created_at")
+
+  proposal Proposal @relation(fields: [proposalId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([proposalId, userId])
+  @@map("proposal_response")
+}
+
+model Availability {
+  id            String    @id @default(uuid()) @db.Uuid
+  timeslotStart DateTime? @map("timeslot_start")
+  timeslotEnd   DateTime? @map("timeslot_end")
+  groupId       String    @map("group_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+
+  group Group @relation(fields: [groupId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("availability")
+}
+
+model InviteLink {
+  id        String   @id @default(uuid()) @db.Uuid
+  token     String   @default(uuid()) @db.Uuid
+  validity  DateTime
+  createdAt DateTime @map("created_at")
+  groupId   String   @map("group_id") @db.Uuid
+
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@map("invite_link")
+}
+
+model Location {
+  id              String   @id @default(uuid()) @db.Uuid
+  externalId      String?  @map("external_id")
+  description     String?
+  address         String?
+  manuallyCreated Boolean? @map("manually_created")
+
+  events          Event[]
+  folderLocations FolderLocation[]
+
+  @@map("location")
+}
+
+model Folder {
+  id      String @id @default(uuid()) @db.Uuid
+  name    String
+  userId  String @map("user_id") @db.Uuid
+  groupId String @map("group_id") @db.Uuid
+
+  user            User             @relation(fields: [userId], references: [id])
+  group           Group            @relation(fields: [groupId], references: [id])
+  folderLocations FolderLocation[]
+
+  @@map("folder")
+}
+
+model FolderLocation {
+  id         String @id @default(uuid()) @db.Uuid
+  folderId   String @map("folder_id") @db.Uuid
+  locationId String @map("location_id") @db.Uuid
+
+  folder   Folder   @relation(fields: [folderId], references: [id])
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@map("folder_location")
+}
+
+enum StatusEnum {
+  pending
+  confirmed
+  declined
+
+  @@map("status_enum")
+}
+
+enum AnswerEnum {
+  pending
+  yes
+  no
+
+  @@map("answer_enum")
+}
