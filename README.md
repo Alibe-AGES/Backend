@@ -537,8 +537,7 @@ query ou body: futuramente virá da autenticação. A resposta contém somente d
 Os campos `scheduledEventIds`, `proposalIds`, `availableUserIds` e `completedEventIds` são arrays
 de UUIDs, sem objetos intermediários.
 
-O contrato completo de exemplo está em [`calendar-response-example.json`](calendar-response-example.json)
-e também pode ser consultado pelo Swagger em <http://localhost:3000/docs>.
+O contrato completo pode ser consultado pelo Swagger em <http://localhost:3000/docs>.
 
 ### Endpoint mockado de disponibilidade
 
@@ -553,9 +552,8 @@ POST /groups/:groupId/availabilities
 `HH:mm`, mas devem ser enviados juntos e o horário final deve ser posterior ao inicial. Quando
 ambos são omitidos, a disponibilidade vale para o dia inteiro.
 
-Exemplos: [`create-availability-request-example.json`](create-availability-request-example.json),
-[`create-full-day-availability-request-example.json`](create-full-day-availability-request-example.json)
-e [`create-availability-response-example.json`](create-availability-response-example.json).
+Os exemplos de requisição e resposta podem ser consultados pelo Swagger em
+<http://localhost:3000/docs>.
 
 ### Status HTTP dos endpoints mockados
 
