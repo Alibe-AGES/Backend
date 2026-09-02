@@ -152,7 +152,7 @@ model Availability {
 
 model InviteLink {
   id        String   @id @default(uuid()) @db.Uuid
-  token     String   @default(uuid()) @db.Uuid
+  token     String   @unique @default(uuid()) @db.Uuid
   validity  DateTime
   createdAt DateTime @map("created_at")
   groupId   String   @map("group_id") @db.Uuid

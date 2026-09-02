@@ -20,6 +20,8 @@ services:
 
     environment:
       PORT: ${APP_PORT}
+      DATABASE_URL: postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@alibe-db:5432/${DATABASE_NAME}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
 
     volumes:
       - .:/app
@@ -30,7 +32,8 @@ services:
       - '${APP_PORT}:${APP_PORT}'
       - '5555:5555'
 
-    command: sh -c "npm run prisma:generate && npx prisma migrate deploy && exec npm run start:dev"
+    # TEMPORÁRIO: permite executar a seed local quando SEED_ON_STARTUP=true.
+    command: sh -c "npm run prisma:generate && npx prisma migrate deploy && if [ "$${SEED_ON_STARTUP}" = "true" ]; then npm run prisma:seed; fi && exec npm run start:dev"
 
   alibe-db:
     container_name: alibe-db
@@ -80,6 +83,7 @@ services:
   grafana:
     image: grafana/grafana:13.2.0
     container_name: alibe-grafana
+    attach: false
     environment:
       GF_PLUGINS_PREINSTALL_DISABLED: 'true'
     ports:

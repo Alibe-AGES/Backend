@@ -3,7 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import 'dotenv/config';
 
 const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL!.replace('@alibe-db:', '@localhost:'),
+  connectionString: process.env.DATABASE_URL!,
 });
 
 const prisma = new PrismaClient({
@@ -12,7 +12,7 @@ const prisma = new PrismaClient({
 const PASSWORD_PLACEHOLDER = 'NOT_IMPLEMENTED';
 
 async function main() {
-  console.log('🌱 Iniciando seed...');
+  console.log('Iniciando seed...');
 
   // ============================================================
   // 1. LIMPEZA
@@ -21,7 +21,7 @@ async function main() {
   // A ordem importa por causa das foreign keys.
   //
 
-  console.log('🧹 Limpando banco...');
+  console.log('Limpando banco...');
 
   await prisma.folderLocation.deleteMany();
   await prisma.memory.deleteMany();
@@ -42,7 +42,7 @@ async function main() {
   // 2. USUÁRIOS
   // ============================================================
 
-  console.log('👤 Criando usuários...');
+  console.log('Criando usuários...');
 
   const usersData = [
     {
@@ -140,7 +140,7 @@ async function main() {
   // 3. GRUPOS
   // ============================================================
 
-  console.log('👥 Criando grupos...');
+  console.log('Criando grupos...');
 
   const groupsData = [
     {
@@ -179,10 +179,10 @@ async function main() {
   }
 
   // ============================================================
-  // 4. RELACIONAMENTO USUÁRIO ↔ GRUPO
+  // 4. RELACIONAMENTO USUÁRIO x GRUPO
   // ============================================================
 
-  console.log('🔗 Associando usuários aos grupos...');
+  console.log('Associando usuários aos grupos...');
 
   /*
    * Grupo 1 - Turma da Faculdade
@@ -247,7 +247,7 @@ async function main() {
   // 5. LOCATIONS
   // ============================================================
 
-  console.log('📍 Criando locais...');
+  console.log('Criando locais...');
 
   const locationsData = [
     {
@@ -308,7 +308,7 @@ async function main() {
   // 6. EVENTS
   // ============================================================
 
-  console.log('📅 Criando eventos...');
+  console.log('Criando eventos...');
 
   const eventsData = [
     {
@@ -396,7 +396,7 @@ async function main() {
   // 7. MEMORIES
   // ============================================================
 
-  console.log('📸 Criando memories...');
+  console.log('Criando memories...');
 
   const memoriesData = [
     {
@@ -430,7 +430,7 @@ async function main() {
   // 8. MOODS
   // ============================================================
 
-  console.log('😊 Criando moods...');
+  console.log('Criando moods...');
 
   const moodsData = [
     [0, 0, 8, '2026-08-20'],
@@ -483,7 +483,7 @@ async function main() {
   // 9. PROPOSALS
   // ============================================================
 
-  console.log('💡 Criando propostas...');
+  console.log('Criando propostas...');
 
   const proposalsData = [
     { eventIndex: 0, ownerIndex: 0 },
@@ -513,7 +513,7 @@ async function main() {
   // 10. PROPOSAL RESPONSES
   // ============================================================
 
-  console.log('🗳️ Criando respostas às propostas...');
+  console.log('Criando respostas às propostas...');
 
   /*
    * As respostas são escolhidas de acordo com os membros
@@ -580,7 +580,7 @@ async function main() {
   // 11. AVAILABILITIES
   // ============================================================
 
-  console.log('🕐 Criando disponibilidades...');
+  console.log('Criando disponibilidades...');
 
   const availabilitiesData = [
     // Faculdade
@@ -635,7 +635,7 @@ async function main() {
   // 12. INVITE LINKS
   // ============================================================
 
-  console.log('🔗 Criando links de convite...');
+  console.log('Criando links de convite...');
 
   const inviteLinksData = [
     {
@@ -684,7 +684,7 @@ async function main() {
   // 13. FOLDERS
   // ============================================================
 
-  console.log('📁 Criando pastas...');
+  console.log('Criando pastas...');
 
   const foldersData = [
     {
@@ -739,10 +739,10 @@ async function main() {
   }
 
   // ============================================================
-  // 14. FOLDER ↔ LOCATION
+  // 14. FOLDER x LOCATION
   // ============================================================
 
-  console.log('📂 Associando locais às pastas...');
+  console.log('Associando locais às pastas...');
 
   const folderLocationsData = [
     [0, 4],
@@ -773,24 +773,24 @@ async function main() {
   // ============================================================
 
   console.log('');
-  console.log('✅ Seed concluída com sucesso!');
+  console.log('Seed concluída com sucesso!');
   console.log('');
-  console.log(`👤 Usuários: ${users.length}`);
-  console.log(`👥 Grupos: ${groups.length}`);
-  console.log(`🔗 Relações UserGroup: ${groupMemberships.length}`);
-  console.log(`📍 Locations: ${locations.length}`);
-  console.log(`📅 Events: ${events.length}`);
-  console.log(`💡 Proposals: ${proposals.length}`);
-  console.log(`🗳️ Proposal responses: ${proposalResponses.length}`);
-  console.log(`😊 Moods: ${moodsData.length}`);
-  console.log(`🕐 Availabilities: ${availabilitiesData.length}`);
-  console.log(`📁 Folders: ${folders.length}`);
-  console.log(`🔗 Folder locations: ${folderLocationsData.length}`);
+  console.log(`Usuários: ${users.length}`);
+  console.log(`Grupos: ${groups.length}`);
+  console.log(`Relações UserGroup: ${groupMemberships.length}`);
+  console.log(`Locations: ${locations.length}`);
+  console.log(`Events: ${events.length}`);
+  console.log(`Proposals: ${proposals.length}`);
+  console.log(`Proposal responses: ${proposalResponses.length}`);
+  console.log(`Moods: ${moodsData.length}`);
+  console.log(`Availabilities: ${availabilitiesData.length}`);
+  console.log(`Folders: ${folders.length}`);
+  console.log(`Folder locations: ${folderLocationsData.length}`);
 }
 
 main()
   .catch((error) => {
-    console.error('❌ Erro ao executar seed:');
+    console.error('Erro ao executar seed:');
     console.error(error);
     process.exit(1);
   })

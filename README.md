@@ -108,20 +108,19 @@ Esta é a maneira recomendada para começar, porque API, PostgreSQL e Adminer ut
 cp .env.template .env
 ```
 
-Na execução completamente pelo Docker, esta URL está correta:
+O `.env.template` mantém uma URL apropriada para comandos executados diretamente no computador:
+
+```dotenv
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/alibe
+```
+
+Ao iniciar o Backend pelo Docker Compose, o serviço `backend` sobrescreve somente dentro do container a `DATABASE_URL` com:
 
 ```dotenv
 DATABASE_URL=postgres://postgres:postgres@alibe-db:5432/alibe
 ```
 
-Cada parte significa:
-
-```text
-postgres:// usuario : senha    @ host     : porta / banco
-postgres:// postgres: postgres @ alibe-db : 5432  / alibe
-```
-
-`alibe-db` é o nome do serviço PostgreSQL no `docker-compose.yml`. O Docker fornece DNS interno entre os containers, então o container `backend` encontra o banco por esse nome. Essa URL só é correta para processos dentro da rede do Compose; ao executar a API diretamente no computador, use `localhost` como host. O Prisma aceita os protocolos `postgres://` e `postgresql://`.
+`alibe-db` é o DNS interno do serviço PostgreSQL na rede do Compose. Dessa forma, o mesmo código utiliza `localhost` no computador e `alibe-db` dentro do container, sem modificar a URL em tempo de execução. O Prisma aceita os protocolos `postgres://` e `postgresql://`.
 
 ### 2. Construir e iniciar os serviços
 
@@ -491,9 +490,9 @@ npm ci
 
 `npm ci` utiliza exatamente as versões registradas no `package-lock.json` e é o comando utilizado pela CI. Use `npm install <pacote>` apenas quando estiver adicionando ou atualizando uma dependência.
 
-### 2. Ajustar a conexão local
+### 2. Conferir a conexão local
 
-Crie o `.env` e troque o host da `DATABASE_URL` de `alibe-db` para `localhost`:
+O `.env.template` já utiliza `localhost`, então não é necessário trocar o host para executar o Prisma ou a API diretamente no computador:
 
 ```dotenv
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/alibe
@@ -587,7 +586,17 @@ Não crie migrations vazias apenas como exemplo. Uma migration deve representar 
 
 Atualmente os testes do módulo `example` utilizam memória e, portanto, não precisam executar migration. Quando um teste de integração utilizar um repository Prisma real, ele deverá usar um banco exclusivo de teste e a pipeline deverá aplicar `prisma migrate deploy` antes desses testes.
 
-Seeds devem ficar em `prisma/seed.ts` quando forem implementados. O seed deve ser idempotente sempre que possível, ou seja, poder ser executado novamente sem duplicar dados indevidamente. Dados de seed não substituem migrations.
+Seeds ficam em `prisma/seed.ts`. A seed usa a `DATABASE_URL` fornecida pelo ambiente, sem trocar o host no código.
+
+```bash
+# Executar no computador: usa localhost conforme o .env
+npm run prisma:seed
+
+# Executar no container já iniciado: o Compose injeta alibe-db
+docker compose exec backend npm run prisma:seed
+```
+
+A seed deve ser idempotente sempre que possível, ou seja, poder ser executada novamente sem duplicar dados indevidamente. Dados de seed não substituem migrations. A seed atual limpa as tabelas antes de inserir os dados e deve ser usada somente em banco local.
 
 ## Scripts disponíveis
 
@@ -599,6 +608,7 @@ Seeds devem ficar em `prisma/seed.ts` quando forem implementados. O seed deve se
 | `npm run build`                | Compila o projeto para `dist/`.                                              |
 | `npm run start:prod`           | Executa o build compilado em `dist/src/main.js`.                             |
 | `npm run prisma:generate`      | Gera o Prisma Client.                                                        |
+| `npm run prisma:seed`          | Executa a seed no banco configurado pela `DATABASE_URL`.                     |
 | `npm run format`               | Formata os arquivos com Prettier.                                            |
 | `npm run format:check`         | Verifica a formatação sem alterar arquivos.                                  |
 | `npm run lint`                 | Verifica o código TypeScript com ESLint.                                     |
