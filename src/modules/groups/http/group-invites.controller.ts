@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Request } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
@@ -9,6 +9,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { randomUUID } from 'node:crypto';
+import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { JoinGroupByInviteResponseDto } from './dto/join-group-by-invite-response.dto';
 import { GetGroupInviteLinkResponseDto } from './dto/get-group-invite-link-response.dto';
 
@@ -41,8 +42,13 @@ export class GroupInvitesController {
   @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   getInviteLink(
-    @Param('groupId', new ParseUUIDPipe()) groupId: string
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Request() request: AuthenticatedRequest
   ): GetGroupInviteLinkResponseDto {
+    // Disponível para a futura validação de acesso ao grupo.
+    const userId = request.user?.id;
+    void userId;
+
     const now = Date.now();
     const currentInviteLink = this.currentInviteLinks.get(groupId);
 
@@ -73,7 +79,14 @@ export class GroupInvitesController {
   })
   @ApiBadRequestResponse({ description: 'token deve ser um UUID válido.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  join(@Param('token', new ParseUUIDPipe()) token: string): JoinGroupByInviteResponseDto {
+  join(
+    @Param('token', new ParseUUIDPipe()) token: string,
+    @Request() request: AuthenticatedRequest
+  ): JoinGroupByInviteResponseDto {
+    // Será usado para vincular o usuário autenticado ao grupo do convite.
+    const userId = request.user?.id;
+    void userId;
+
     return {
       token,
     };

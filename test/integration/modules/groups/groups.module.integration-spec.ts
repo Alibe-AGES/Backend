@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GroupsModule } from '../../../../src/modules/groups/groups.module';
+import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import { GroupInvitesController } from '../../../../src/modules/groups/http/group-invites.controller';
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
+
+const authenticatedRequest = {
+  user: { id: '11111111-1111-4111-8111-111111111111' },
+} as AuthenticatedRequest;
 
 describe('GroupsModule integration', () => {
   let module: TestingModule;
@@ -27,14 +32,14 @@ describe('GroupsModule integration', () => {
     const initialTime = new Date('2026-08-30T12:00:00.000Z').getTime();
     const now = jest.spyOn(Date, 'now').mockReturnValue(initialTime);
 
-    const first = controller.getInviteLink(groupId);
-    const current = controller.getInviteLink(groupId);
+    const first = controller.getInviteLink(groupId, authenticatedRequest);
+    const current = controller.getInviteLink(groupId, authenticatedRequest);
 
     expect(current.token).toBe(first.token);
     expect(first.expiresAt).toEqual(new Date('2026-09-06T12:00:00.000Z'));
 
     now.mockReturnValue(new Date('2026-09-07T12:00:00.000Z').getTime());
-    const renewed = controller.getInviteLink(groupId);
+    const renewed = controller.getInviteLink(groupId, authenticatedRequest);
 
     expect(renewed.token).not.toBe(first.token);
     now.mockRestore();

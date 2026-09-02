@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query, Request } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiInternalServerErrorResponse,
@@ -8,6 +8,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { CalendarDayResponseDto } from './dto/calendar-day-response.dto';
 import { GetGroupCalendarQueryDto } from './dto/get-group-calendar-query.dto';
 
@@ -50,11 +51,14 @@ export class CalendarController {
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   list(
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
-    @Query() query: GetGroupCalendarQueryDto
+    @Query() query: GetGroupCalendarQueryDto,
+    @Request() request: AuthenticatedRequest
   ): CalendarDayResponseDto[] {
-    // O mock ainda não consulta membros ou permissões. Quando a autenticação existir, o userId
-    // será obtido dela e nunca será recebido em path, query ou body.
+    // Disponível para a futura validação de que o usuário pertence ao grupo.
+    const userId = request.user?.id;
+
     void groupId;
+    void userId;
     const datePrefix = `${query.year}-${String(query.month).padStart(2, '0')}`;
 
     return [
