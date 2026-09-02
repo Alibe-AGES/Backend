@@ -478,6 +478,115 @@ Ao criar um endpoint:
 4. abra `/docs` e confira o contrato gerado;
 5. mantenha o teste E2E de `/docs-json` passando.
 
+### Endpoints mockados de grupos
+
+Por enquanto, o módulo `groups` contém apenas os contratos HTTP já discutidos. Os próprios controllers
+devolvem objetos mockados compatíveis com os DTOs; não existem services, use cases, repositories ou
+persistência neste módulo.
+
+| Método | Rota                           | Contrato mockado                         |
+| ------ | ------------------------------ | ---------------------------------------- |
+| GET    | `/groups`                      | Listagem da tela inicial.                |
+| GET    | `/groups/:groupId`             | Grupo, participantes e próximo encontro. |
+| POST   | `/groups`                      | Resposta de criação de grupo.            |
+| GET    | `/groups/:groupId/invite-link` | Token atual e sua data de expiração.     |
+| POST   | `/invite-links/:token/join`    | Acesso ao grupo pelo token de convite.   |
+
+Neste mock, `GET /groups` devolve todos os grupos sem receber `userId`. Quando a autenticação for
+implementada, o identificador será obtido do usuário autenticado e a mesma rota passará a filtrar
+somente os grupos dos quais ele participa. O `userId` não será enviado em path, query ou body para
+essa listagem.
+
+`GET /groups/:groupId` devolve os dados básicos do grupo e a lista de participantes. O mock expõe
+somente `id`, `name` e `profilePic` de cada participante; dados sensíveis, como `password_hash`,
+nunca fazem parte da resposta. Futuramente, essa consulta utilizará os relacionamentos `user_group`.
+O campo `nextEvent` contém o próximo encontro marcado ou `null` quando o grupo ainda não possui um
+próximo encontro.
+
+`POST /groups` recebe `multipart/form-data` com `name` obrigatório e `profile_pic` opcional. O usuário
+criador não é enviado no body: futuramente ele também será obtido da autenticação. Como este é um
+mock, a imagem não é armazenada e a resposta devolve apenas uma URL ilustrativa.
+
+`GET /groups/:groupId/invite-link` cria um token quando não existe, reutiliza o token enquanto sua
+data de expiração estiver no futuro e cria outro depois do vencimento. Como o estado é somente um
+mock em memória, ele é perdido quando a aplicação reinicia. A resposta contém apenas `token` e
+`expiresAt`.
+
+`POST /invite-links/:token/join` recebe somente o token pela URL e responde somente com o próprio
+`token`. Futuramente, o `userId` será extraído do usuário autenticado e não será enviado em path,
+query ou body.
+
+Os DTOs, exemplos de payload e respostas podem ser consultados e executados em
+<http://localhost:3000/docs>. Outros fluxos serão adicionados somente depois que seus contratos
+forem discutidos.
+
+### Endpoint mockado de calendário
+
+O calendário fica em um módulo próprio porque agrega informações de eventos, propostas,
+disponibilidades, usuários e participantes do grupo. Nesta etapa, ele contém somente controller e
+DTOs HTTP mockados, sem service, use case, repository ou persistência.
+
+```http
+GET /groups/:groupId/calendar?month=5&year=2026
+```
+
+O `groupId` é recebido pela URL; `month` e `year` são obrigatórios. `month` deve ser um número
+entre 1 e 12 e `year` deve ser um inteiro com quatro dígitos. O `userId` não é recebido em path,
+query ou body: futuramente virá da autenticação. A resposta contém somente dias com informações.
+Os campos `scheduledEventIds`, `proposalIds`, `availableUserIds` e `completedEventIds` são arrays
+de UUIDs, sem objetos intermediários.
+
+O contrato completo pode ser consultado pelo Swagger em <http://localhost:3000/docs>.
+
+### Endpoint mockado de disponibilidade
+
+A disponibilidade fica no módulo `availability`, separado do calendário. O endpoint recebe o
+grupo pela URL e futuramente obtém o usuário pela autenticação:
+
+```http
+POST /groups/:groupId/availabilities
+```
+
+`date` é obrigatória no formato `YYYY-MM-DD`. `startTime` e `endTime` são opcionais no formato
+`HH:mm`, mas devem ser enviados juntos e o horário final deve ser posterior ao inicial. Quando
+ambos são omitidos, a disponibilidade vale para o dia inteiro.
+
+Os exemplos de requisição e resposta podem ser consultados pelo Swagger em
+<http://localhost:3000/docs>.
+
+### Status HTTP dos endpoints mockados
+
+Os códigos abaixo descrevem o comportamento implementado atualmente. Eles também estão declarados
+nos decorators do Swagger de cada controller.
+
+| Método | Rota                              | Sucesso | Erros atuais |
+| ------ | --------------------------------- | ------- | ------------ |
+| GET    | `/groups`                         | `200`   | `500`        |
+| GET    | `/groups/:groupId`                | `200`   | `400`, `500` |
+| POST   | `/groups`                         | `201`   | `400`, `500` |
+| GET    | `/groups/:groupId/invite-link`    | `200`   | `400`, `500` |
+| POST   | `/invite-links/:token/join`       | `201`   | `400`, `500` |
+| GET    | `/groups/:groupId/calendar`       | `200`   | `400`, `500` |
+| POST   | `/groups/:groupId/availabilities` | `201`   | `400`, `500` |
+
+| Status                      | Significado atual                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `200 OK`                    | Consulta processada e resposta mockada retornada com sucesso.                                                            |
+| `201 Created`               | Recurso ou vínculo simulado criado com sucesso.                                                                          |
+| `400 Bad Request`           | UUID inválido, campo obrigatório ausente, data ou intervalo inválido, `month` fora de 1–12 ou `year` sem quatro dígitos. |
+| `500 Internal Server Error` | Falha inesperada não tratada durante o processamento.                                                                    |
+
+Quando autenticação e persistência forem implementadas, os contratos deverão incorporar os códigos
+abaixo junto com o comportamento e os testes correspondentes. Eles ainda não são retornados pelos
+mocks atuais:
+
+| Status futuro      | Situação prevista                               |
+| ------------------ | ----------------------------------------------- |
+| `401 Unauthorized` | Requisição sem autenticação válida.             |
+| `403 Forbidden`    | Usuário autenticado sem acesso ao grupo.        |
+| `404 Not Found`    | Grupo, convite ou outro recurso não encontrado. |
+| `410 Gone`         | Tentativa de usar um convite expirado.          |
+
 ## Executando a API localmente
 
 Use esta opção quando quiser executar o NestJS diretamente no computador e manter apenas o PostgreSQL no Docker.
