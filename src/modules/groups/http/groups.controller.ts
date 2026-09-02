@@ -25,10 +25,13 @@ import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
+import { ListGroupsUseCase } from '../application/list-groups.use-case';
 
 @ApiTags('Groups - Mock')
 @Controller('groups')
 export class GroupsController {
+  constructor(private readonly listGroupsUseCase: ListGroupsUseCase) {}
+
   /**
    * GET /groups
    * Lista os grupos mockados da tela inicial. Futuramente, o usuário será identificado pela
@@ -36,7 +39,7 @@ export class GroupsController {
    */
   @Get()
   @ApiOperation({
-    summary: '[Mock] Lista todos os grupos do usuário que será obtido pela autenticação',
+    summary: 'Lista todos os grupos do usuário que será obtido pela autenticação',
   })
   @ApiOkResponse({
     description: 'Grupos listados com sucesso.',
@@ -44,25 +47,15 @@ export class GroupsController {
     isArray: true,
   })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  list(@Request() request: AuthenticatedRequest): GroupListItemResponseDto[] {
-    // Disponível para a futura consulta dos grupos pertencentes ao usuário.
-    const userId = request.user?.id;
-    void userId;
+  async list(@Request() request: AuthenticatedRequest): Promise<GroupListItemResponseDto[]> {
+    const groups = await this.listGroupsUseCase.execute(request.user?.id ?? '');
 
-    return [
-      {
-        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        name: 'Amigos da faculdade',
-        profilePic: 'https://images.example.com/groups/faculdade.jpg',
-        createdAt: new Date('2026-08-01T15:00:00.000Z'),
-      },
-      {
-        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        name: 'Família',
-        profilePic: null,
-        createdAt: new Date('2026-07-20T18:30:00.000Z'),
-      },
-    ];
+    return groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      profilePic: group.profilePic,
+      createdAt: group.createdAt,
+    }));
   }
 
   /**
