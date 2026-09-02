@@ -10,6 +10,23 @@ const prisma = new PrismaClient({
   adapter,
 });
 const PASSWORD_PLACEHOLDER = 'NOT_IMPLEMENTED';
+const SEEDED_USER_IDS = [
+  '11111111-1111-4111-8111-111111111111',
+  '22222222-2222-4222-8222-222222222222',
+  '33333333-3333-4333-8333-333333333333',
+  '44444444-4444-4444-8444-444444444444',
+  '55555555-5555-4555-8555-555555555555',
+  '66666666-6666-4666-8666-666666666666',
+  '77777777-7777-4777-8777-777777777777',
+  '88888888-8888-4888-8888-888888888888',
+  '99999999-9999-4999-8999-999999999999',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  'ffffffff-ffff-4fff-8fff-ffffffffffff',
+] as const;
 
 async function main() {
   console.log('Iniciando seed...');
@@ -124,9 +141,10 @@ async function main() {
 
   const users = [];
 
-  for (const userData of usersData) {
+  for (const [index, userData] of usersData.entries()) {
     const user = await prisma.user.create({
       data: {
+        id: SEEDED_USER_IDS[index],
         ...userData,
         passwordHash: PASSWORD_PLACEHOLDER,
         profilePic: null,

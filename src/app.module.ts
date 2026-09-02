@@ -6,9 +6,17 @@ import { ExampleModule } from './modules/example/example.module';
 import { GroupsModule } from './modules/groups/groups.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
-  imports: [ExampleModule, MonitoringModule, GroupsModule, CalendarModule, AvailabilityModule],
+  imports: [
+    AuthModule,
+    ExampleModule,
+    MonitoringModule,
+    GroupsModule,
+    CalendarModule,
+    AvailabilityModule,
+  ],
   providers: [
     {
       provide: APP_PIPE,

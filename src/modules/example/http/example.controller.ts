@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Request,
   Res,
   UploadedFile,
   UseInterceptors,
@@ -26,6 +27,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
+import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { CreateExampleUseCase, InvalidExampleError } from '../application/create-example.use-case';
 import {
   ExampleImageNotFoundError,
@@ -70,8 +72,12 @@ export class ExampleController {
   @ApiPayloadTooLargeResponse({ description: 'A imagem ultrapassa o limite de 5 MB.' })
   async create(
     @Body() input: CreateExampleDto,
-    @UploadedFile() image?: Express.Multer.File
+    @UploadedFile() image: Express.Multer.File | undefined,
+    @Request() request: AuthenticatedRequest
   ): Promise<ExampleResponseDto> {
+    const userId = request.user?.id;
+    void userId;
+
     if (!image) {
       throw new BadRequestException('Image file is required');
     }
@@ -101,7 +107,13 @@ export class ExampleController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: ExampleResponseDto })
   @ApiNotFoundResponse({ description: 'Exemplo não encontrado.' })
-  async get(@Param('id', new ParseUUIDPipe()) id: string): Promise<ExampleResponseDto> {
+  async get(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<ExampleResponseDto> {
+    const userId = request.user?.id;
+    void userId;
+
     try {
       return this.toResponse(await this.getExampleUseCase.execute(id));
     } catch (error) {
@@ -124,8 +136,12 @@ export class ExampleController {
   @ApiNotFoundResponse({ description: 'Imagem não encontrada.' })
   async getImage(
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Res() response: Response
+    @Res() response: Response,
+    @Request() request: AuthenticatedRequest
   ): Promise<void> {
+    const userId = request.user?.id;
+    void userId;
+
     try {
       const image = await this.getExampleImageUseCase.execute(id);
       response.setHeader('Content-Type', image.contentType);

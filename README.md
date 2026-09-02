@@ -90,6 +90,8 @@ Variáveis atuais:
 | `DATABASE_NAME`         | Nome do banco da aplicação.                                     |
 | `APP_PORT`              | Porta exposta pela API quando executada pelo Docker Compose.    |
 | `DATABASE_URL`          | URL de conexão utilizada pelo Prisma.                           |
+| `MOCK_AUTH_ENABLED`     | Ativa temporariamente o usuário simulado da Sprint 1.           |
+| `MOCK_AUTH_USER_ID`     | UUID de um usuário criado pela seed e injetado em cada request. |
 | `AWS_REGION`            | Região usada pelo MiniStack e pelos comandos da AWS CLI.        |
 | `AWS_S3_BUCKET`         | Nome do bucket utilizado pela aplicação.                        |
 | `AWS_ENDPOINT_URL`      | Endpoint global dos serviços AWS; presente apenas no MiniStack. |
@@ -196,6 +198,7 @@ Os endereços abaixo consideram o ambiente local com `docker compose up` em exec
 | -------------------- | -------------------------------------------------- | --------------------------------------------------- |
 | API                  | <http://localhost:3000>                            | URL base do Backend.                                |
 | Endpoint de exemplo  | <http://localhost:3000/example>                    | Verificação rápida da API.                          |
+| Usuário mockado      | <http://localhost:3000/auth/me>                    | Mostra o usuário injetado na request na Sprint 1.   |
 | Swagger UI           | <http://localhost:3000/docs>                       | Documentação interativa e teste dos endpoints.      |
 | OpenAPI JSON         | <http://localhost:3000/docs-json>                  | Contrato OpenAPI consumível por outras ferramentas. |
 | Métricas do Backend  | <http://localhost:3000/metrics>                    | Métricas brutas no formato Prometheus.              |
@@ -477,6 +480,44 @@ Ao criar um endpoint:
 3. documente as respostas com `@ApiOkResponse()`, `@ApiCreatedResponse()` ou o decorator correspondente;
 4. abra `/docs` e confira o contrato gerado;
 5. mantenha o teste E2E de `/docs-json` passando.
+
+### Autenticação temporária da Sprint 1
+
+Enquanto a autenticação real não estiver disponível, `MockAuthenticationMiddleware` injeta em
+cada request o mesmo contrato esperado futuramente:
+
+```ts
+request.user = { id: process.env.MOCK_AUTH_USER_ID };
+```
+
+O mock é controlado exclusivamente pelo ambiente:
+
+```dotenv
+MOCK_AUTH_ENABLED=true
+MOCK_AUTH_USER_ID=11111111-1111-4111-8111-111111111111
+```
+
+O ID padrão pertence à primeira usuária da seed, Ana Beatriz Silva. O segundo usuário, Bruno
+Henrique Souza, possui o ID `22222222-2222-4222-8222-222222222222`. Todos os 15 usuários da seed
+possuem IDs determinísticos; eles podem ser consultados no Adminer.
+
+Para simular outro usuário, altere `MOCK_AUTH_USER_ID` no `.env` e recrie somente o Backend:
+
+```bash
+docker compose up -d --force-recreate backend
+```
+
+O usuário selecionado pode ser conferido em `GET /auth/me`. Controllers que necessitam do usuário
+recebem a request com `@Request() request: AuthenticatedRequest` e acessam `request.user.id`; o
+`userId` nunca é recebido por path, query ou body. Quando a autenticação real for implementada, o
+middleware temporário será desativado e um Guard validará as credenciais, mantendo o mesmo
+`request.user`.
+
+Em produção, mantenha obrigatoriamente:
+
+```dotenv
+MOCK_AUTH_ENABLED=false
+```
 
 ### Endpoints mockados de grupos
 

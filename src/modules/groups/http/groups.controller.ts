@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Request,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { Param, ParseUUIDPipe } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -13,6 +21,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { randomUUID } from 'node:crypto';
+import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
@@ -35,7 +44,11 @@ export class GroupsController {
     isArray: true,
   })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  list(): GroupListItemResponseDto[] {
+  list(@Request() request: AuthenticatedRequest): GroupListItemResponseDto[] {
+    // Disponível para a futura consulta dos grupos pertencentes ao usuário.
+    const userId = request.user?.id;
+    void userId;
+
     return [
       {
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -66,7 +79,14 @@ export class GroupsController {
   })
   @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  getById(@Param('groupId', new ParseUUIDPipe()) groupId: string): GroupDetailsResponseDto {
+  getById(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Request() request: AuthenticatedRequest
+  ): GroupDetailsResponseDto {
+    // Disponível para a futura validação de acesso ao grupo.
+    const userId = request.user?.id;
+    void userId;
+
     return {
       id: groupId,
       name: 'Amigos da faculdade',
@@ -125,8 +145,13 @@ export class GroupsController {
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   create(
     @Body() input: CreateGroupDto,
-    @UploadedFile() profilePicFile?: unknown
+    @UploadedFile() profilePicFile: unknown,
+    @Request() request: AuthenticatedRequest
   ): GroupListItemResponseDto {
+    // Disponível para vincular o criador como participante do grupo.
+    const userId = request.user?.id;
+    void userId;
+
     const id = randomUUID();
 
     return {

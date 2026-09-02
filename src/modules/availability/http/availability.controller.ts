@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post, Request } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -9,6 +9,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { randomUUID } from 'node:crypto';
+import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { AvailabilityResponseDto } from './dto/availability-response.dto';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
 
@@ -48,12 +49,13 @@ export class AvailabilityController {
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   create(
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
-    @Body() input: CreateAvailabilityDto
+    @Body() input: CreateAvailabilityDto,
+    @Request() request: AuthenticatedRequest
   ): AvailabilityResponseDto {
     return {
       id: randomUUID(),
       groupId,
-      userId: MOCK_AUTHENTICATED_USER_ID,
+      userId: request.user?.id ?? MOCK_AUTHENTICATED_USER_ID,
       date: input.date,
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,
