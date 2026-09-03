@@ -1,7 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
   Request,
   UploadedFile,
@@ -22,6 +25,7 @@ import {
 } from '@nestjs/swagger';
 import { randomUUID } from 'node:crypto';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
+import { CreateGroupUseCase, InvalidGroupError } from '../application/create-group.use-case';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
@@ -29,6 +33,7 @@ import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
 @ApiTags('Groups - Mock')
 @Controller('groups')
 export class GroupsController {
+  constructor(private readonly createGroupUseCase: CreateGroupUseCase) {}
   /**
    * GET /groups
    * Lista os grupos mockados da tela inicial. Futuramente, o usuário será identificado pela
@@ -119,6 +124,7 @@ export class GroupsController {
    * não persiste os dados nem armazena a imagem.
    */
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('profile_pic'))
   @ApiOperation({ summary: '[Mock] Cria um grupo com nome e foto de perfil opcional' })
   @ApiConsumes('multipart/form-data')
@@ -138,27 +144,37 @@ export class GroupsController {
     },
   })
   @ApiCreatedResponse({
-    description: 'Grupo criado com sucesso pelo mock.',
+    description: 'Grupo criado com sucesso.',
     type: GroupListItemResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Nome ausente ou fora dos limites permitidos.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  create(
+  async create(
     @Body() input: CreateGroupDto,
-    @UploadedFile() profilePicFile: unknown,
+    @UploadedFile() image: Express.Multer.File | undefined,
     @Request() request: AuthenticatedRequest
-  ): GroupListItemResponseDto {
+  ): Promise<GroupListItemResponseDto> {
     // Disponível para vincular o criador como participante do grupo.
     const userId = request.user?.id;
     void userId;
 
-    const id = randomUUID();
+    try {
+      const group = await this.createGroupUseCase.execute({
+        name: input.name,
+        image: image ? {
+          originalName: image.originalname,
+          contentType: image.mimetype,
+          bytes: image.buffer,
+        } : undefined,
+      });
 
-    return {
-      id,
-      name: input.name,
-      profilePic: profilePicFile ? `https://images.example.com/groups/${id}` : null,
-      createdAt: new Date(),
-    };
+      return GroupListItemResponseDto.fromEntity(group);
+    } catch (error) {
+      if (error instanceof InvalidGroupError) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
   }
 }

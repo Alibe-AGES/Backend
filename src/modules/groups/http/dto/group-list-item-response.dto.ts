@@ -12,4 +12,16 @@ export class GroupListItemResponseDto {
 
   @ApiProperty({ format: 'date-time' })
   createdAt!: Date;
+
+  static fromEntity(
+    group: { id: string; name: string; imageKey: string },
+    createdAt: Date = new Date()
+  ): GroupListItemResponseDto {
+    const dto = new GroupListItemResponseDto();
+    dto.id = group.id;
+    dto.name = group.name;
+    dto.profilePic = group.imageKey;
+    dto.createdAt = createdAt;
+    return dto;
+  }
 }
