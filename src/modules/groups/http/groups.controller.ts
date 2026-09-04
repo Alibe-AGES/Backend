@@ -48,14 +48,7 @@ export class GroupsController {
   })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   async list(@Request() request: AuthenticatedRequest): Promise<GroupListItemResponseDto[]> {
-    const groups = await this.listGroupsUseCase.execute(request.user?.id ?? '');
-
-    return groups.map((group) => ({
-      id: group.id,
-      name: group.name,
-      profilePic: group.profilePic,
-      createdAt: group.createdAt,
-    }));
+    return this.listGroupsUseCase.execute(request.user?.id ?? '');
   }
 
   /**
