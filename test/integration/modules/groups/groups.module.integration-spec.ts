@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { GroupsModule } from '../../../../src/modules/groups/groups.module';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
+import { ListGroupsUseCase } from '../../../../src/modules/groups/application/list-groups.use-case';
+import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
 import { GroupInvitesController } from '../../../../src/modules/groups/http/group-invites.controller';
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
 
@@ -10,18 +13,54 @@ const authenticatedRequest = {
 
 describe('GroupsModule integration', () => {
   let module: TestingModule;
+  const findMany = jest.fn();
+  const prisma = {
+    group: { findMany },
+  } as unknown as PrismaService;
 
   beforeAll(async () => {
     module = await Test.createTestingModule({
       imports: [GroupsModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue(prisma)
+      .compile();
   });
 
   afterAll(async () => {
     await module.close();
   });
 
-  it('registers the mock controllers without application providers', () => {
+  beforeEach(() => {
+    findMany.mockReset();
+  });
+
+  it('connects the use case, repository and Prisma adapter', async () => {
+    const userId = '11111111-1111-4111-8111-111111111111';
+    const row = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'Turma da Faculdade',
+      profilePic: null,
+      createdAt: new Date('2026-07-12'),
+    };
+    findMany.mockResolvedValue([row]);
+
+    const listGroups = module.get(ListGroupsUseCase);
+    const repository = module.get(GroupRepository);
+
+    await expect(listGroups.execute(userId)).resolves.toEqual([row]);
+    expect(repository).toBeDefined();
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        users: {
+          some: { userId },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  it('registers the groups controllers', () => {
     expect(module.get(GroupsController)).toBeInstanceOf(GroupsController);
     expect(module.get(GroupInvitesController)).toBeInstanceOf(GroupInvitesController);
   });
