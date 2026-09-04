@@ -29,6 +29,9 @@ import { CreateGroupUseCase, InvalidGroupError } from '../application/create-gro
 import { CreateGroupDto } from './dto/create-group.dto';
 import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
+import { Group } from '../domain/group.entity';
+
+const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
 @ApiTags('Groups - Mock')
 @Controller('groups')
@@ -125,7 +128,7 @@ export class GroupsController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('profile_pic'))
+  @UseInterceptors(FileInterceptor('profile_pic', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } }))
   @ApiOperation({ summary: '[Mock] Cria um grupo com nome e foto de perfil opcional' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -168,13 +171,20 @@ export class GroupsController {
         } : undefined,
       });
 
-      return GroupListItemResponseDto.fromEntity(group);
+      return this.toResponse(group);
     } catch (error) {
       if (error instanceof InvalidGroupError) {
         throw new BadRequestException(error.message);
       }
-
-      throw error;
     }
+  }
+
+  private toResponse(group: Group): GroupListItemResponseDto {
+    return {
+      id: group.id,
+      name: group.name,
+      profilePic: `/group/${group.id}/image`,
+      createdAt: group.createdAt,
+    };
   }
 }
