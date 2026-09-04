@@ -183,7 +183,7 @@ export class GroupsController {
     return {
       id: group.id,
       name: group.name,
-      profilePic: `/group/${group.id}/image`,
+      profilePic: group.imageKey ? `/group/${group.id}/image` : null,
       createdAt: group.createdAt,
     };
   }

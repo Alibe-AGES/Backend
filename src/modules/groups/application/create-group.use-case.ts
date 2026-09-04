@@ -32,14 +32,21 @@ export class CreateGroupUseCase {
     }
 
     const id = randomUUID();
-    const extension = this.safeExtension(input.image.originalName);
-    const profilePic = `groups/${id}/image${extension}`;
+    let extension = null
+    let profilePic = null
 
-    await this.storage.save({
-      key: profilePic,
-      bytes: input.image.bytes,
-      contentType: input.image.contentType,
-    });
+    if(input.image) {
+      extension = this.safeExtension(input.image.originalName);
+      profilePic = `groups/${id}/image${extension}`;
+    }
+
+    if(profilePic) {
+      await this.storage.save({
+        key: profilePic,
+        bytes: input.image.bytes,
+        contentType: input.image.contentType,
+      });
+    }
 
     try {
       const createdAt = new Date();
