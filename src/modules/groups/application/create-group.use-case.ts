@@ -36,6 +36,10 @@ export class CreateGroupUseCase {
     let profilePic = null
 
     if(input.image) {
+      if (!input.image.contentType.startsWith('image/')) {
+          throw new InvalidGroupError('Somente imagens são aceitas');
+      }
+
       extension = this.safeExtension(input.image.originalName);
       profilePic = `groups/${id}/image${extension}`;
     }
@@ -52,7 +56,7 @@ export class CreateGroupUseCase {
       const createdAt = new Date();
       return await this.groups.create({ id, name, profilePic, createdAt });
     } catch (error) {
-      await this.storage.delete(profilePic).catch(() => undefined);
+      await this.storage.delete(profilePic).catch(() => null);
       throw error;
     }
   }

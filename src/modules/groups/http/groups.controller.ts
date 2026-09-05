@@ -154,7 +154,7 @@ export class GroupsController {
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   async create(
     @Body() input: CreateGroupDto,
-    @UploadedFile() image: Express.Multer.File | undefined,
+    @UploadedFile() image: Express.Multer.File | null,
     @Request() request: AuthenticatedRequest
   ): Promise<GroupListItemResponseDto> {
     // Disponível para vincular o criador como participante do grupo.
@@ -168,7 +168,7 @@ export class GroupsController {
           originalName: image.originalname,
           contentType: image.mimetype,
           bytes: image.buffer,
-        } : undefined,
+        } : null,
       });
 
       return this.toResponse(group);
@@ -183,7 +183,7 @@ export class GroupsController {
     return {
       id: group.id,
       name: group.name,
-      profilePic: group.imageKey ? `/group/${group.id}/image` : null,
+      profilePic: group.profilePic ? `/group/${group.id}/image` : null,
       createdAt: group.createdAt,
     };
   }

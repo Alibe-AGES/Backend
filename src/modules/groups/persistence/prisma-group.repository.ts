@@ -11,7 +11,6 @@ export class PrismaGroupRepository extends GroupRepository {
 
   async create(data: CreateGroupData): Promise<Group> {
     const group = await this.prisma.group.create({ data });
-    console.log("Data persisted");
     return this.toDomain(group);
   }
 

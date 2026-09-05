@@ -3,7 +3,7 @@ import { Group } from './group.entity';
 export interface CreateGroupData {
   id: string;
   name: string;
-  profilePic: string | undefined;
+  profilePic: string | null;
   createdAt: Date;
 }
 

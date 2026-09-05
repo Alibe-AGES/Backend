@@ -1,20 +1,20 @@
 export interface GroupProps {
   id: string;
   name: string;
-  imageKey?: string | undefined;
+  profilePic?: string | null;
   createdAt: Date;
 }
 
 export class Group {
   readonly id: string;
   readonly name: string;
-  readonly imageKey: string | null; 
+  readonly profilePic: string | null; 
   readonly createdAt: Date;
 
   constructor(props: GroupProps) {
     this.id = props.id;
     this.name = props.name;
-    this.imageKey = props.imageKey;
+    this.profilePic = props.profilePic;
     this.createdAt = props.createdAt;
   }
 }
