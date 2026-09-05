@@ -19,12 +19,7 @@ export class PrismaGroupRepository extends GroupRepository {
     return group ? this.toDomain(group) : null;
   }
 
-  private toDomain(data: {
-    id: string;
-    name: string;
-    imageKey?: string;
-    createdAt: Date;
-  }): Group {
+  private toDomain(data: { id: string; name: string; imageKey?: string; createdAt: Date }): Group {
     return new Group(data);
   }
 }

@@ -7,7 +7,11 @@ export class GroupListItemResponseDto {
   @ApiProperty({ example: 'Amigos da faculdade' })
   name!: string;
 
-  @ApiProperty({ example: 'https://images.example.com/groups/faculdade.jpg', nullable: true, required: false })
+  @ApiProperty({
+    example: 'https://images.example.com/groups/faculdade.jpg',
+    nullable: true,
+    required: false,
+  })
   profilePic!: string | null;
 
   @ApiProperty({ format: 'date-time' })

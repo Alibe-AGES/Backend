@@ -128,7 +128,9 @@ export class GroupsController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('profile_pic', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } }))
+  @UseInterceptors(
+    FileInterceptor('profile_pic', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } })
+  )
   @ApiOperation({ summary: '[Mock] Cria um grupo com nome e foto de perfil opcional' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -164,11 +166,13 @@ export class GroupsController {
     try {
       const group = await this.createGroupUseCase.execute({
         name: input.name,
-        image: image ? {
-          originalName: image.originalname,
-          contentType: image.mimetype,
-          bytes: image.buffer,
-        } : null,
+        image: image
+          ? {
+              originalName: image.originalname,
+              contentType: image.mimetype,
+              bytes: image.buffer,
+            }
+          : null,
       });
 
       return this.toResponse(group);

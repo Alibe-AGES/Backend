@@ -18,5 +18,4 @@ import { PrismaGroupRepository } from './persistence/prisma-group.repository';
     },
   ],
 })
-
 export class GroupsModule {}

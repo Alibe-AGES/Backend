@@ -8,7 +8,7 @@ export interface GroupProps {
 export class Group {
   readonly id: string;
   readonly name: string;
-  readonly profilePic: string | null; 
+  readonly profilePic: string | null;
   readonly createdAt: Date;
 
   constructor(props: GroupProps) {

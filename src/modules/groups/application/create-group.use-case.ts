@@ -32,19 +32,19 @@ export class CreateGroupUseCase {
     }
 
     const id = randomUUID();
-    let extension = null
-    let profilePic = null
+    let extension = null;
+    let profilePic = null;
 
-    if(input.image) {
+    if (input.image) {
       if (!input.image.contentType.startsWith('image/')) {
-          throw new InvalidGroupError('Somente imagens são aceitas');
+        throw new InvalidGroupError('Somente imagens são aceitas');
       }
 
       extension = this.safeExtension(input.image.originalName);
       profilePic = `groups/${id}/image${extension}`;
     }
 
-    if(profilePic) {
+    if (profilePic) {
       await this.storage.save({
         key: profilePic,
         bytes: input.image.bytes,
