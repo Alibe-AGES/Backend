@@ -6,6 +6,8 @@ import { setupApplication } from '../../../../src/app.setup';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { ExampleRepository } from '../../../../src/modules/example/domain/example.repository';
+import { Group } from '../../../../src/modules/groups/domain/group.entity';
+import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryExampleRepository } from '../../../helpers/in-memory-example.repository';
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
@@ -25,6 +27,17 @@ describe('Groups mock endpoints (e2e)', () => {
       .useValue('alibe-local-media')
       .overrideProvider(PrismaService)
       .useValue({})
+      .overrideProvider(GroupRepository)
+      .useValue({
+        findByUserId: jest.fn().mockResolvedValue([
+          new Group({
+            id: DEMO_GROUP_ID,
+            name: 'Amigos da faculdade',
+            profilePic: 'https://images.example.com/groups/faculdade.jpg',
+            createdAt: new Date('2026-08-01T15:00:00.000Z'),
+          }),
+        ]),
+      })
       .overrideProvider(ExampleRepository)
       .useClass(InMemoryExampleRepository)
       .overrideProvider(ObjectStorage)
@@ -40,7 +53,7 @@ describe('Groups mock endpoints (e2e)', () => {
     await app.close();
   });
 
-  it('lists the mocked groups', async () => {
+  it('lists the groups for the mocked user', async () => {
     const response = await request(app.getHttpServer()).get('/groups').expect(200);
 
     expect(response.body).toEqual(

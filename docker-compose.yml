@@ -1,6 +1,7 @@
 services:
   backend:
     container_name: alibe-backend
+    user: node
 
     build:
       context: .
@@ -26,7 +27,6 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-      - /app/generated
 
     ports:
       - '${APP_PORT}:${APP_PORT}'

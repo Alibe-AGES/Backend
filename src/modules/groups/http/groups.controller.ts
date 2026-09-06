@@ -29,6 +29,7 @@ import { CreateGroupUseCase, InvalidGroupError } from '../application/create-gro
 import { CreateGroupDto } from './dto/create-group.dto';
 import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
+import { ListGroupsUseCase } from '../application/list-groups.use-case';
 import { Group } from '../domain/group.entity';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
@@ -36,7 +37,8 @@ const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 @ApiTags('Groups - Mock')
 @Controller('groups')
 export class GroupsController {
-  constructor(private readonly createGroupUseCase: CreateGroupUseCase) {}
+  constructor(private readonly createGroupUseCase: CreateGroupUseCase,
+              private readonly listGroupsUseCase: ListGroupsUseCase) {}
   /**
    * GET /groups
    * Lista os grupos mockados da tela inicial. Futuramente, o usuário será identificado pela
@@ -44,7 +46,7 @@ export class GroupsController {
    */
   @Get()
   @ApiOperation({
-    summary: '[Mock] Lista todos os grupos do usuário que será obtido pela autenticação',
+    summary: 'Lista todos os grupos do usuário que será obtido pela autenticação',
   })
   @ApiOkResponse({
     description: 'Grupos listados com sucesso.',
@@ -52,25 +54,8 @@ export class GroupsController {
     isArray: true,
   })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  list(@Request() request: AuthenticatedRequest): GroupListItemResponseDto[] {
-    // Disponível para a futura consulta dos grupos pertencentes ao usuário.
-    const userId = request.user?.id;
-    void userId;
-
-    return [
-      {
-        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        name: 'Amigos da faculdade',
-        profilePic: 'https://images.example.com/groups/faculdade.jpg',
-        createdAt: new Date('2026-08-01T15:00:00.000Z'),
-      },
-      {
-        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        name: 'Família',
-        profilePic: null,
-        createdAt: new Date('2026-07-20T18:30:00.000Z'),
-      },
-    ];
+  async list(@Request() request: AuthenticatedRequest): Promise<GroupListItemResponseDto[]> {
+    return this.listGroupsUseCase.execute(request.user?.id ?? '');
   }
 
   /**

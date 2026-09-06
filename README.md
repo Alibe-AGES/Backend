@@ -668,7 +668,10 @@ Esse comando lê o `prisma/schema.prisma` e gera o cliente TypeScript tipado em 
 > não cria tabelas e não executa migrations. Execute-o depois de `npm ci` e sempre que o
 > `schema.prisma` mudar ao trabalhar diretamente no computador. Na execução pelo Docker Compose,
 > esse comando e o `prisma migrate deploy` são executados automaticamente antes da API. O banco é
-> criado pelo PostgreSQL/Docker; as tabelas são criadas ou alteradas por migrations.
+> criado pelo PostgreSQL/Docker; as tabelas são criadas ou alteradas por migrations. O Compose
+> grava o client gerado no mesmo diretório `generated/prisma` usado pelo VS Code, portanto
+> `docker compose up` também mantém as tipagens locais sincronizadas. O serviço roda como o
+> usuário `node` para não criar esses arquivos com proprietário `root`.
 
 Fluxo correto quando alguém adicionar ou alterar um model:
 
