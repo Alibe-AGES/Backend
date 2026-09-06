@@ -36,8 +36,10 @@ const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 @ApiTags('Groups - Mock')
 @Controller('groups')
 export class GroupsController {
-  constructor(private readonly createGroupUseCase: CreateGroupUseCase,
-              private readonly listGroupsUseCase: ListGroupsUseCase) {}
+  constructor(
+    private readonly createGroupUseCase: CreateGroupUseCase,
+    private readonly listGroupsUseCase: ListGroupsUseCase
+  ) {}
   /**
    * GET /groups
    * Lista os grupos mockados da tela inicial. Futuramente, o usuário será identificado pela

@@ -26,15 +26,15 @@ describe('GroupsModule integration', () => {
     module = await Test.createTestingModule({
       imports: [GroupsModule],
     })
-    .overrideProvider(PrismaService)
-    .useValue(prisma)
-    .overrideProvider(S3_CLIENT)
-    .useValue({ send: jest.fn() })
-    .overrideProvider(S3_BUCKET)
-    .useValue('alibe-local-media')  
-    .overrideProvider(ObjectStorage)
-    .useClass(InMemoryObjectStorage) 
-    .compile();
+      .overrideProvider(PrismaService)
+      .useValue(prisma)
+      .overrideProvider(S3_CLIENT)
+      .useValue({ send: jest.fn() })
+      .overrideProvider(S3_BUCKET)
+      .useValue('alibe-local-media')
+      .overrideProvider(ObjectStorage)
+      .useClass(InMemoryObjectStorage)
+      .compile();
   });
 
   afterAll(async () => {
@@ -86,12 +86,12 @@ describe('GroupsModule integration', () => {
         createdAt: new Date('2026-08-01'),
       };
 
-      create.mockResolvedValue(createdGroup)
+      create.mockResolvedValue(createdGroup);
 
       const result = await controller.create(
         { name: 'Group of friends' } as any,
         null,
-        authenticatedRequest,
+        authenticatedRequest
       );
 
       expect(result.name).toEqual('Group of friends');
@@ -111,17 +111,17 @@ describe('GroupsModule integration', () => {
         name: 'Group with photo',
         profilePic: file,
         createdAt: new Date('2026-08-01'),
-      }
+      };
 
-      create.mockResolvedValue(createdGroup)
+      create.mockResolvedValue(createdGroup);
 
       const result = await controller.create(
         { name: 'Group with photo' } as any,
         file,
-        authenticatedRequest,
+        authenticatedRequest
       );
 
-      expect(result.name).toEqual('Group with photo')
+      expect(result.name).toEqual('Group with photo');
       expect(result.profilePic).toEqual(`/group/${result.id}/image`);
     });
 
@@ -129,7 +129,7 @@ describe('GroupsModule integration', () => {
       const controller = module.get(GroupsController);
 
       await expect(
-        controller.create({ name: '' } as any, null, authenticatedRequest),
+        controller.create({ name: '' } as any, null, authenticatedRequest)
       ).rejects.toThrow();
     });
   });
@@ -140,16 +140,16 @@ describe('GroupsModule integration', () => {
       const groupId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
       const initialTime = new Date('2026-08-30T12:00:00.000Z').getTime();
       const now = jest.spyOn(Date, 'now').mockReturnValue(initialTime);
-  
+
       const first = controller.getInviteLink(groupId, authenticatedRequest);
       const current = controller.getInviteLink(groupId, authenticatedRequest);
-  
+
       expect(current.token).toBe(first.token);
       expect(first.expiresAt).toEqual(new Date('2026-09-06T12:00:00.000Z'));
-  
+
       now.mockReturnValue(new Date('2026-09-07T12:00:00.000Z').getTime());
       const renewed = controller.getInviteLink(groupId, authenticatedRequest);
-  
+
       expect(renewed.token).not.toBe(first.token);
       now.mockRestore();
     });

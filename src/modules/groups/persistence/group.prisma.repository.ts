@@ -6,7 +6,7 @@ import { Group } from '../domain/group.entity';
 @Injectable()
 export class PrismaGroupRepository implements GroupRepository {
   constructor(protected readonly prisma: PrismaService) {}
-  
+
   async create(data: CreateGroupData): Promise<Group> {
     const group = await this.prisma.group.create({ data });
     return group;

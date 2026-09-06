@@ -11,6 +11,6 @@ export abstract class GroupRepository {
   abstract create(data: CreateGroupData): Promise<Group>;
 
   abstract findById(id: string): Promise<Group | null>;
-  
+
   abstract findByUserId(userId: string): Promise<Group[]>;
 }
