@@ -180,6 +180,7 @@ export class GroupsController {
       if (error instanceof InvalidGroupError) {
         throw new BadRequestException(error.message);
       }
+      throw error;
     }
   }
 
