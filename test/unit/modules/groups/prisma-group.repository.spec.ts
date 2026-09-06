@@ -1,5 +1,5 @@
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
-import { PrismaGroupRepository } from '../../../../src/modules/groups/persistence/prisma-group.repository';
+import { PrismaGroupRepository } from '../../../../src/modules/groups/persistence/group.prisma.repository';
 
 describe('PrismaGroupRepository', () => {
   const create = jest.fn();

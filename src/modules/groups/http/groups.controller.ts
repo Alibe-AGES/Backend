@@ -23,7 +23,6 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { randomUUID } from 'node:crypto';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { CreateGroupUseCase, InvalidGroupError } from '../application/create-group.use-case';
 import { CreateGroupDto } from './dto/create-group.dto';

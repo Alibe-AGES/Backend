@@ -5,6 +5,9 @@ import {
 } from '../../src/modules/groups/domain/group.repository';
 
 export class InMemoryGroupRepository extends GroupRepository {
+  findByUserId(userId: string): Promise<Group[]> {
+    throw new Error('Method not implemented.');
+  }
   private readonly groups = new Map<string, Group>();
 
   create(data: CreateGroupData): Promise<Group> {

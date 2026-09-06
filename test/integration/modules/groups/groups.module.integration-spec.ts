@@ -6,6 +6,9 @@ import { ListGroupsUseCase } from '../../../../src/modules/groups/application/li
 import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
 import { GroupInvitesController } from '../../../../src/modules/groups/http/group-invites.controller';
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
+import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
+import { InMemoryObjectStorage } from '../../../../test/helpers/in-memory-object.storage';
+import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 
 const authenticatedRequest = {
   user: { id: '11111111-1111-4111-8111-111111111111' },
@@ -23,9 +26,15 @@ describe('GroupsModule integration', () => {
     module = await Test.createTestingModule({
       imports: [GroupsModule],
     })
-      .overrideProvider(PrismaService)
-      .useValue(prisma)
-      .compile();
+    .overrideProvider(PrismaService)
+    .useValue(prisma)
+    .overrideProvider(S3_CLIENT)
+    .useValue({ send: jest.fn() })
+    .overrideProvider(S3_BUCKET)
+    .useValue('alibe-local-media')  
+    .overrideProvider(ObjectStorage)
+    .useClass(InMemoryObjectStorage) 
+    .compile();
   });
 
   afterAll(async () => {
@@ -34,6 +43,7 @@ describe('GroupsModule integration', () => {
 
   beforeEach(() => {
     findMany.mockReset();
+    create.mockReset();
   });
 
   it('connects the use case, repository and Prisma adapter', async () => {
@@ -69,6 +79,14 @@ describe('GroupsModule integration', () => {
   describe('GroupsController', () => {
     it('creates a group without image', async () => {
       const controller = module.get(GroupsController);
+      const createdGroup = {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        name: 'Group of friends',
+        profilePic: null,
+        createdAt: new Date('2026-08-01'),
+      };
+
+      create.mockResolvedValue(createdGroup)
 
       const result = await controller.create(
         { name: 'Group of friends' } as any,
@@ -76,7 +94,7 @@ describe('GroupsModule integration', () => {
         authenticatedRequest,
       );
 
-      expect(result.name).toBe('Group of friends');
+      expect(result.name).toEqual('Group of friends');
       expect(result.profilePic).toBeNull();
     });
 
@@ -88,13 +106,23 @@ describe('GroupsModule integration', () => {
         buffer: Buffer.from([1, 2, 3]),
       } as Express.Multer.File;
 
+      const createdGroup = {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        name: 'Group with photo',
+        profilePic: file,
+        createdAt: new Date('2026-08-01'),
+      }
+
+      create.mockResolvedValue(createdGroup)
+
       const result = await controller.create(
         { name: 'Group with photo' } as any,
         file,
         authenticatedRequest,
       );
 
-      expect(result.profilePic).toBe(`/group/${result.id}/image`);
+      expect(result.name).toEqual('Group with photo')
+      expect(result.profilePic).toEqual(`/group/${result.id}/image`);
     });
 
     it('rejects an invalid name with 400', async () => {

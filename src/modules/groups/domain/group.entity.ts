@@ -1,11 +1,7 @@
 export interface GroupProps {
   id: string;
   name: string;
-<<<<<<< HEAD
-  profilePic?: string | null;
-=======
   profilePic: string | null;
->>>>>>> develop
   createdAt: Date;
 }
 
