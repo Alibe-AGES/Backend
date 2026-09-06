@@ -4,7 +4,6 @@ import { Injectable } from '@nestjs/common';
 import { ObjectStorage } from '../../../shared/storage/object-storage';
 import { Group } from '../domain/group.entity';
 import { GroupRepository } from '../domain/group.repository';
-import { GroupListItemResponseDto } from '../http/dto/group-list-item-response.dto';
 
 export interface CreateGroupInput {
   name: string;

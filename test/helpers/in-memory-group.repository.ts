@@ -5,10 +5,12 @@ import {
 } from '../../src/modules/groups/domain/group.repository';
 
 export class InMemoryGroupRepository extends GroupRepository {
-  findByUserId(userId: string): Promise<Group[]> {
+  private readonly groups = new Map<string, Group>();
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  findByUserId(_userId: string): Promise<Group[]> {
     throw new Error('Method not implemented.');
   }
-  private readonly groups = new Map<string, Group>();
 
   create(data: CreateGroupData): Promise<Group> {
     const group = new Group({
