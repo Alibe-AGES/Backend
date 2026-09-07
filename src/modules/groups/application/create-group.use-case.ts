@@ -65,7 +65,7 @@ export class CreateGroupUseCase {
   private safeExtension(originalName: string): string {
     const extension = extname(originalName).toLowerCase();
 
-    const allowedExtensions = new Set(['.jpg', '.png', '.webp', '.jpeg', 'svg']);
+    const allowedExtensions = new Set(['.jpg', '.png', '.webp', '.jpeg', '.svg']);
 
     if (!allowedExtensions.has(extension)) {
       throw new InvalidGroupError('Extensão inválida para imagem');
