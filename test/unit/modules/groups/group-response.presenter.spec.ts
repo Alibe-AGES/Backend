@@ -5,7 +5,7 @@ describe('GroupResponsePresenter', () => {
 
   it('replaces the storage key with the API profile picture route', () => {
     expect(
-      GroupResponsePresenter.toListItem({
+      GroupResponsePresenter.toResponse({
         id: groupId,
         name: 'Amigos da faculdade',
         profilePic: `groups/${groupId}/image.png`,

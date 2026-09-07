@@ -46,7 +46,6 @@ import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
 import { GroupResponsePresenter } from './presenters/group-response.presenter';
 import { ListGroupsUseCase } from '../application/list-groups.use-case';
-import { Group } from '../domain/group.entity';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
