@@ -57,7 +57,10 @@ export class CreateGroupUseCase {
       const createdAt = new Date();
       return await this.groups.create({ id, name, profilePic, createdAt, creatorId });
     } catch (error) {
-      await this.storage.delete(profilePic).catch(() => null);
+      if (profilePic) {
+        await this.storage.delete(profilePic).catch(() => null);
+      }
+
       throw error;
     }
   }
