@@ -117,7 +117,7 @@ export class GroupsController {
   @UseInterceptors(
     FileInterceptor('profile_pic', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } })
   )
-  @ApiOperation({ summary: '[Mock] Cria um grupo com nome e foto de perfil opcional' })
+  @ApiOperation({ summary: 'Cria um grupo com nome e foto de perfil opcional' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
