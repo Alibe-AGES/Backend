@@ -5,6 +5,7 @@ export interface CreateGroupData {
   name: string;
   profilePic: string | null;
   createdAt: Date;
+  creatorId: string;
 }
 
 export abstract class GroupRepository {

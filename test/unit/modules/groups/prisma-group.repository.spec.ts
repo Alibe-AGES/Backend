@@ -16,18 +16,33 @@ describe('PrismaGroupRepository', () => {
 
   it('creates and maps a group', async () => {
     const createdAt = new Date('2026-08-30T00:00:00.000Z');
+    const userId = '11111111-1111-4111-8111-111111111111';
     const data = {
       id: '550e8400-e29b-41d4-a716-446655440000',
       name: 'Group of friends',
       profilePic: 'groups/550e8400-e29b-41d4-a716-446655440000/image.png',
       createdAt: createdAt,
+      creatorId: userId,
     };
 
     create.mockResolvedValue({ ...data, createdAt });
 
     const result = await repository.create(data);
 
-    expect(create).toHaveBeenCalledWith({ data });
+    expect(create).toHaveBeenCalledWith({
+      data: {
+        id: data.id,
+        name: data.name,
+        profilePic: data.profilePic,
+        createdAt: data.createdAt,
+        users: {
+          create: {
+            userId: data.creatorId,
+          },
+        },
+      },
+    });
+
     expect(result).toEqual(expect.objectContaining({ ...data, createdAt }));
   });
 

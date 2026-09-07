@@ -151,6 +151,7 @@ export class GroupsController {
 
     try {
       const group = await this.createGroupUseCase.execute({
+        creatorId: userId,
         name: input.name,
         image: image
           ? {

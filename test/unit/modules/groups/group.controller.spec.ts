@@ -15,8 +15,9 @@ describe('GroupsController', () => {
   let createGroupUseCaseMock: { execute: jest.Mock };
   let listGroupsUseCaseMock: { execute: jest.Mock };
 
+  const userId = '11111111-1111-4111-8111-111111111111';
   const authenticatedRequest = {
-    user: { id: '11111111-1111-4111-8111-111111111111' },
+    user: { id: userId },
   } as AuthenticatedRequest;
 
   beforeEach(async () => {
@@ -36,7 +37,6 @@ describe('GroupsController', () => {
         },
       ],
     }).compile();
-
     controller = module.get(GroupsController);
   });
 
@@ -60,7 +60,9 @@ describe('GroupsController', () => {
     expect(createGroupUseCaseMock.execute).toHaveBeenCalledWith({
       name: 'Group of friends',
       image: null,
+      creatorId: userId,
     });
+
     expect(result).toEqual({
       id: group.id,
       name: group.name,
@@ -99,6 +101,7 @@ describe('GroupsController', () => {
         contentType: 'image/png',
         bytes: file.buffer,
       },
+      creatorId: userId,
     });
     expect(result.profilePic).toBe(`/group/${group.id}/image`);
   });

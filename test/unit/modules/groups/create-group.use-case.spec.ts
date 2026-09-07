@@ -6,6 +6,8 @@ import { GroupRepository } from '../../../../src/modules/groups/domain/group.rep
 import { InMemoryGroupRepository } from '../../../helpers/in-memory-group.repository';
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
 
+const userId = '11111111-1111-4111-8111-111111111111';
+
 describe('CreateGroupUseCase', () => {
   it('saves the image and persists its key with the name', async () => {
     const groups = new InMemoryGroupRepository();
@@ -20,6 +22,7 @@ describe('CreateGroupUseCase', () => {
         contentType: 'image/png',
         bytes,
       },
+      creatorId: userId,
     });
 
     expect(result.name).toBe('Group of friends with image');
@@ -40,6 +43,7 @@ describe('CreateGroupUseCase', () => {
     const result = await useCase.execute({
       name: 'Group of friends with no image',
       image: null,
+      creatorId: userId,
     });
 
     expect(result.name).toBe('Group of friends with no image');
@@ -60,10 +64,12 @@ describe('CreateGroupUseCase', () => {
       bytes: Uint8Array.from([1]),
     };
 
-    await expect(useCase.execute({ name: '   ', image })).rejects.toBeInstanceOf(InvalidGroupError);
-    await expect(useCase.execute({ name: 'a'.repeat(501), image })).rejects.toBeInstanceOf(
+    await expect(useCase.execute({ name: '   ', image, creatorId: userId })).rejects.toBeInstanceOf(
       InvalidGroupError
     );
+    await expect(
+      useCase.execute({ name: 'a'.repeat(501), image, creatorId: userId })
+    ).rejects.toBeInstanceOf(InvalidGroupError);
   });
 
   it('rejects a file that is not an image', async () => {
@@ -80,6 +86,7 @@ describe('CreateGroupUseCase', () => {
           contentType: 'text/plain',
           bytes: Uint8Array.from([1]),
         },
+        creatorId: userId,
       })
     ).rejects.toBeInstanceOf(InvalidGroupError);
   });
@@ -101,6 +108,7 @@ describe('CreateGroupUseCase', () => {
           contentType: 'image/png',
           bytes: Uint8Array.from([1]),
         },
+        creatorId: userId,
       })
     ).rejects.toBe(error);
 

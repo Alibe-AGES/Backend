@@ -12,6 +12,7 @@ export interface CreateGroupInput {
     contentType: string;
     bytes: Uint8Array;
   };
+  creatorId: string;
 }
 
 export class InvalidGroupError extends Error {}
@@ -52,8 +53,9 @@ export class CreateGroupUseCase {
     }
 
     try {
+      const creatorId = input.creatorId;
       const createdAt = new Date();
-      return await this.groups.create({ id, name, profilePic, createdAt });
+      return await this.groups.create({ id, name, profilePic, createdAt, creatorId });
     } catch (error) {
       await this.storage.delete(profilePic).catch(() => null);
       throw error;
@@ -62,6 +64,13 @@ export class CreateGroupUseCase {
 
   private safeExtension(originalName: string): string {
     const extension = extname(originalName).toLowerCase();
-    return /^\.[a-z0-9]{1,10}$/.test(extension) ? extension : '';
+
+    const allowedExtensions = new Set(['.jpg', '.png', '.webp', '.jpeg', 'svg']);
+
+    if (!allowedExtensions.has(extension)) {
+      throw new InvalidGroupError('Extensão inválida para imagem');
+    }
+
+    return extension;
   }
 }

@@ -8,7 +8,20 @@ export class PrismaGroupRepository implements GroupRepository {
   constructor(protected readonly prisma: PrismaService) {}
 
   async create(data: CreateGroupData): Promise<Group> {
-    const group = await this.prisma.group.create({ data });
+    const group = await this.prisma.group.create({
+      data: {
+        id: data.id,
+        name: data.name,
+        profilePic: data.profilePic,
+        createdAt: data.createdAt,
+        users: {
+          create: {
+            userId: data.creatorId,
+          },
+        },
+      },
+    });
+
     return group;
   }
 
