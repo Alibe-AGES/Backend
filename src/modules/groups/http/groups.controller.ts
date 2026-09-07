@@ -1,7 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
   Request,
   UploadedFile,
@@ -20,18 +23,23 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { randomUUID } from 'node:crypto';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
+import { CreateGroupUseCase, InvalidGroupError } from '../application/create-group.use-case';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
 import { ListGroupsUseCase } from '../application/list-groups.use-case';
+import { Group } from '../domain/group.entity';
+
+const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
 @ApiTags('Groups - Mock')
 @Controller('groups')
 export class GroupsController {
-  constructor(private readonly listGroupsUseCase: ListGroupsUseCase) {}
-
+  constructor(
+    private readonly createGroupUseCase: CreateGroupUseCase,
+    private readonly listGroupsUseCase: ListGroupsUseCase
+  ) {}
   /**
    * GET /groups
    * Lista os grupos mockados da tela inicial. Futuramente, o usuário será identificado pela
@@ -105,8 +113,11 @@ export class GroupsController {
    * não persiste os dados nem armazena a imagem.
    */
   @Post()
-  @UseInterceptors(FileInterceptor('profile_pic'))
-  @ApiOperation({ summary: '[Mock] Cria um grupo com nome e foto de perfil opcional' })
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(
+    FileInterceptor('profile_pic', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } })
+  )
+  @ApiOperation({ summary: 'Cria um grupo com nome e foto de perfil opcional' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -124,27 +135,48 @@ export class GroupsController {
     },
   })
   @ApiCreatedResponse({
-    description: 'Grupo criado com sucesso pelo mock.',
+    description: 'Grupo criado com sucesso.',
     type: GroupListItemResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Nome ausente ou fora dos limites permitidos.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  create(
+  async create(
     @Body() input: CreateGroupDto,
-    @UploadedFile() profilePicFile: unknown,
+    @UploadedFile() image: Express.Multer.File | null,
     @Request() request: AuthenticatedRequest
-  ): GroupListItemResponseDto {
+  ): Promise<GroupListItemResponseDto> {
     // Disponível para vincular o criador como participante do grupo.
     const userId = request.user?.id;
     void userId;
 
-    const id = randomUUID();
+    try {
+      const group = await this.createGroupUseCase.execute({
+        creatorId: userId,
+        name: input.name,
+        image: image
+          ? {
+              originalName: image.originalname,
+              contentType: image.mimetype,
+              bytes: image.buffer,
+            }
+          : null,
+      });
 
+      return this.toResponse(group);
+    } catch (error) {
+      if (error instanceof InvalidGroupError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  private toResponse(group: Group): GroupListItemResponseDto {
     return {
-      id,
-      name: input.name,
-      profilePic: profilePicFile ? `https://images.example.com/groups/${id}` : null,
-      createdAt: new Date(),
+      id: group.id,
+      name: group.name,
+      profilePic: group.profilePic ? `/group/${group.id}/image` : null,
+      createdAt: group.createdAt,
     };
   }
 }

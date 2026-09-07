@@ -37,6 +37,15 @@ describe('Groups mock endpoints (e2e)', () => {
             createdAt: new Date('2026-08-01T15:00:00.000Z'),
           }),
         ]),
+        create: jest.fn().mockImplementation(async (data) => {
+          const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+          return new Group({
+            id,
+            name: data.name,
+            profilePic: data.profilePic ?? null,
+            createdAt: new Date('2026-08-01T15:00:00.000Z'),
+          });
+        }),
       })
       .overrideProvider(ExampleRepository)
       .useClass(InMemoryExampleRepository)
@@ -110,7 +119,7 @@ describe('Groups mock endpoints (e2e)', () => {
     expect(response.body).toEqual({
       id: expect.stringMatching(/^[0-9a-f-]{36}$/),
       name: 'Grupo criado no E2E',
-      profilePic: expect.stringMatching(/^https:\/\/images\.example\.com\/groups\//),
+      profilePic: expect.stringMatching(/^\/group\/[0-9a-f-]{36}\/image$/),
       createdAt: expect.any(String),
     });
 
