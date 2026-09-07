@@ -2,6 +2,7 @@ import { Group } from '../../src/modules/groups/domain/group.entity';
 import {
   GroupRepository,
   type CreateGroupData,
+  type GroupProfilePictureAccess,
 } from '../../src/modules/groups/domain/group.repository';
 
 export class InMemoryGroupRepository extends GroupRepository {
@@ -24,5 +25,11 @@ export class InMemoryGroupRepository extends GroupRepository {
 
   findById(id: string): Promise<Group | null> {
     return Promise.resolve(this.groups.get(id) ?? null);
+  }
+
+  findProfilePictureAccess(groupId: string): Promise<GroupProfilePictureAccess | null> {
+    const group = this.groups.get(groupId);
+
+    return Promise.resolve(group ? { imageKey: group.profilePic, userIsMember: true } : null);
   }
 }

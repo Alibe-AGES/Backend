@@ -18,6 +18,8 @@ describe('GetGroupProfilePictureUseCase', () => {
 
   beforeEach(() => {
     groups = {
+      create: jest.fn(),
+      findById: jest.fn(),
       findByUserId: jest.fn(),
       findProfilePictureAccess: jest.fn(),
     };

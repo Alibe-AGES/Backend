@@ -119,7 +119,7 @@ describe('Groups mock endpoints (e2e)', () => {
     expect(response.body).toEqual({
       id: expect.stringMatching(/^[0-9a-f-]{36}$/),
       name: 'Grupo criado no E2E',
-      profilePic: expect.stringMatching(/^\/group\/[0-9a-f-]{36}\/image$/),
+      profilePic: expect.stringMatching(/^\/groups\/[0-9a-f-]{36}\/profile-picture$/),
       createdAt: expect.any(String),
     });
 
