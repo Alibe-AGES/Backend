@@ -33,7 +33,7 @@ describe('Groups mock endpoints (e2e)', () => {
           new Group({
             id: DEMO_GROUP_ID,
             name: 'Amigos da faculdade',
-            profilePic: 'https://images.example.com/groups/faculdade.jpg',
+            profilePic: `groups/${DEMO_GROUP_ID}/image.png`,
             createdAt: new Date('2026-08-01T15:00:00.000Z'),
           }),
         ]),
@@ -70,7 +70,7 @@ describe('Groups mock endpoints (e2e)', () => {
         {
           id: DEMO_GROUP_ID,
           name: 'Amigos da faculdade',
-          profilePic: 'https://images.example.com/groups/faculdade.jpg',
+          profilePic: `/groups/${DEMO_GROUP_ID}/profile-picture`,
           createdAt: '2026-08-01T15:00:00.000Z',
         },
       ])

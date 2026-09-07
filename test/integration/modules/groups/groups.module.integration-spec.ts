@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { GroupsModule } from '../../../../src/modules/groups/groups.module';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import { ListGroupsUseCase } from '../../../../src/modules/groups/application/list-groups.use-case';

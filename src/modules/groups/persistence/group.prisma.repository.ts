@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { CreateGroupData, GroupRepository } from '../domain/group.repository';
+import {
+  CreateGroupData,
+  GroupRepository,
+  type GroupProfilePictureAccess,
+} from '../domain/group.repository';
 import { Group } from '../domain/group.entity';
 
 @Injectable()
@@ -40,5 +44,24 @@ export class PrismaGroupRepository implements GroupRepository {
       orderBy: { createdAt: 'desc' },
     });
     return groups.map((group) => new Group(group));
+  }
+
+  async findProfilePictureAccess(
+    groupId: string,
+    userId: string
+  ): Promise<GroupProfilePictureAccess | null> {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: {
+        profilePic: true,
+        users: {
+          where: { userId },
+          select: { userId: true },
+          take: 1,
+        },
+      },
+    });
+
+    return group ? { imageKey: group.profilePic, userIsMember: group.users.length === 1 } : null;
   }
 }
