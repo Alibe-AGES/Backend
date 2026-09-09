@@ -8,10 +8,30 @@ export interface CreateGroupData {
   creatorId: string;
 }
 
+export interface GroupDetails {
+  id: string;
+  name: string;
+  profilePic: string | null;
+  createdAt: Date;
+  participants: Array<{
+    id: string;
+    name: string | null;
+    profilePic: string | null;
+  }>;
+  nextEvent: {
+    id: string;
+    name: string | null;
+    timeslot: Date;
+    status: 'pending' | 'confirmed' | 'declined';
+  } | null;
+}
+
 export abstract class GroupRepository {
   abstract create(data: CreateGroupData): Promise<Group>;
 
   abstract findById(id: string): Promise<Group | null>;
+
+  abstract findDetailsById(id: string): Promise<GroupDetails | null>;
 
   abstract findByUserId(userId: string): Promise<Group[]>;
 }

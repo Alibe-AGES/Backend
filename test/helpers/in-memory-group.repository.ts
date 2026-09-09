@@ -2,6 +2,7 @@ import { Group } from '../../src/modules/groups/domain/group.entity';
 import {
   GroupRepository,
   type CreateGroupData,
+  type GroupDetails,
 } from '../../src/modules/groups/domain/group.repository';
 
 export class InMemoryGroupRepository extends GroupRepository {
@@ -24,5 +25,22 @@ export class InMemoryGroupRepository extends GroupRepository {
 
   findById(id: string): Promise<Group | null> {
     return Promise.resolve(this.groups.get(id) ?? null);
+  }
+
+  findDetailsById(id: string): Promise<GroupDetails | null> {
+    const group = this.groups.get(id);
+
+    if (!group) {
+      return Promise.resolve(null);
+    }
+
+    return Promise.resolve({
+      id: group.id,
+      name: group.name,
+      profilePic: group.profilePic,
+      createdAt: group.createdAt,
+      participants: [],
+      nextEvent: null,
+    });
   }
 }

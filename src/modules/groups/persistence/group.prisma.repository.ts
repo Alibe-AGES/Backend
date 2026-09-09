@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { CreateGroupData, GroupRepository } from '../domain/group.repository';
+import { CreateGroupData, GroupDetails, GroupRepository } from '../domain/group.repository';
 import { Group } from '../domain/group.entity';
 
 @Injectable()
@@ -28,6 +28,58 @@ export class PrismaGroupRepository implements GroupRepository {
   async findById(id: string): Promise<Group | null> {
     const group = await this.prisma.group.findUnique({ where: { id } });
     return group;
+  }
+
+  async findDetailsById(id: string): Promise<GroupDetails | null> {
+    const group = await this.prisma.group.findUnique({
+      where: { id },
+      include: {
+        users: {
+          select: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profilePic: true,
+              },
+            },
+          },
+        },
+        events: {
+          where: { timeslot: { gte: new Date() } },
+          orderBy: { timeslot: 'asc' },
+          take: 1,
+          select: {
+            id: true,
+            name: true,
+            timeslot: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!group) {
+      return null;
+    }
+
+    const [nextEvent] = group.events;
+
+    return {
+      id: group.id,
+      name: group.name,
+      profilePic: group.profilePic,
+      createdAt: group.createdAt,
+      participants: group.users.map(({ user }) => user),
+      nextEvent: nextEvent
+        ? {
+            id: nextEvent.id,
+            name: nextEvent.name,
+            timeslot: nextEvent.timeslot as Date,
+            status: nextEvent.status,
+          }
+        : null,
+    };
   }
 
   async findByUserId(userId: string): Promise<Group[]> {
