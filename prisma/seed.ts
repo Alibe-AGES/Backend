@@ -643,6 +643,7 @@ async function main() {
       data: {
         userId: users[userIndex].id,
         groupId: groups[groupIndex].id,
+        date: new Date(),
         timeslotStart: new Date(timeslotStart as string),
         timeslotEnd: new Date(timeslotEnd as string),
       },
