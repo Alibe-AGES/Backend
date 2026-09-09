@@ -4,8 +4,10 @@ import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-
 import { GroupsModule } from '../../../../src/modules/groups/groups.module';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import { ListGroupsUseCase } from '../../../../src/modules/groups/application/list-groups.use-case';
+import { GetGroupUseCase } from '../../../../src/modules/groups/application/get-group.use-case';
 import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
 import { GroupInvitesController } from '../../../../src/modules/groups/http/group-invites.controller';
+import { GroupImageController } from '../../../../src/modules/groups/http/group-image.controller';
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryObjectStorage } from '../../../../test/helpers/in-memory-object.storage';
@@ -17,11 +19,12 @@ const authenticatedRequest = {
 describe('GroupsModule integration', () => {
   let module: TestingModule;
   const findMany = jest.fn();
+  const findUnique = jest.fn();
   const create = jest.fn();
   const inviteFindFirst = jest.fn();
   const inviteCreate = jest.fn();
   const prisma = {
-    group: { findMany, create },
+    group: { findMany, findUnique, create },
     inviteLink: { findFirst: inviteFindFirst, create: inviteCreate },
   } as unknown as PrismaService;
 
@@ -46,6 +49,7 @@ describe('GroupsModule integration', () => {
 
   beforeEach(() => {
     findMany.mockReset();
+    findUnique.mockReset();
     create.mockReset();
     inviteFindFirst.mockReset();
     inviteCreate.mockReset();
@@ -79,6 +83,51 @@ describe('GroupsModule integration', () => {
   it('registers the groups controllers', () => {
     expect(module.get(GroupsController)).toBeInstanceOf(GroupsController);
     expect(module.get(GroupInvitesController)).toBeInstanceOf(GroupInvitesController);
+    expect(module.get(GroupImageController)).toBeInstanceOf(GroupImageController);
+  });
+
+  it('connects the group details use case to the Prisma repository', async () => {
+    const groupId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const row = {
+      id: groupId,
+      name: 'Amigos da faculdade',
+      profilePic: 'groups/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/image.png',
+      createdAt: new Date('2026-08-01T15:00:00.000Z'),
+    };
+    const participant = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Ana Souza',
+      profilePic: null,
+    };
+    const event = {
+      id: '33333333-3333-4333-8333-333333333333',
+      name: 'Jantar da turma',
+      timeslot: new Date('2026-09-10T20:00:00.000Z'),
+      status: 'confirmed',
+    };
+    findUnique.mockResolvedValue({
+      ...row,
+      users: [{ user: participant }],
+      events: [event],
+    });
+
+    const getGroup = module.get(GetGroupUseCase);
+
+    await expect(getGroup.execute(groupId)).resolves.toEqual({
+      ...row,
+      profilePic: `/group/${groupId}/image`,
+      participants: [participant],
+      nextEvent: event,
+    });
+    expect(findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: groupId },
+        include: expect.objectContaining({
+          users: expect.any(Object),
+          events: expect.any(Object),
+        }),
+      })
+    );
   });
 
   describe('GroupsController', () => {

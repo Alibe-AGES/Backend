@@ -15,6 +15,7 @@ import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage
 
 const DEMO_GROUP_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const inviteLinksByGroupId = new Map<string, GroupInviteLink>();
+const GROUP_IMAGE_KEY = `groups/${DEMO_GROUP_ID}/image.png`;
 
 describe('Groups mock endpoints (e2e)', () => {
   let app: INestApplication;
@@ -39,6 +40,44 @@ describe('Groups mock endpoints (e2e)', () => {
             createdAt: new Date('2026-08-01T15:00:00.000Z'),
           }),
         ]),
+        findById: jest.fn().mockImplementation((id) =>
+          id === DEMO_GROUP_ID
+            ? new Group({
+                id: DEMO_GROUP_ID,
+                name: 'Amigos da faculdade',
+                profilePic: GROUP_IMAGE_KEY,
+                createdAt: new Date('2026-08-01T15:00:00.000Z'),
+              })
+            : null
+        ),
+        findDetailsById: jest.fn().mockImplementation((id) =>
+          id === DEMO_GROUP_ID
+            ? {
+                id: DEMO_GROUP_ID,
+                name: 'Amigos da faculdade',
+                profilePic: GROUP_IMAGE_KEY,
+                createdAt: new Date('2026-08-01T15:00:00.000Z'),
+                participants: [
+                  {
+                    id: '11111111-1111-4111-8111-111111111111',
+                    name: 'Ana Souza',
+                    profilePic: 'users/ana/image.jpg',
+                  },
+                  {
+                    id: '22222222-2222-4222-8222-222222222222',
+                    name: 'Leonardo Silva',
+                    profilePic: null,
+                  },
+                ],
+                nextEvent: {
+                  id: '33333333-3333-4333-8333-333333333333',
+                  name: 'Jantar da turma',
+                  timeslot: new Date('2026-09-10T20:00:00.000Z'),
+                  status: 'confirmed',
+                },
+              }
+            : null
+        ),
         create: jest.fn().mockImplementation(async (data) => {
           const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
           return new Group({
@@ -66,6 +105,12 @@ describe('Groups mock endpoints (e2e)', () => {
     app = moduleFixture.createNestApplication();
     setupApplication(app);
     await app.init();
+
+    await app.get(ObjectStorage).save({
+      key: GROUP_IMAGE_KEY,
+      bytes: Uint8Array.from([137, 80, 78, 71]),
+      contentType: 'image/png',
+    });
   });
 
   afterAll(async () => {
@@ -87,19 +132,19 @@ describe('Groups mock endpoints (e2e)', () => {
     );
   });
 
-  it('gets the mocked group details, participants and next event', async () => {
+  it('gets group details, participants and next event from the use case', async () => {
     const response = await request(app.getHttpServer()).get(`/groups/${DEMO_GROUP_ID}`).expect(200);
 
     expect(response.body).toEqual({
       id: DEMO_GROUP_ID,
       name: 'Amigos da faculdade',
-      profilePic: 'https://images.example.com/groups/faculdade.jpg',
+      profilePic: `/group/${DEMO_GROUP_ID}/image`,
       createdAt: '2026-08-01T15:00:00.000Z',
       participants: [
         {
           id: '11111111-1111-4111-8111-111111111111',
           name: 'Ana Souza',
-          profilePic: 'https://images.example.com/users/ana.jpg',
+          profilePic: 'users/ana/image.jpg',
         },
         {
           id: '22222222-2222-4222-8222-222222222222',
@@ -110,10 +155,17 @@ describe('Groups mock endpoints (e2e)', () => {
       nextEvent: {
         id: '33333333-3333-4333-8333-333333333333',
         name: 'Jantar da turma',
-        timeslot: '2026-09-05T20:00:00.000Z',
+        timeslot: '2026-09-10T20:00:00.000Z',
         status: 'confirmed',
       },
     });
+
+    const imageResponse = await request(app.getHttpServer())
+      .get(response.body.profilePic)
+      .expect('Content-Type', /image\/png/)
+      .expect(200);
+
+    expect(imageResponse.body).toEqual(Buffer.from([137, 80, 78, 71]));
   });
 
   it('creates a mocked group from multipart name and profile_pic', async () => {
@@ -161,6 +213,10 @@ describe('Groups mock endpoints (e2e)', () => {
 
   it('validates invite UUIDs and exposes the current endpoints in Swagger', async () => {
     await request(app.getHttpServer()).get('/groups/not-a-uuid').expect(400);
+    await request(app.getHttpServer())
+      .get('/groups/ffffffff-ffff-4fff-8fff-ffffffffffff')
+      .expect(404);
+    await request(app.getHttpServer()).get('/group/not-a-uuid/image').expect(400);
     await request(app.getHttpServer()).get('/groups/not-a-uuid/invite-link').expect(400);
     await request(app.getHttpServer()).post('/invite-links/not-a-uuid/join').expect(400);
 

@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Post,
   Request,
   StreamableFile,
@@ -41,6 +42,7 @@ import {
   GroupProfilePictureNotFoundError,
 } from '../application/get-group-profile-picture.use-case';
 import { CreateGroupUseCase, InvalidGroupError } from '../application/create-group.use-case';
+import { GroupNotFoundError, GetGroupUseCase } from '../application/get-group.use-case';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
@@ -55,6 +57,7 @@ export class GroupsController {
   constructor(
     private readonly createGroupUseCase: CreateGroupUseCase,
     private readonly listGroupsUseCase: ListGroupsUseCase,
+    private readonly getGroupUseCase: GetGroupUseCase,
     private readonly getGroupProfilePictureUseCase: GetGroupProfilePictureUseCase
   ) {}
   /**
@@ -129,7 +132,7 @@ export class GroupsController {
    * acesso ao grupo será validado a partir do usuário autenticado.
    */
   @Get(':groupId')
-  @ApiOperation({ summary: '[Mock] Obtém o grupo, seus participantes e o próximo encontro' })
+  @ApiOperation({ summary: 'Obtém o grupo, seus participantes e o próximo encontro' })
   @ApiParam({ name: 'groupId', format: 'uuid' })
   @ApiOkResponse({
     description: 'Grupo encontrado e detalhado com sucesso.',
@@ -137,38 +140,18 @@ export class GroupsController {
   })
   @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  getById(
-    @Param('groupId', new ParseUUIDPipe()) groupId: string,
-    @Request() request: AuthenticatedRequest
-  ): GroupDetailsResponseDto {
-    // Disponível para a futura validação de acesso ao grupo.
-    const userId = request.user?.id;
-    void userId;
+  async getById(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string
+  ): Promise<GroupDetailsResponseDto> {
+    try {
+      return await this.getGroupUseCase.execute(groupId);
+    } catch (error) {
+      if (error instanceof GroupNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
 
-    return {
-      id: groupId,
-      name: 'Amigos da faculdade',
-      profilePic: 'https://images.example.com/groups/faculdade.jpg',
-      createdAt: new Date('2026-08-01T15:00:00.000Z'),
-      participants: [
-        {
-          id: '11111111-1111-4111-8111-111111111111',
-          name: 'Ana Souza',
-          profilePic: 'https://images.example.com/users/ana.jpg',
-        },
-        {
-          id: '22222222-2222-4222-8222-222222222222',
-          name: 'Leonardo Silva',
-          profilePic: null,
-        },
-      ],
-      nextEvent: {
-        id: '33333333-3333-4333-8333-333333333333',
-        name: 'Jantar da turma',
-        timeslot: new Date('2026-09-05T20:00:00.000Z'),
-        status: 'confirmed',
-      },
-    };
+      throw error;
+    }
   }
 
   /**
