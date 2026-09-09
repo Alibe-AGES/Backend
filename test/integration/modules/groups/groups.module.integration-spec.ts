@@ -18,8 +18,11 @@ describe('GroupsModule integration', () => {
   let module: TestingModule;
   const findMany = jest.fn();
   const create = jest.fn();
+  const inviteFindFirst = jest.fn();
+  const inviteCreate = jest.fn();
   const prisma = {
     group: { findMany, create },
+    inviteLink: { findFirst: inviteFindFirst, create: inviteCreate },
   } as unknown as PrismaService;
 
   beforeAll(async () => {
@@ -44,6 +47,8 @@ describe('GroupsModule integration', () => {
   beforeEach(() => {
     findMany.mockReset();
     create.mockReset();
+    inviteFindFirst.mockReset();
+    inviteCreate.mockReset();
   });
 
   it('connects the use case, repository and Prisma adapter', async () => {
@@ -135,23 +140,45 @@ describe('GroupsModule integration', () => {
   });
 
   describe('GroupInvitesController', () => {
-    it('reuses a valid invite and creates a new token after expiration', () => {
+    it('reuses a valid invite and creates a new token after expiration', async () => {
       const controller = module.get(GroupInvitesController);
       const groupId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-      const initialTime = new Date('2026-08-30T12:00:00.000Z').getTime();
-      const now = jest.spyOn(Date, 'now').mockReturnValue(initialTime);
 
-      const first = controller.getInviteLink(groupId, authenticatedRequest);
-      const current = controller.getInviteLink(groupId, authenticatedRequest);
+      const validInvite = {
+        id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        token: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        validity: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+        groupId,
+      };
 
-      expect(current.token).toBe(first.token);
-      expect(first.expiresAt).toEqual(new Date('2026-09-06T12:00:00.000Z'));
+      inviteFindFirst.mockResolvedValueOnce(validInvite);
 
-      now.mockReturnValue(new Date('2026-09-07T12:00:00.000Z').getTime());
-      const renewed = controller.getInviteLink(groupId, authenticatedRequest);
+      const current = await controller.getInviteLink(groupId, authenticatedRequest);
 
-      expect(renewed.token).not.toBe(first.token);
-      now.mockRestore();
+      expect(current.token).toBe(validInvite.token);
+      expect(current.expiresAt).toEqual(validInvite.validity);
+      expect(inviteCreate).not.toHaveBeenCalled();
+
+      const expiredInvite = { ...validInvite, validity: new Date(Date.now() - 1000) };
+      const renewedInvite = {
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        token: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        validity: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+        groupId,
+      };
+
+      inviteFindFirst.mockResolvedValueOnce(expiredInvite);
+      inviteCreate.mockResolvedValueOnce(renewedInvite);
+
+      const renewed = await controller.getInviteLink(groupId, authenticatedRequest);
+
+      expect(renewed.token).toBe(renewedInvite.token);
+      expect(renewed.token).not.toBe(validInvite.token);
+      expect(inviteCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({ groupId }),
+      });
     });
   });
 });

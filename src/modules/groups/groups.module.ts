@@ -5,6 +5,7 @@ import { GroupInvitesController } from './http/group-invites.controller';
 import { PrismaModule } from '../../../src/infrastructure/prisma/prisma.module';
 import { StorageModule } from '../../../src/infrastructure/storage/storage.module';
 import { CreateGroupUseCase } from './application/create-group.use-case';
+import { GetOrCreateGroupInviteLinkUseCase } from './application/get-or-create-group-invite-link.use-case';
 import { GroupRepository } from './domain/group.repository';
 import { PrismaGroupRepository } from './persistence/group.prisma.repository';
 
@@ -14,6 +15,7 @@ import { PrismaGroupRepository } from './persistence/group.prisma.repository';
   providers: [
     CreateGroupUseCase,
     ListGroupsUseCase,
+    GetOrCreateGroupInviteLinkUseCase,
     {
       provide: GroupRepository,
       useClass: PrismaGroupRepository,

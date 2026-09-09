@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { CreateGroupData, GroupRepository } from '../domain/group.repository';
+import {
+  CreateGroupData,
+  CreateGroupInviteLinkData,
+  GroupRepository,
+} from '../domain/group.repository';
 import { Group } from '../domain/group.entity';
+import { GroupInviteLink } from '../domain/group-invite-link.entity';
 
 @Injectable()
 export class PrismaGroupRepository implements GroupRepository {
@@ -40,5 +45,28 @@ export class PrismaGroupRepository implements GroupRepository {
       orderBy: { createdAt: 'desc' },
     });
     return groups.map((group) => new Group(group));
+  }
+
+  async createInviteLink(data: CreateGroupInviteLinkData): Promise<GroupInviteLink> {
+    const inviteLink = await this.prisma.inviteLink.create({
+      data: {
+        id: data.id,
+        token: data.token,
+        validity: data.validity,
+        createdAt: data.createdAt,
+        groupId: data.groupId,
+      },
+    });
+
+    return new GroupInviteLink(inviteLink);
+  }
+
+  async findLatestInviteLinkByGroupId(groupId: string): Promise<GroupInviteLink | null> {
+    const inviteLink = await this.prisma.inviteLink.findFirst({
+      where: { groupId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return inviteLink ? new GroupInviteLink(inviteLink) : null;
   }
 }
