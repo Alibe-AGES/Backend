@@ -3,6 +3,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import {
   CreateGroupData,
   CreateGroupInviteLinkData,
+  GroupProfilePictureAccess,
   GroupRepository,
 } from '../domain/group.repository';
 import { Group } from '../domain/group.entity';
