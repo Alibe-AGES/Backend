@@ -1,4 +1,5 @@
 import { Group } from './group.entity';
+import { GroupInviteLink } from './group-invite-link.entity';
 
 export interface CreateGroupData {
   id: string;
@@ -6,6 +7,14 @@ export interface CreateGroupData {
   profilePic: string | null;
   createdAt: Date;
   creatorId: string;
+}
+
+export interface CreateGroupInviteLinkData {
+  id: string;
+  token: string;
+  validity: Date;
+  createdAt: Date;
+  groupId: string;
 }
 
 export interface GroupProfilePictureAccess {
@@ -19,6 +28,10 @@ export abstract class GroupRepository {
   abstract findById(id: string): Promise<Group | null>;
 
   abstract findByUserId(userId: string): Promise<Group[]>;
+
+  abstract createInviteLink(data: CreateGroupInviteLinkData): Promise<GroupInviteLink>;
+
+  abstract findLatestInviteLinkByGroupId(groupId: string): Promise<GroupInviteLink | null>;
 
   abstract findProfilePictureAccess(
     groupId: string,

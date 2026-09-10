@@ -7,12 +7,14 @@ import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.serv
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { ExampleRepository } from '../../../../src/modules/example/domain/example.repository';
 import { Group } from '../../../../src/modules/groups/domain/group.entity';
+import { GroupInviteLink } from '../../../../src/modules/groups/domain/group-invite-link.entity';
 import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryExampleRepository } from '../../../helpers/in-memory-example.repository';
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
 
 const DEMO_GROUP_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const inviteLinksByGroupId = new Map<string, GroupInviteLink>();
 
 describe('Groups mock endpoints (e2e)', () => {
   let app: INestApplication;
@@ -45,6 +47,14 @@ describe('Groups mock endpoints (e2e)', () => {
             profilePic: data.profilePic ?? null,
             createdAt: new Date('2026-08-01T15:00:00.000Z'),
           });
+        }),
+        findLatestInviteLinkByGroupId: jest.fn().mockImplementation(async (groupId: string) => {
+          return inviteLinksByGroupId.get(groupId) ?? null;
+        }),
+        createInviteLink: jest.fn().mockImplementation(async (data) => {
+          const inviteLink = new GroupInviteLink(data);
+          inviteLinksByGroupId.set(data.groupId, inviteLink);
+          return inviteLink;
         }),
       })
       .overrideProvider(ExampleRepository)

@@ -1,12 +1,15 @@
 import { Group } from '../../src/modules/groups/domain/group.entity';
+import { GroupInviteLink } from '../../src/modules/groups/domain/group-invite-link.entity';
 import {
   GroupRepository,
   type CreateGroupData,
+  type CreateGroupInviteLinkData,
   type GroupProfilePictureAccess,
 } from '../../src/modules/groups/domain/group.repository';
 
 export class InMemoryGroupRepository extends GroupRepository {
   private readonly groups = new Map<string, Group>();
+  private readonly inviteLinks: GroupInviteLink[] = [];
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   findByUserId(_userId: string): Promise<Group[]> {
@@ -25,6 +28,20 @@ export class InMemoryGroupRepository extends GroupRepository {
 
   findById(id: string): Promise<Group | null> {
     return Promise.resolve(this.groups.get(id) ?? null);
+  }
+
+  createInviteLink(data: CreateGroupInviteLinkData): Promise<GroupInviteLink> {
+    const inviteLink = new GroupInviteLink(data);
+    this.inviteLinks.push(inviteLink);
+    return Promise.resolve(inviteLink);
+  }
+
+  findLatestInviteLinkByGroupId(groupId: string): Promise<GroupInviteLink | null> {
+    const latest = this.inviteLinks
+      .filter((inviteLink) => inviteLink.groupId === groupId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+
+    return Promise.resolve(latest ?? null);
   }
 
   findProfilePictureAccess(groupId: string): Promise<GroupProfilePictureAccess | null> {

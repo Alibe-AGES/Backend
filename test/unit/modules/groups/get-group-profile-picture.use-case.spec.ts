@@ -21,6 +21,8 @@ describe('GetGroupProfilePictureUseCase', () => {
       create: jest.fn(),
       findById: jest.fn(),
       findByUserId: jest.fn(),
+      createInviteLink: jest.fn(),
+      findLatestInviteLinkByGroupId: jest.fn(),
       findProfilePictureAccess: jest.fn(),
     };
     storage = {

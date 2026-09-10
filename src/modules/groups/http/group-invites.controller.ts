@@ -8,31 +8,26 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { randomUUID } from 'node:crypto';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
+import { GetOrCreateGroupInviteLinkUseCase } from '../application/get-or-create-group-invite-link.use-case';
 import { JoinGroupByInviteResponseDto } from './dto/join-group-by-invite-response.dto';
 import { GetGroupInviteLinkResponseDto } from './dto/get-group-invite-link-response.dto';
 
-interface CurrentInviteLink {
-  token: string;
-  expiresAt: Date;
-}
-
-const INVITE_VALIDITY_IN_MILLISECONDS = 7 * 24 * 60 * 60 * 1000;
-
-@ApiTags('Group invites - Mock')
+@ApiTags('Group invites')
 @Controller()
 export class GroupInvitesController {
-  private readonly currentInviteLinks = new Map<string, CurrentInviteLink>();
+  constructor(
+    private readonly getOrCreateGroupInviteLinkUseCase: GetOrCreateGroupInviteLinkUseCase
+  ) {}
 
   /**
    * GET /groups/:groupId/invite-link
-   * Retorna o convite atual do grupo. O mock cria um token quando ainda não existe e o substitui
+   * Retorna o convite atual do grupo. Cria um token quando ainda não existe e o substitui
    * quando sua data de expiração já passou.
    */
   @Get('groups/:groupId/invite-link')
   @ApiOperation({
-    summary: '[Mock] Obtém o convite válido do grupo ou cria um novo',
+    summary: 'Obtém o convite válido do grupo ou cria um novo',
   })
   @ApiParam({ name: 'groupId', format: 'uuid' })
   @ApiOkResponse({
@@ -41,28 +36,15 @@ export class GroupInvitesController {
   })
   @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  getInviteLink(
+  async getInviteLink(
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
     @Request() request: AuthenticatedRequest
-  ): GetGroupInviteLinkResponseDto {
+  ): Promise<GetGroupInviteLinkResponseDto> {
     // Disponível para a futura validação de acesso ao grupo.
     const userId = request.user?.id;
     void userId;
 
-    const now = Date.now();
-    const currentInviteLink = this.currentInviteLinks.get(groupId);
-
-    if (currentInviteLink && currentInviteLink.expiresAt.getTime() > now) {
-      return currentInviteLink;
-    }
-
-    const newInviteLink: CurrentInviteLink = {
-      token: randomUUID(),
-      expiresAt: new Date(now + INVITE_VALIDITY_IN_MILLISECONDS),
-    };
-
-    this.currentInviteLinks.set(groupId, newInviteLink);
-    return newInviteLink;
+    return this.getOrCreateGroupInviteLinkUseCase.execute(groupId);
   }
 
   /**

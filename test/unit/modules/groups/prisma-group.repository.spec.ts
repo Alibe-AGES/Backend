@@ -4,14 +4,19 @@ import { PrismaGroupRepository } from '../../../../src/modules/groups/persistenc
 describe('PrismaGroupRepository', () => {
   const create = jest.fn();
   const findUnique = jest.fn();
+  const inviteLinkCreate = jest.fn();
+  const inviteLinkFindFirst = jest.fn();
   const prisma = {
     group: { create, findUnique },
+    inviteLink: { create: inviteLinkCreate, findFirst: inviteLinkFindFirst },
   } as unknown as PrismaService;
   const repository = new PrismaGroupRepository(prisma);
 
   beforeEach(() => {
     create.mockReset();
     findUnique.mockReset();
+    inviteLinkCreate.mockReset();
+    inviteLinkFindFirst.mockReset();
   });
 
   it('creates and maps a group', async () => {
@@ -63,5 +68,50 @@ describe('PrismaGroupRepository', () => {
     findUnique.mockResolvedValue(null);
 
     await expect(repository.findById('550e8400-e29b-41d4-a716-446655440000')).resolves.toBeNull();
+  });
+
+  it('creates and maps an invite link', async () => {
+    const data = {
+      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      token: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      validity: new Date('2026-09-16T00:00:00.000Z'),
+      createdAt: new Date('2026-09-09T00:00:00.000Z'),
+      groupId: '550e8400-e29b-41d4-a716-446655440000',
+    };
+
+    inviteLinkCreate.mockResolvedValue(data);
+
+    const result = await repository.createInviteLink(data);
+
+    expect(inviteLinkCreate).toHaveBeenCalledWith({ data });
+    expect(result).toEqual(expect.objectContaining(data));
+  });
+
+  it('finds and maps the latest invite link for a group', async () => {
+    const row = {
+      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      token: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      validity: new Date('2026-09-16T00:00:00.000Z'),
+      createdAt: new Date('2026-09-09T00:00:00.000Z'),
+      groupId: '550e8400-e29b-41d4-a716-446655440000',
+    };
+
+    inviteLinkFindFirst.mockResolvedValue(row);
+
+    await expect(repository.findLatestInviteLinkByGroupId(row.groupId)).resolves.toEqual(
+      expect.objectContaining(row)
+    );
+    expect(inviteLinkFindFirst).toHaveBeenCalledWith({
+      where: { groupId: row.groupId },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  it('returns null when no invite link exists for the group', async () => {
+    inviteLinkFindFirst.mockResolvedValue(null);
+
+    await expect(
+      repository.findLatestInviteLinkByGroupId('550e8400-e29b-41d4-a716-446655440000')
+    ).resolves.toBeNull();
   });
 });
