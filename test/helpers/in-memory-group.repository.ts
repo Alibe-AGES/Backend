@@ -4,6 +4,7 @@ import {
   GroupRepository,
   type CreateGroupData,
   type CreateGroupInviteLinkData,
+  type GroupProfilePictureAccess,
 } from '../../src/modules/groups/domain/group.repository';
 
 export class InMemoryGroupRepository extends GroupRepository {
@@ -41,5 +42,11 @@ export class InMemoryGroupRepository extends GroupRepository {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
 
     return Promise.resolve(latest ?? null);
+  }
+
+  findProfilePictureAccess(groupId: string): Promise<GroupProfilePictureAccess | null> {
+    const group = this.groups.get(groupId);
+
+    return Promise.resolve(group ? { imageKey: group.profilePic, userIsMember: true } : null);
   }
 }

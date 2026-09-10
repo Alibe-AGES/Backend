@@ -6,6 +6,7 @@ import {
   InvalidGroupError,
 } from '../../../../src/modules/groups/application/create-group.use-case';
 import { ListGroupsUseCase } from '../../../../src/modules/groups/application/list-groups.use-case';
+import { GetGroupProfilePictureUseCase } from '../../../../src/modules/groups/application/get-group-profile-picture.use-case';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import type { Group } from '../../../../src/modules/groups/domain/group.entity';
 import { randomUUID } from 'crypto';
@@ -14,6 +15,7 @@ describe('GroupsController', () => {
   let controller: GroupsController;
   let createGroupUseCaseMock: { execute: jest.Mock };
   let listGroupsUseCaseMock: { execute: jest.Mock };
+  let getGroupProfilePictureUseCaseMock: { execute: jest.Mock };
 
   const userId = '11111111-1111-4111-8111-111111111111';
   const authenticatedRequest = {
@@ -23,6 +25,7 @@ describe('GroupsController', () => {
   beforeEach(async () => {
     createGroupUseCaseMock = { execute: jest.fn() };
     listGroupsUseCaseMock = { execute: jest.fn() };
+    getGroupProfilePictureUseCaseMock = { execute: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GroupsController],
@@ -34,6 +37,10 @@ describe('GroupsController', () => {
         {
           provide: ListGroupsUseCase,
           useValue: listGroupsUseCaseMock,
+        },
+        {
+          provide: GetGroupProfilePictureUseCase,
+          useValue: getGroupProfilePictureUseCaseMock,
         },
       ],
     }).compile();
@@ -103,7 +110,7 @@ describe('GroupsController', () => {
       },
       creatorId: userId,
     });
-    expect(result.profilePic).toBe(`/group/${group.id}/image`);
+    expect(result.profilePic).toBe(`/groups/${group.id}/profile-picture`);
   });
 
   it('Retorna BadRequestException para nome em branco', async () => {

@@ -8,7 +8,7 @@ export class GroupListItemResponseDto {
   name!: string;
 
   @ApiProperty({
-    example: 'https://images.example.com/groups/faculdade.jpg',
+    example: '/groups/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/profile-picture',
     nullable: true,
     required: false,
   })

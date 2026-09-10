@@ -35,7 +35,7 @@ describe('Groups mock endpoints (e2e)', () => {
           new Group({
             id: DEMO_GROUP_ID,
             name: 'Amigos da faculdade',
-            profilePic: 'https://images.example.com/groups/faculdade.jpg',
+            profilePic: `groups/${DEMO_GROUP_ID}/image.png`,
             createdAt: new Date('2026-08-01T15:00:00.000Z'),
           }),
         ]),
@@ -80,7 +80,7 @@ describe('Groups mock endpoints (e2e)', () => {
         {
           id: DEMO_GROUP_ID,
           name: 'Amigos da faculdade',
-          profilePic: 'https://images.example.com/groups/faculdade.jpg',
+          profilePic: `/groups/${DEMO_GROUP_ID}/profile-picture`,
           createdAt: '2026-08-01T15:00:00.000Z',
         },
       ])
@@ -129,7 +129,7 @@ describe('Groups mock endpoints (e2e)', () => {
     expect(response.body).toEqual({
       id: expect.stringMatching(/^[0-9a-f-]{36}$/),
       name: 'Grupo criado no E2E',
-      profilePic: expect.stringMatching(/^\/group\/[0-9a-f-]{36}\/image$/),
+      profilePic: expect.stringMatching(/^\/groups\/[0-9a-f-]{36}\/profile-picture$/),
       createdAt: expect.any(String),
     });
 

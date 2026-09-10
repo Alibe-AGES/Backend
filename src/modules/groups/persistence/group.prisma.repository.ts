@@ -69,4 +69,23 @@ export class PrismaGroupRepository implements GroupRepository {
 
     return inviteLink ? new GroupInviteLink(inviteLink) : null;
   }
+
+  async findProfilePictureAccess(
+    groupId: string,
+    userId: string
+  ): Promise<GroupProfilePictureAccess | null> {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: {
+        profilePic: true,
+        users: {
+          where: { userId },
+          select: { userId: true },
+          take: 1,
+        },
+      },
+    });
+
+    return group ? { imageKey: group.profilePic, userIsMember: group.users.length === 1 } : null;
+  }
 }

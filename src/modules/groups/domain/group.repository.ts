@@ -17,6 +17,11 @@ export interface CreateGroupInviteLinkData {
   groupId: string;
 }
 
+export interface GroupProfilePictureAccess {
+  imageKey: string | null;
+  userIsMember: boolean;
+}
+
 export abstract class GroupRepository {
   abstract create(data: CreateGroupData): Promise<Group>;
 
@@ -27,4 +32,9 @@ export abstract class GroupRepository {
   abstract createInviteLink(data: CreateGroupInviteLinkData): Promise<GroupInviteLink>;
 
   abstract findLatestInviteLinkByGroupId(groupId: string): Promise<GroupInviteLink | null>;
+
+  abstract findProfilePictureAccess(
+    groupId: string,
+    userId: string
+  ): Promise<GroupProfilePictureAccess | null>;
 }
