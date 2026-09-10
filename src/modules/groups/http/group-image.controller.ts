@@ -1,5 +1,11 @@
 import { Controller, Get, NotFoundException, Param, ParseUUIDPipe, Res } from '@nestjs/common';
-import {ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProduces, ApiTags,
+import {
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiProduces,
+  ApiTags,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import {
