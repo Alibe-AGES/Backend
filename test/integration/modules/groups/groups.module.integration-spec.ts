@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { GroupsModule } from '../../../../src/modules/groups/groups.module';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import { ListGroupsUseCase } from '../../../../src/modules/groups/application/list-groups.use-case';
@@ -8,7 +9,6 @@ import { GroupInvitesController } from '../../../../src/modules/groups/http/grou
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryObjectStorage } from '../../../../test/helpers/in-memory-object.storage';
-import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 
 const authenticatedRequest = {
   user: { id: '11111111-1111-4111-8111-111111111111' },
@@ -122,7 +122,7 @@ describe('GroupsModule integration', () => {
       );
 
       expect(result.name).toEqual('Group with photo');
-      expect(result.profilePic).toEqual(`/group/${result.id}/image`);
+      expect(result.profilePic).toEqual(`/groups/${result.id}/profile-picture`);
     });
 
     it('rejects an invalid name with 400', async () => {

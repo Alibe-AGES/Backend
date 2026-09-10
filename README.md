@@ -199,6 +199,8 @@ Os endereços abaixo consideram o ambiente local com `docker compose up` em exec
 | API                  | <http://localhost:3000>                            | URL base do Backend.                                |
 | Endpoint de exemplo  | <http://localhost:3000/example>                    | Verificação rápida da API.                          |
 | Usuário mockado      | <http://localhost:3000/auth/me>                    | Mostra o usuário injetado na request na Sprint 1.   |
+| Imagem de grupo      | `/groups/{groupId}/profile-picture`                | Entrega a foto somente para integrantes do grupo.   |
+| Imagem de usuário    | `/users/{userId}/profile-picture`                  | Entrega a própria foto ou a de participante comum.  |
 | Swagger UI           | <http://localhost:3000/docs>                       | Documentação interativa e teste dos endpoints.      |
 | OpenAPI JSON         | <http://localhost:3000/docs-json>                  | Contrato OpenAPI consumível por outras ferramentas. |
 | Métricas do Backend  | <http://localhost:3000/metrics>                    | Métricas brutas no formato Prometheus.              |
@@ -385,6 +387,109 @@ curl http://localhost:3000/example/550e8400-e29b-41d4-a716-446655440000/image \
 ```
 
 O upload utiliza `multipart/form-data`, exige os campos `description` e `image`, aceita apenas MIME `image/*` e limita o arquivo a 5 MB.
+
+### Imagens autenticadas de grupos
+
+A foto de perfil de um grupo pode ser consumida pela rota:
+
+```http
+GET /groups/{groupId}/profile-picture
+```
+
+O cliente não informa a key do S3. A API:
+
+1. obtém o usuário de `request.user.id`;
+2. busca o grupo pelo `groupId`;
+3. verifica a relação `user_group`;
+4. lê a key armazenada em `Group.profilePic`;
+5. busca o objeto no S3 e devolve seus bytes com o `Content-Type` original.
+
+Isso impede que o cliente altere uma key para tentar acessar imagens de outro grupo. O endpoint
+pode responder:
+
+| Status | Significado                                        |
+| ------ | -------------------------------------------------- |
+| `200`  | Imagem retornada como conteúdo binário.            |
+| `400`  | `groupId` não é um UUID válido.                    |
+| `401`  | Usuário não autenticado.                           |
+| `403`  | Usuário autenticado não pertence ao grupo.         |
+| `404`  | Grupo, referência ou objeto da imagem inexistente. |
+
+Para consumir essa rota, o cliente utiliza o `id` do grupo; não precisa enviar a key do S3:
+
+```tsx
+<Image
+  source={{
+    uri: `${API_BASE_URL}/groups/${group.id}/profile-picture`,
+  }}
+/>
+```
+
+Quando a autenticação real utilizar Bearer Token, a requisição da imagem também precisará enviar
+o header:
+
+```tsx
+<Image
+  source={{
+    uri: `${API_BASE_URL}${group.profilePic}`,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  }}
+/>
+```
+
+O banco continua armazenando somente uma key como
+`groups/{groupId}/profile-picture.png`; os bytes permanecem no S3.
+
+### Imagens autenticadas de usuários
+
+A foto de perfil de um usuário é responsabilidade do módulo `users` e possui uma rota própria:
+
+```http
+GET /users/{userId}/profile-picture
+```
+
+O usuário autenticado pode consultar:
+
+- a própria foto;
+- a foto de um usuário que compartilhe pelo menos um grupo com ele.
+
+A API obtém o solicitante por `request.user.id`, consulta a relação `user_group`, lê a key
+armazenada em `User.profilePic` e só então busca os bytes no S3.
+
+| Status | Significado                                              |
+| ------ | -------------------------------------------------------- |
+| `200`  | Imagem retornada como conteúdo binário.                  |
+| `400`  | `userId` não é um UUID válido.                           |
+| `401`  | Usuário não autenticado.                                 |
+| `403`  | Solicitante e usuário consultado não compartilham grupo. |
+| `404`  | Usuário, referência ou objeto da imagem inexistente.     |
+
+Nas respostas que apresentam um usuário, o campo `profilePic` deve conter a rota da API:
+
+```json
+{
+  "id": "22222222-2222-4222-8222-222222222222",
+  "profilePic": "/users/22222222-2222-4222-8222-222222222222/profile-picture"
+}
+```
+
+No React Native, a utilização segue a mesma ideia da imagem de grupo:
+
+```tsx
+<Image
+  source={{
+    uri: `${API_BASE_URL}${user.profilePic}`,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  }}
+/>
+```
+
+O banco armazena somente uma key como `users/{userId}/profile-picture.png`; os bytes permanecem
+no S3.
 
 ### Placeholder para uma AWS remota
 

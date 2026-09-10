@@ -2,43 +2,60 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
+  Header,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
   HttpCode,
   HttpStatus,
   Post,
   Request,
+  StreamableFile,
+  UnauthorizedException,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { Param, ParseUUIDPipe } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
+import {
+  GetGroupProfilePictureUseCase,
+  GroupImageAccessDeniedError,
+  GroupNotFoundError,
+  GroupProfilePictureNotFoundError,
+} from '../application/get-group-profile-picture.use-case';
 import { CreateGroupUseCase, InvalidGroupError } from '../application/create-group.use-case';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
+import { GroupResponsePresenter } from './presenters/group-response.presenter';
 import { ListGroupsUseCase } from '../application/list-groups.use-case';
-import { Group } from '../domain/group.entity';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
-@ApiTags('Groups - Mock')
+@ApiTags('Groups')
 @Controller('groups')
 export class GroupsController {
   constructor(
     private readonly createGroupUseCase: CreateGroupUseCase,
-    private readonly listGroupsUseCase: ListGroupsUseCase
+    private readonly listGroupsUseCase: ListGroupsUseCase,
+    private readonly getGroupProfilePictureUseCase: GetGroupProfilePictureUseCase
   ) {}
   /**
    * GET /groups
@@ -56,7 +73,54 @@ export class GroupsController {
   })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   async list(@Request() request: AuthenticatedRequest): Promise<GroupListItemResponseDto[]> {
-    return this.listGroupsUseCase.execute(request.user?.id ?? '');
+    const groups = await this.listGroupsUseCase.execute(request.user?.id ?? '');
+
+    return groups.map((group) => GroupResponsePresenter.toResponse(group));
+  }
+
+  /**
+   * GET /groups/:groupId/profile-picture
+   * Entrega a foto do grupo somente quando o usuário autenticado pertence a ele.
+   */
+  @Get(':groupId/profile-picture')
+  @Header('Cache-Control', 'private, max-age=300')
+  @ApiOperation({ summary: 'Obtém a foto de perfil de um grupo do usuário autenticado' })
+  @ApiParam({ name: 'groupId', format: 'uuid' })
+  @ApiProduces('image/png', 'image/jpeg', 'image/webp')
+  @ApiOkResponse({
+    description: 'Conteúdo binário da imagem.',
+    content: { 'image/*': { schema: { type: 'string', format: 'binary' } } },
+  })
+  @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo.' })
+  @ApiNotFoundResponse({ description: 'Grupo ou imagem não encontrado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar banco ou storage.' })
+  async getProfilePicture(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<StreamableFile> {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
+    try {
+      const image = await this.getGroupProfilePictureUseCase.execute(groupId, userId);
+      return new StreamableFile(Buffer.from(image.bytes), {
+        type: image.contentType,
+        disposition: 'inline',
+        length: image.bytes.byteLength,
+      });
+    } catch (error) {
+      if (error instanceof GroupImageAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+      if (
+        error instanceof GroupNotFoundError ||
+        error instanceof GroupProfilePictureNotFoundError
+      ) {
+        throw new NotFoundException(error.message);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -162,21 +226,12 @@ export class GroupsController {
           : null,
       });
 
-      return this.toResponse(group);
+      return GroupResponsePresenter.toResponse(group);
     } catch (error) {
       if (error instanceof InvalidGroupError) {
         throw new BadRequestException(error.message);
       }
       throw error;
     }
-  }
-
-  private toResponse(group: Group): GroupListItemResponseDto {
-    return {
-      id: group.id,
-      name: group.name,
-      profilePic: group.profilePic ? `/group/${group.id}/image` : null,
-      createdAt: group.createdAt,
-    };
   }
 }
