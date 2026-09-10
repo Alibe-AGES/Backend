@@ -1,4 +1,4 @@
-import { Availability } from "./availability.entity";
+import { Availability } from './availability.entity';
 
 export interface CreateAvailabilityData {
   groupId: string;

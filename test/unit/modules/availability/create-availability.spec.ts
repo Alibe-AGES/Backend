@@ -1,4 +1,7 @@
-import { CreateAvailabilityUseCase, InvalidAvailabilityError } from '../../../../src/modules/availability/application/create-availability.use-case';
+import {
+  CreateAvailabilityUseCase,
+  InvalidAvailabilityError,
+} from '../../../../src/modules/availability/application/create-availability.use-case';
 import { InMemoryAvailabilityRepository } from '../../../../test/helpers/in-memory-availability.repository';
 
 const userId = '11111111-1111-4111-8111-111111111111';
@@ -56,7 +59,9 @@ describe('CreateAvailabilityUseCase', () => {
     };
 
     await expect(useCase.create(input)).rejects.toThrow(InvalidAvailabilityError);
-    await expect(useCase.create(input)).rejects.toThrow('startTime e endTime devem estar ambos preenchidos ou nenhum');
+    await expect(useCase.create(input)).rejects.toThrow(
+      'startTime e endTime devem estar ambos preenchidos ou nenhum'
+    );
   });
 
   it('should throw InvalidAvailabilityError if only timeslotEnd is fulfill', async () => {
@@ -68,6 +73,8 @@ describe('CreateAvailabilityUseCase', () => {
     };
 
     await expect(useCase.create(input)).rejects.toThrow(InvalidAvailabilityError);
-    await expect(useCase.create(input)).rejects.toThrow('startTime e endTime devem estar ambos preenchidos ou nenhum');
+    await expect(useCase.create(input)).rejects.toThrow(
+      'startTime e endTime devem estar ambos preenchidos ou nenhum'
+    );
   });
 });

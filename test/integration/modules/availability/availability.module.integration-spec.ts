@@ -26,26 +26,28 @@ describe('AvailabilityModule integration', () => {
 
   const prisma = {
     availability: {
-      create: jest.fn((input: {
-        data: {
-          group: { connect: { id: string } };
-          user: { connect: { id: string } };
-          date: Date;
-          timeslotStart?: Date | null;
-          timeslotEnd?: Date | null;
-        };
-      }) => {
-        const row = {
-          id: `availability-uuid-${idCounter++}`,
-          groupId: input.data.group.connect.id,
-          userId: input.data.user.connect.id,
-          date: input.data.date,
-          timeslotStart: input.data.timeslotStart ?? null,
-          timeslotEnd: input.data.timeslotEnd ?? null,
-        };
-        rows.set(row.id, row);
-        return Promise.resolve(row);
-      }),
+      create: jest.fn(
+        (input: {
+          data: {
+            group: { connect: { id: string } };
+            user: { connect: { id: string } };
+            date: Date;
+            timeslotStart?: Date | null;
+            timeslotEnd?: Date | null;
+          };
+        }) => {
+          const row = {
+            id: `availability-uuid-${idCounter++}`,
+            groupId: input.data.group.connect.id,
+            userId: input.data.user.connect.id,
+            date: input.data.date,
+            timeslotStart: input.data.timeslotStart ?? null,
+            timeslotEnd: input.data.timeslotEnd ?? null,
+          };
+          rows.set(row.id, row);
+          return Promise.resolve(row);
+        }
+      ),
     },
   };
 
@@ -69,7 +71,6 @@ describe('AvailabilityModule integration', () => {
 
   it('connects controller, use case and Prisma repository for creation with timeslots', async () => {
     const controller = moduleFixture.get(AvailabilityController);
-    const useCase = moduleFixture.get(CreateAvailabilityUseCase);
 
     const dto = {
       userId,
