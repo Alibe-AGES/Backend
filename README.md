@@ -666,11 +666,17 @@ Os DTOs, exemplos de payload e respostas podem ser consultados e executados em
 <http://localhost:3000/docs>. Outros fluxos serão adicionados somente depois que seus contratos
 forem discutidos.
 
-### Endpoint mockado de calendário
+### Endpoint de calendário
 
 O calendário fica em um módulo próprio porque agrega informações de eventos, propostas,
-disponibilidades, usuários e participantes do grupo. Nesta etapa, ele contém somente controller e
-DTOs HTTP mockados, sem service, use case, repository ou persistência.
+disponibilidades, usuários e participantes do grupo. O fluxo segue a arquitetura do projeto:
+
+```text
+CalendarController
+    -> GetGroupCalendarUseCase
+        -> CalendarRepository
+            -> PrismaCalendarRepository -> PostgreSQL
+```
 
 ```http
 GET /groups/:groupId/calendar?month=5&year=2026
@@ -678,9 +684,23 @@ GET /groups/:groupId/calendar?month=5&year=2026
 
 O `groupId` é recebido pela URL; `month` e `year` são obrigatórios. `month` deve ser um número
 entre 1 e 12 e `year` deve ser um inteiro com quatro dígitos. O `userId` não é recebido em path,
-query ou body: futuramente virá da autenticação. A resposta contém somente dias com informações.
+query ou body: ele vem de `request.user`, preenchido pela autenticação. A consulta só é permitida
+quando o usuário pertence ao grupo e a resposta contém somente dias com informações.
 Os campos `scheduledEventIds`, `proposalIds`, `availableUserIds` e `completedEventIds` são arrays
 de UUIDs, sem objetos intermediários.
+
+Os dados são agrupados por dia, usando datas UTC, com as seguintes regras:
+
+- eventos `confirmed` futuros entram em `scheduledEventIds`;
+- eventos `confirmed` passados entram em `completedEventIds`;
+- propostas de eventos `pending` entram em `proposalIds`;
+- eventos `declined` não aparecem no calendário;
+- `availableUserIds` contém somente participantes do grupo, sem IDs repetidos;
+- `allUsersAvailable` é `true` quando todos os participantes possuem disponibilidade naquele dia.
+
+Quando o mês não possui eventos, propostas ou disponibilidades, a API responde `200` com um array
+vazio. Grupo inexistente responde `404` e tentativa de acesso por alguém que não participa do grupo
+responde `403`.
 
 O contrato completo pode ser consultado pelo Swagger em <http://localhost:3000/docs>.
 
@@ -715,7 +735,7 @@ nos decorators do Swagger de cada controller.
 | POST   | `/groups`                         | `201`   | `400`, `500`                      |
 | GET    | `/groups/:groupId/invite-link`    | `200`   | `400`, `500`                      |
 | POST   | `/invite-links/:token/join`       | `201`   | `400`, `500`                      |
-| GET    | `/groups/:groupId/calendar`       | `200`   | `400`, `500`                      |
+| GET    | `/groups/:groupId/calendar`       | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/groups/:groupId/availabilities` | `201`   | `400`, `401`, `403`, `404`, `500` |
 
 | Status                      | Significado atual                                                                                                        |
