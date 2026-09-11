@@ -14,6 +14,7 @@ import { InMemoryExampleRepository } from '../../../helpers/in-memory-example.re
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
 
 const DEMO_GROUP_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const GROUP_IMAGE_KEY = `groups/${DEMO_GROUP_ID}/image.png`;
 const inviteLinksByGroupId = new Map<string, GroupInviteLink>();
 
 describe('Groups mock endpoints (e2e)', () => {
@@ -104,6 +105,12 @@ describe('Groups mock endpoints (e2e)', () => {
     app = moduleFixture.createNestApplication();
     setupApplication(app);
     await app.init();
+
+    await app.get(ObjectStorage).save({
+      key: GROUP_IMAGE_KEY,
+      bytes: Uint8Array.from([137, 80, 78, 71]),
+      contentType: 'image/png',
+    });
   });
 
   afterAll(async () => {
@@ -152,6 +159,13 @@ describe('Groups mock endpoints (e2e)', () => {
         status: 'confirmed',
       },
     });
+
+    const imageResponse = await request(app.getHttpServer())
+      .get(response.body.profilePic)
+      .expect('Content-Type', /image\/png/)
+      .expect(200);
+
+    expect(imageResponse.body).toEqual(Buffer.from([137, 80, 78, 71]));
   });
 
   it('creates a mocked group from multipart name and profile_pic', async () => {

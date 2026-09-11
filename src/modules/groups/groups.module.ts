@@ -17,9 +17,9 @@ import { PrismaGroupRepository } from './persistence/group.prisma.repository';
   providers: [
     CreateGroupUseCase,
     ListGroupsUseCase,
+    GetGroupUseCase,
     GetOrCreateGroupInviteLinkUseCase,
     GetGroupProfilePictureUseCase,
-    GetGroupUseCase,
     {
       provide: GroupRepository,
       useClass: PrismaGroupRepository,
