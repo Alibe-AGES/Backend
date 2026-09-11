@@ -95,14 +95,22 @@ export class GetGroupCalendarUseCase {
     return [...days.entries()]
       .sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate))
       .map(([date, day]) => {
-        const availableUserIds = [...day.availableUserIds].sort();
+        const availableUserIds = [...day.availableUserIds].sort((firstId, secondId) =>
+          firstId.localeCompare(secondId)
+        );
 
         return {
           date,
-          scheduledEventIds: [...day.scheduledEventIds].sort(),
-          proposalIds: [...day.proposalIds].sort(),
+          scheduledEventIds: [...day.scheduledEventIds].sort((firstId, secondId) =>
+            firstId.localeCompare(secondId)
+          ),
+          proposalIds: [...day.proposalIds].sort((firstId, secondId) =>
+            firstId.localeCompare(secondId)
+          ),
           availableUserIds,
-          completedEventIds: [...day.completedEventIds].sort(),
+          completedEventIds: [...day.completedEventIds].sort((firstId, secondId) =>
+            firstId.localeCompare(secondId)
+          ),
           allUsersAvailable:
             memberIds.size > 0 &&
             [...memberIds].every((memberId) => day.availableUserIds.has(memberId)),

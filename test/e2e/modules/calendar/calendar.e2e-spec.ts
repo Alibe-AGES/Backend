@@ -151,19 +151,23 @@ describe('Calendar endpoint (e2e)', () => {
       availabilities: [],
     });
 
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .get(`/groups/${DEMO_GROUP_ID}/calendar`)
       .query({ month: 5, year: 2026 })
       .expect(403);
+
+    expect(response.status).toBe(403);
   });
 
   it('returns 404 when the group does not exist', async () => {
     findGroupCalendarData.mockResolvedValue(null);
 
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .get(`/groups/${DEMO_GROUP_ID}/calendar`)
       .query({ month: 5, year: 2026 })
       .expect(404);
+
+    expect(response.status).toBe(404);
   });
 
   it('exposes the calendar endpoint in Swagger', async () => {
