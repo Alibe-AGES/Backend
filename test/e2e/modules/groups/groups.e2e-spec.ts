@@ -104,7 +104,6 @@ describe('Groups mock endpoints (e2e)', () => {
     app = moduleFixture.createNestApplication();
     setupApplication(app);
     await app.init();
-
   });
 
   afterAll(async () => {
@@ -153,7 +152,6 @@ describe('Groups mock endpoints (e2e)', () => {
         status: 'confirmed',
       },
     });
-
   });
 
   it('creates a mocked group from multipart name and profile_pic', async () => {
