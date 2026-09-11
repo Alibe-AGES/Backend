@@ -1,4 +1,6 @@
 import {
+  AvailabilityAccessDeniedError,
+  AvailabilityGroupNotFoundError,
   CreateAvailabilityUseCase,
   InvalidAvailabilityError,
 } from '../../../../src/modules/availability/application/create-availability.use-case';
@@ -35,7 +37,7 @@ describe('CreateAvailabilityUseCase', () => {
     expect(result.timeslotEnd).toEqual(new Date('2026-10-15T20:00:00.000Z'));
   });
 
-  it('should successfullyregister availability without timeslotStart and timeslotEnd', async () => {
+  it('registers availability without timeslotStart and timeslotEnd', async () => {
     const input = {
       groupId,
       userId,
@@ -75,6 +77,34 @@ describe('CreateAvailabilityUseCase', () => {
     await expect(useCase.create(input)).rejects.toThrow(InvalidAvailabilityError);
     await expect(useCase.create(input)).rejects.toThrow(
       'startTime e endTime devem estar ambos preenchidos ou nenhum'
+    );
+  });
+
+  it('rejects an inverted time interval', async () => {
+    await expect(
+      useCase.create({
+        groupId,
+        userId,
+        date: '2026-10-15',
+        timeslotStart: '20:00',
+        timeslotEnd: '15:00',
+      })
+    ).rejects.toThrow(InvalidAvailabilityError);
+  });
+
+  it('reports a group that does not exist', async () => {
+    availabilities.setMembershipResult(null);
+
+    await expect(useCase.create({ groupId, userId, date: '2026-10-15' })).rejects.toThrow(
+      AvailabilityGroupNotFoundError
+    );
+  });
+
+  it('denies creation when the user does not belong to the group', async () => {
+    availabilities.setMembershipResult(false);
+
+    await expect(useCase.create({ groupId, userId, date: '2026-10-15' })).rejects.toThrow(
+      AvailabilityAccessDeniedError
     );
   });
 });

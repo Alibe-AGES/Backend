@@ -7,13 +7,44 @@ const groupId = '8549aded-7ca6-45bf-b96c-a8ddc49c95f0';
 
 describe('PrismaAvailabilityRepository', () => {
   const create = jest.fn();
+  const findUnique = jest.fn();
   const prisma = {
     availability: { create },
+    group: { findUnique },
   } as unknown as PrismaService;
   const repository = new PrismaAvailabilityRepository(prisma);
 
   beforeEach(() => {
     create.mockReset();
+    findUnique.mockReset();
+  });
+
+  it('returns true when the user belongs to the group', async () => {
+    findUnique.mockResolvedValue({ users: [{ userId }] });
+
+    await expect(repository.findGroupMembership(groupId, userId)).resolves.toBe(true);
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: groupId },
+      select: {
+        users: {
+          where: { userId },
+          select: { userId: true },
+          take: 1,
+        },
+      },
+    });
+  });
+
+  it('returns false when the user does not belong to the group', async () => {
+    findUnique.mockResolvedValue({ users: [] });
+
+    await expect(repository.findGroupMembership(groupId, userId)).resolves.toBe(false);
+  });
+
+  it('returns null when the group does not exist', async () => {
+    findUnique.mockResolvedValue(null);
+
+    await expect(repository.findGroupMembership(groupId, userId)).resolves.toBeNull();
   });
 
   it('creates and maps an availability with all fields provided', async () => {

@@ -1,12 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { AvailabilityRepository, CreateAvailabilityData } from '../domain/availability.repository';
+import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { Availability } from '../domain/availability.entity';
-import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { AvailabilityRepository, CreateAvailabilityData } from '../domain/availability.repository';
 
 @Injectable()
 export class PrismaAvailabilityRepository extends AvailabilityRepository {
   constructor(private readonly prisma: PrismaService) {
     super();
+  }
+
+  async findGroupMembership(groupId: string, userId: string): Promise<boolean | null> {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: {
+        users: {
+          where: { userId },
+          select: { userId: true },
+          take: 1,
+        },
+      },
+    });
+
+    return group ? group.users.length > 0 : null;
   }
 
   async create(data: CreateAvailabilityData): Promise<Availability> {

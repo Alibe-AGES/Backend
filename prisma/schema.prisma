@@ -139,7 +139,7 @@ model ProposalResponse {
 
 model Availability {
   id            String    @id @default(uuid()) @db.Uuid
-  date          DateTime  @db.Date      
+  date          DateTime  @db.Date
   timeslotStart DateTime? @map("timeslot_start")
   timeslotEnd   DateTime? @map("timeslot_end")
   groupId       String    @map("group_id") @db.Uuid

@@ -25,6 +25,9 @@ describe('AvailabilityModule integration', () => {
   let idCounter = 1;
 
   const prisma = {
+    group: {
+      findUnique: jest.fn(),
+    },
     availability: {
       create: jest.fn(
         (input: {
@@ -67,6 +70,7 @@ describe('AvailabilityModule integration', () => {
   beforeEach(() => {
     rows.clear();
     jest.clearAllMocks();
+    prisma.group.findUnique.mockResolvedValue({ users: [{ userId }] });
   });
 
   it('connects controller, use case and Prisma repository for creation with timeslots', async () => {
@@ -99,6 +103,17 @@ describe('AvailabilityModule integration', () => {
         date: new Date('2026-10-15T00:00:00.000Z'),
         timeslotStart: new Date('2026-10-15T15:00:00.000Z'),
         timeslotEnd: new Date('2026-10-15T20:00:00.000Z'),
+      },
+    });
+
+    expect(prisma.group.findUnique).toHaveBeenCalledWith({
+      where: { id: groupId },
+      select: {
+        users: {
+          where: { userId },
+          select: { userId: true },
+          take: 1,
+        },
       },
     });
 

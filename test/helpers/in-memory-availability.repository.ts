@@ -7,16 +7,25 @@ import {
 
 export class InMemoryAvailabilityRepository extends AvailabilityRepository {
   private readonly availabilities = new Map<string, Availability>();
+  private membershipResult: boolean | null = true;
+
+  setMembershipResult(result: boolean | null): void {
+    this.membershipResult = result;
+  }
+
+  findGroupMembership(): Promise<boolean | null> {
+    return Promise.resolve(this.membershipResult);
+  }
 
   create(data: CreateAvailabilityData): Promise<Availability> {
     const id = randomUUID();
     const availability = new Availability({
-      id: id,
+      id,
       groupId: data.groupId,
       userId: data.userId,
       date: data.date,
-      timeslotStart: data.timeslotStart ? data.timeslotStart : null,
-      timeslotEnd: data.timeslotEnd ? data.timeslotEnd : null,
+      timeslotStart: data.timeslotStart ?? null,
+      timeslotEnd: data.timeslotEnd ?? null,
     });
 
     this.availabilities.set(availability.id, availability);

@@ -1,15 +1,22 @@
-import { BadRequestException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-import { randomUUID } from 'crypto';
-import { AuthenticatedRequest } from 'src/modules/auth/http/authenticated-user';
 import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { randomUUID } from 'node:crypto';
+import { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
+import {
+  AvailabilityAccessDeniedError,
+  AvailabilityGroupNotFoundError,
   CreateAvailabilityUseCase,
   InvalidAvailabilityError,
 } from '../../../../src/modules/availability/application/create-availability.use-case';
 import { AvailabilityController } from '../../../../src/modules/availability/http/availability.controller';
 import { AvailabilityResponseDto } from '../../../../src/modules/availability/http/dto/availability-response.dto';
 import { CreateAvailabilityDto } from '../../../../src/modules/availability/http/dto/create-availability.dto';
-import { Availability } from 'src/modules/availability/domain/availability.entity';
+import { Availability } from '../../../../src/modules/availability/domain/availability.entity';
 
 const userId = '11111111-1111-4111-8111-111111111111';
 const groupId = '8549aded-7ca6-45bf-b96c-a8ddc49c95f0';
@@ -125,18 +132,32 @@ describe('AvailabilityController', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('should throw BadRequestException for a date older than Date.now()', async () => {
-    createAvailabilityUseCaseMock.create.mockRejectedValue(
-      new InvalidAvailabilityError('startTime e endTime devem estar ambos preenchidos ou nenhum')
-    );
-
-    const createAvailabilityDto = {
-      userId: userId,
-      date: '2026-05-14',
-    } as CreateAvailabilityDto;
+  it('rejects a request without an authenticated user', async () => {
+    const requestWithoutUser = {} as AuthenticatedRequest;
 
     await expect(
-      controller.create(groupId, createAvailabilityDto, authenticatedRequest)
-    ).rejects.toThrow(BadRequestException);
+      controller.create(groupId, { date: '2026-05-14' }, requestWithoutUser)
+    ).rejects.toThrow(UnauthorizedException);
+    expect(createAvailabilityUseCaseMock.create).not.toHaveBeenCalled();
+  });
+
+  it('maps access denied to ForbiddenException', async () => {
+    createAvailabilityUseCaseMock.create.mockRejectedValue(
+      new AvailabilityAccessDeniedError('User does not belong to this group')
+    );
+
+    await expect(
+      controller.create(groupId, { date: '2026-05-14' }, authenticatedRequest)
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('maps a missing group to NotFoundException', async () => {
+    createAvailabilityUseCaseMock.create.mockRejectedValue(
+      new AvailabilityGroupNotFoundError('Group not found')
+    );
+
+    await expect(
+      controller.create(groupId, { date: '2026-05-14' }, authenticatedRequest)
+    ).rejects.toThrow(NotFoundException);
   });
 });

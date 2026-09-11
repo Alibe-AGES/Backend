@@ -13,6 +13,8 @@ const MOCK_AUTHENTICATED_USER_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('AvailabilityController (e2e)', () => {
   let app: INestApplication;
+  let availabilityRepository: InMemoryAvailabilityRepository;
+  const previousMockAuthEnabled = process.env.MOCK_AUTH_ENABLED;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -29,12 +31,26 @@ describe('AvailabilityController (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    availabilityRepository = moduleFixture.get(
+      AvailabilityRepository
+    ) as InMemoryAvailabilityRepository;
     setupApplication(app);
     await app.init();
   });
 
   afterAll(async () => {
+    if (previousMockAuthEnabled === undefined) {
+      delete process.env.MOCK_AUTH_ENABLED;
+    } else {
+      process.env.MOCK_AUTH_ENABLED = previousMockAuthEnabled;
+    }
+
     await app.close();
+  });
+
+  beforeEach(() => {
+    process.env.MOCK_AUTH_ENABLED = 'true';
+    availabilityRepository.setMembershipResult(true);
   });
 
   it('registers availability with an optional time interval', async () => {
@@ -97,11 +113,45 @@ describe('AvailabilityController (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects a request without an authenticated user', async () => {
+    process.env.MOCK_AUTH_ENABLED = 'false';
+
+    await request(app.getHttpServer())
+      .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
+      .send({ date: '2026-05-14' })
+      .expect(401);
+  });
+
+  it('rejects a user who does not belong to the group', async () => {
+    availabilityRepository.setMembershipResult(false);
+
+    await request(app.getHttpServer())
+      .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
+      .send({ date: '2026-05-14' })
+      .expect(403);
+  });
+
+  it('reports a group that does not exist', async () => {
+    availabilityRepository.setMembershipResult(null);
+
+    await request(app.getHttpServer())
+      .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
+      .send({ date: '2026-05-14' })
+      .expect(404);
+  });
+
   it('documents the endpoint and its status codes in Swagger', async () => {
     const response = await request(app.getHttpServer()).get('/docs-json').expect(200);
     const operation = response.body.paths['/groups/{groupId}/availabilities'].post;
 
     expect(operation).toBeDefined();
-    expect(Object.keys(operation.responses).sort()).toEqual(['201', '400', '500']);
+    expect(Object.keys(operation.responses).sort()).toEqual([
+      '201',
+      '400',
+      '401',
+      '403',
+      '404',
+      '500',
+    ]);
   });
 });
