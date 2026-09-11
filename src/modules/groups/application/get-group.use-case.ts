@@ -18,7 +18,7 @@ export class GetGroupUseCase {
     return {
       id: group.id,
       name: group.name,
-      profilePic: group.profilePic ? `/group/${group.id}/image` : null,
+      profilePic: group.profilePic ? `/groups/${group.id}/profile-picture` : null,
       createdAt: group.createdAt,
       participants: group.participants.map((participant) => ({
         id: participant.id,

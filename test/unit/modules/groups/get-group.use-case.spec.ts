@@ -38,7 +38,7 @@ describe('GetGroupUseCase', () => {
 
     await expect(useCase.execute(groupId)).resolves.toEqual({
       ...details,
-      profilePic: `/group/${groupId}/image`,
+      profilePic: `/groups/${groupId}/profile-picture`,
       participants: [details.participants[0], { ...details.participants[1], name: '' }],
     });
     expect(findDetailsById).toHaveBeenCalledWith(groupId);

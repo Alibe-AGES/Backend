@@ -5,7 +5,6 @@ import {
   ForbiddenException,
   Get,
   Header,
-  NotFoundException,
   Param,
   ParseUUIDPipe,
   HttpCode,
@@ -38,7 +37,7 @@ import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import {
   GetGroupProfilePictureUseCase,
   GroupImageAccessDeniedError,
-  GroupNotFoundError,
+  GroupNotFoundError as ProfileGroupNotFoundError,
   GroupProfilePictureNotFoundError,
 } from '../application/get-group-profile-picture.use-case';
 import { CreateGroupUseCase, InvalidGroupError } from '../application/create-group.use-case';
@@ -117,7 +116,7 @@ export class GroupsController {
         throw new ForbiddenException(error.message);
       }
       if (
-        error instanceof GroupNotFoundError ||
+        error instanceof ProfileGroupNotFoundError ||
         error instanceof GroupProfilePictureNotFoundError
       ) {
         throw new NotFoundException(error.message);

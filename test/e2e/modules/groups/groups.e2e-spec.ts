@@ -15,7 +15,6 @@ import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage
 
 const DEMO_GROUP_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const inviteLinksByGroupId = new Map<string, GroupInviteLink>();
-const GROUP_IMAGE_KEY = `groups/${DEMO_GROUP_ID}/image.png`;
 
 describe('Groups mock endpoints (e2e)', () => {
   let app: INestApplication;
@@ -45,7 +44,7 @@ describe('Groups mock endpoints (e2e)', () => {
             ? new Group({
                 id: DEMO_GROUP_ID,
                 name: 'Amigos da faculdade',
-                profilePic: GROUP_IMAGE_KEY,
+                profilePic: `groups/${DEMO_GROUP_ID}/image.png`,
                 createdAt: new Date('2026-08-01T15:00:00.000Z'),
               })
             : null
@@ -55,7 +54,7 @@ describe('Groups mock endpoints (e2e)', () => {
             ? {
                 id: DEMO_GROUP_ID,
                 name: 'Amigos da faculdade',
-                profilePic: GROUP_IMAGE_KEY,
+                profilePic: `groups/${DEMO_GROUP_ID}/image.png`,
                 createdAt: new Date('2026-08-01T15:00:00.000Z'),
                 participants: [
                   {
@@ -105,12 +104,6 @@ describe('Groups mock endpoints (e2e)', () => {
     app = moduleFixture.createNestApplication();
     setupApplication(app);
     await app.init();
-
-    await app.get(ObjectStorage).save({
-      key: GROUP_IMAGE_KEY,
-      bytes: Uint8Array.from([137, 80, 78, 71]),
-      contentType: 'image/png',
-    });
   });
 
   afterAll(async () => {
@@ -138,7 +131,7 @@ describe('Groups mock endpoints (e2e)', () => {
     expect(response.body).toEqual({
       id: DEMO_GROUP_ID,
       name: 'Amigos da faculdade',
-      profilePic: `/group/${DEMO_GROUP_ID}/image`,
+      profilePic: `/groups/${DEMO_GROUP_ID}/profile-picture`,
       createdAt: '2026-08-01T15:00:00.000Z',
       participants: [
         {
@@ -159,13 +152,6 @@ describe('Groups mock endpoints (e2e)', () => {
         status: 'confirmed',
       },
     });
-
-    const imageResponse = await request(app.getHttpServer())
-      .get(response.body.profilePic)
-      .expect('Content-Type', /image\/png/)
-      .expect(200);
-
-    expect(imageResponse.body).toEqual(Buffer.from([137, 80, 78, 71]));
   });
 
   it('creates a mocked group from multipart name and profile_pic', async () => {
@@ -216,7 +202,6 @@ describe('Groups mock endpoints (e2e)', () => {
     await request(app.getHttpServer())
       .get('/groups/ffffffff-ffff-4fff-8fff-ffffffffffff')
       .expect(404);
-    await request(app.getHttpServer()).get('/group/not-a-uuid/image').expect(400);
     await request(app.getHttpServer()).get('/groups/not-a-uuid/invite-link').expect(400);
     await request(app.getHttpServer()).post('/invite-links/not-a-uuid/join').expect(400);
 

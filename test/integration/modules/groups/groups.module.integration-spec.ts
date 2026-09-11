@@ -7,7 +7,6 @@ import { ListGroupsUseCase } from '../../../../src/modules/groups/application/li
 import { GetGroupUseCase } from '../../../../src/modules/groups/application/get-group.use-case';
 import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
 import { GroupInvitesController } from '../../../../src/modules/groups/http/group-invites.controller';
-import { GroupImageController } from '../../../../src/modules/groups/http/group-image.controller';
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryObjectStorage } from '../../../../test/helpers/in-memory-object.storage';
@@ -83,7 +82,6 @@ describe('GroupsModule integration', () => {
   it('registers the groups controllers', () => {
     expect(module.get(GroupsController)).toBeInstanceOf(GroupsController);
     expect(module.get(GroupInvitesController)).toBeInstanceOf(GroupInvitesController);
-    expect(module.get(GroupImageController)).toBeInstanceOf(GroupImageController);
   });
 
   it('connects the group details use case to the Prisma repository', async () => {
@@ -115,7 +113,7 @@ describe('GroupsModule integration', () => {
 
     await expect(getGroup.execute(groupId)).resolves.toEqual({
       ...row,
-      profilePic: `/group/${groupId}/image`,
+      profilePic: `/groups/${groupId}/profile-picture`,
       participants: [participant],
       nextEvent: event,
     });
