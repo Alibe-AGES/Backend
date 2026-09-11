@@ -4,7 +4,8 @@ import {
   CreateGroupData,
   CreateGroupInviteLinkData,
   GroupProfilePictureAccess,
-  GroupDetails, GroupRepository,
+  GroupDetails,
+  GroupRepository,
 } from '../domain/group.repository';
 import { Group } from '../domain/group.entity';
 import { GroupInviteLink } from '../domain/group-invite-link.entity';
