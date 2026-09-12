@@ -6,9 +6,16 @@ describe('PrismaGroupRepository', () => {
   const findUnique = jest.fn();
   const inviteLinkCreate = jest.fn();
   const inviteLinkFindFirst = jest.fn();
+  const inviteLinkFindUnique = jest.fn();
+  const userGroupUpsert = jest.fn();
   const prisma = {
     group: { create, findUnique },
-    inviteLink: { create: inviteLinkCreate, findFirst: inviteLinkFindFirst },
+    inviteLink: {
+      create: inviteLinkCreate,
+      findFirst: inviteLinkFindFirst,
+      findUnique: inviteLinkFindUnique,
+    },
+    userGroup: { upsert: userGroupUpsert },
   } as unknown as PrismaService;
   const repository = new PrismaGroupRepository(prisma);
 
@@ -17,6 +24,8 @@ describe('PrismaGroupRepository', () => {
     findUnique.mockReset();
     inviteLinkCreate.mockReset();
     inviteLinkFindFirst.mockReset();
+    inviteLinkFindUnique.mockReset();
+    userGroupUpsert.mockReset();
   });
 
   it('creates and maps a group', async () => {
@@ -113,6 +122,41 @@ describe('PrismaGroupRepository', () => {
     await expect(
       repository.findLatestInviteLinkByGroupId('550e8400-e29b-41d4-a716-446655440000')
     ).resolves.toBeNull();
+  });
+
+  it('finds and maps an invite link by token', async () => {
+    const row = {
+      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      token: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      validity: new Date('2026-09-16T00:00:00.000Z'),
+      createdAt: new Date('2026-09-09T00:00:00.000Z'),
+      groupId: '550e8400-e29b-41d4-a716-446655440000',
+    };
+    inviteLinkFindUnique.mockResolvedValue(row);
+
+    await expect(repository.findInviteLinkByToken(row.token)).resolves.toEqual(
+      expect.objectContaining(row)
+    );
+    expect(inviteLinkFindUnique).toHaveBeenCalledWith({ where: { token: row.token } });
+  });
+
+  it('returns null when no invite link matches the token', async () => {
+    inviteLinkFindUnique.mockResolvedValue(null);
+
+    await expect(repository.findInviteLinkByToken('unknown-token')).resolves.toBeNull();
+  });
+
+  it('adds a member to a group', async () => {
+    const groupId = '550e8400-e29b-41d4-a716-446655440000';
+    const userId = '11111111-1111-4111-8111-111111111111';
+
+    await repository.addMember(groupId, userId);
+
+    expect(userGroupUpsert).toHaveBeenCalledWith({
+      where: { userId_groupId: { userId, groupId } },
+      update: {},
+      create: { userId, groupId },
+    });
   });
 
   it('finds group details with users and the next future event', async () => {
