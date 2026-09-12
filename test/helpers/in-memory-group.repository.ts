@@ -5,6 +5,7 @@ import {
   type CreateGroupData,
   type CreateGroupInviteLinkData,
   type GroupProfilePictureAccess,
+  type GroupDetails,
 } from '../../src/modules/groups/domain/group.repository';
 
 export class InMemoryGroupRepository extends GroupRepository {
@@ -48,5 +49,22 @@ export class InMemoryGroupRepository extends GroupRepository {
     const group = this.groups.get(groupId);
 
     return Promise.resolve(group ? { imageKey: group.profilePic, userIsMember: true } : null);
+  }
+
+  findDetailsById(id: string): Promise<GroupDetails | null> {
+    const group = this.groups.get(id);
+
+    if (!group) {
+      return Promise.resolve(null);
+    }
+
+    return Promise.resolve({
+      id: group.id,
+      name: group.name,
+      profilePic: group.profilePic,
+      createdAt: group.createdAt,
+      participants: [],
+      nextEvent: null,
+    });
   }
 }
