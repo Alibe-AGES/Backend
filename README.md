@@ -684,10 +684,10 @@ de UUIDs, sem objetos intermediários.
 
 O contrato completo pode ser consultado pelo Swagger em <http://localhost:3000/docs>.
 
-### Endpoint mockado de disponibilidade
+### Endpoint de disponibilidade
 
 A disponibilidade fica no módulo `availability`, separado do calendário. O endpoint recebe o
-grupo pela URL e futuramente obtém o usuário pela autenticação:
+grupo pela URL e obtém o usuário por `request.user`, preenchido pela autenticação:
 
 ```http
 POST /groups/:groupId/availabilities
@@ -697,28 +697,31 @@ POST /groups/:groupId/availabilities
 `HH:mm`, mas devem ser enviados juntos e o horário final deve ser posterior ao inicial. Quando
 ambos são omitidos, a disponibilidade vale para o dia inteiro.
 
+O grupo deve existir e o usuário autenticado deve participar dele. Grupo inexistente responde
+`404`, usuário fora do grupo responde `403` e ausência de autenticação responde `401`.
+
 Os exemplos de requisição e resposta podem ser consultados pelo Swagger em
 <http://localhost:3000/docs>.
 
-### Status HTTP dos endpoints mockados
+### Status HTTP dos endpoints
 
 Os códigos abaixo descrevem o comportamento implementado atualmente. Eles também estão declarados
 nos decorators do Swagger de cada controller.
 
-| Método | Rota                              | Sucesso | Erros atuais |
-| ------ | --------------------------------- | ------- | ------------ |
-| GET    | `/groups`                         | `200`   | `500`        |
-| GET    | `/groups/:groupId`                | `200`   | `400`, `500` |
-| POST   | `/groups`                         | `201`   | `400`, `500` |
-| GET    | `/groups/:groupId/invite-link`    | `200`   | `400`, `500` |
-| POST   | `/invite-links/:token/join`       | `201`   | `400`, `500` |
-| GET    | `/groups/:groupId/calendar`       | `200`   | `400`, `500` |
-| POST   | `/groups/:groupId/availabilities` | `201`   | `400`, `500` |
+| Método | Rota                              | Sucesso | Erros atuais                      |
+| ------ | --------------------------------- | ------- | --------------------------------- |
+| GET    | `/groups`                         | `200`   | `500`                             |
+| GET    | `/groups/:groupId`                | `200`   | `400`, `500`                      |
+| POST   | `/groups`                         | `201`   | `400`, `500`                      |
+| GET    | `/groups/:groupId/invite-link`    | `200`   | `400`, `500`                      |
+| POST   | `/invite-links/:token/join`       | `201`   | `400`, `500`                      |
+| GET    | `/groups/:groupId/calendar`       | `200`   | `400`, `500`                      |
+| POST   | `/groups/:groupId/availabilities` | `201`   | `400`, `401`, `403`, `404`, `500` |
 
 | Status                      | Significado atual                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `200 OK`                    | Consulta processada e resposta mockada retornada com sucesso.                                                            |
-| `201 Created`               | Recurso ou vínculo simulado criado com sucesso.                                                                          |
+| `200 OK`                    | Consulta processada e resposta retornada com sucesso.                                                                    |
+| `201 Created`               | Recurso ou vínculo criado com sucesso.                                                                                   |
 | `400 Bad Request`           | UUID inválido, campo obrigatório ausente, data ou intervalo inválido, `month` fora de 1–12 ou `year` sem quatro dígitos. |
 | `500 Internal Server Error` | Falha inesperada não tratada durante o processamento.                                                                    |
 

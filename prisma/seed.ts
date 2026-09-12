@@ -639,11 +639,14 @@ async function main() {
   ];
 
   for (const [userIndex, groupIndex, timeslotStart, timeslotEnd] of availabilitiesData) {
+    const timeslotStartValue = timeslotStart as string;
+
     await prisma.availability.create({
       data: {
         userId: users[userIndex].id,
         groupId: groups[groupIndex].id,
-        timeslotStart: new Date(timeslotStart as string),
+        date: new Date(`${timeslotStartValue.slice(0, 10)}T00:00:00.000Z`),
+        timeslotStart: new Date(timeslotStartValue),
         timeslotEnd: new Date(timeslotEnd as string),
       },
     });
