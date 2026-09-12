@@ -7,6 +7,7 @@ import {
 } from '../../../../src/modules/groups/application/create-group.use-case';
 import { ListGroupsUseCase } from '../../../../src/modules/groups/application/list-groups.use-case';
 import { GetGroupProfilePictureUseCase } from '../../../../src/modules/groups/application/get-group-profile-picture.use-case';
+import { GetGroupUseCase } from '../../../../src/modules/groups/application/get-group.use-case';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import type { Group } from '../../../../src/modules/groups/domain/group.entity';
 import { randomUUID } from 'crypto';
@@ -16,6 +17,7 @@ describe('GroupsController', () => {
   let createGroupUseCaseMock: { execute: jest.Mock };
   let listGroupsUseCaseMock: { execute: jest.Mock };
   let getGroupProfilePictureUseCaseMock: { execute: jest.Mock };
+  let getGroupUseCaseMock: { execute: jest.Mock };
 
   const userId = '11111111-1111-4111-8111-111111111111';
   const authenticatedRequest = {
@@ -26,6 +28,7 @@ describe('GroupsController', () => {
     createGroupUseCaseMock = { execute: jest.fn() };
     listGroupsUseCaseMock = { execute: jest.fn() };
     getGroupProfilePictureUseCaseMock = { execute: jest.fn() };
+    getGroupUseCaseMock = { execute: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GroupsController],
@@ -41,6 +44,10 @@ describe('GroupsController', () => {
         {
           provide: GetGroupProfilePictureUseCase,
           useValue: getGroupProfilePictureUseCaseMock,
+        },
+        {
+          provide: GetGroupUseCase,
+          useValue: getGroupUseCaseMock,
         },
       ],
     }).compile();
@@ -121,5 +128,20 @@ describe('GroupsController', () => {
     await expect(
       controller.create({ name: '' } as any, null, authenticatedRequest)
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('delegates group details to the get group use case', async () => {
+    const details = {
+      id: randomUUID(),
+      name: 'Group of friends',
+      profilePic: null,
+      createdAt: new Date('2026-08-30T00:00:00.000Z'),
+      participants: [],
+      nextEvent: null,
+    };
+    getGroupUseCaseMock.execute.mockResolvedValue(details);
+
+    await expect(controller.getById(details.id)).resolves.toBe(details);
+    expect(getGroupUseCaseMock.execute).toHaveBeenCalledWith(details.id);
   });
 });

@@ -3,6 +3,7 @@ import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
 import { StorageModule } from '../../infrastructure/storage/storage.module';
 import { GetGroupProfilePictureUseCase } from './application/get-group-profile-picture.use-case';
 import { ListGroupsUseCase } from './application/list-groups.use-case';
+import { GetGroupUseCase } from './application/get-group.use-case';
 import { GroupsController } from './http/groups.controller';
 import { GroupInvitesController } from './http/group-invites.controller';
 import { CreateGroupUseCase } from './application/create-group.use-case';
@@ -16,6 +17,7 @@ import { PrismaGroupRepository } from './persistence/group.prisma.repository';
   providers: [
     CreateGroupUseCase,
     ListGroupsUseCase,
+    GetGroupUseCase,
     GetOrCreateGroupInviteLinkUseCase,
     GetGroupProfilePictureUseCase,
     {

@@ -20,6 +20,7 @@ describe('GetGroupProfilePictureUseCase', () => {
     groups = {
       create: jest.fn(),
       findById: jest.fn(),
+      findDetailsById: jest.fn(),
       findByUserId: jest.fn(),
       createInviteLink: jest.fn(),
       findLatestInviteLinkByGroupId: jest.fn(),
