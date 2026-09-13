@@ -53,11 +53,17 @@ export class AvailabilityController {
     examples: {
       fullDay: {
         summary: 'Disponível durante o dia todo',
-        value: { date: '2026-05-14' },
+        value: {
+          date: '2026-05-14',
+          intervals: [],
+        },
       },
       interval: {
         summary: 'Disponível em um intervalo',
-        value: { date: '2026-05-14', startTime: '18:00', endTime: '22:00' },
+        value: {
+          date: '2026-05-14',
+          intervals: [{ startTime: '18:00', endTime: '22:00' }],
+        },
       },
     },
   })
@@ -76,7 +82,7 @@ export class AvailabilityController {
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
     @Body() input: CreateAvailabilityDto,
     @Request() request: AuthenticatedRequest
-  ): Promise<AvailabilityResponseDto> {
+  ): Promise<AvailabilityResponseDto[]> {
     const userId = request.user?.id;
 
     if (!userId) {
@@ -88,11 +94,13 @@ export class AvailabilityController {
         groupId,
         userId,
         date: input.date,
-        timeslotStart: input.startTime ?? null,
-        timeslotEnd: input.endTime ?? null,
+        intervals: input.intervals?.map((i) => ({
+          timeslotStart: i.startTime ?? null,
+          timeslotEnd: i.endTime ?? null,
+        })),
       });
 
-      return this.toResponse(response);
+      return response.map((avail) => this.toResponse(avail));
     } catch (error) {
       if (error instanceof InvalidAvailabilityError) {
         throw new BadRequestException(error.message);

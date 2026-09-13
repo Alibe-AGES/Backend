@@ -1,9 +1,8 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
-const createAvailabilitySchema = z
+const availabilityIntervalSchema = z
   .object({
-    date: z.iso.date(),
     startTime: z.iso.time({ precision: -1 }).optional(),
     endTime: z.iso.time({ precision: -1 }).optional(),
   })
@@ -28,5 +27,10 @@ const createAvailabilitySchema = z
       });
     }
   });
+
+const createAvailabilitySchema = z.object({
+  date: z.iso.date(),
+  intervals: z.array(availabilityIntervalSchema).optional().default([]),
+});
 
 export class CreateAvailabilityDto extends createZodDto(createAvailabilitySchema) {}
