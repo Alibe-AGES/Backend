@@ -48,83 +48,151 @@ describe('AvailabilityController', () => {
     jest.resetAllMocks();
   });
 
-  it('should successfully call the useCase', async () => {
+  it('should successfully call the useCase with a single interval', async () => {
     const id = randomUUID();
 
     const createAvailabilityDto = {
-      userId: userId,
       date: '2026-10-14',
-      startTime: '18:00',
-      endTime: '22:00',
+      intervals: [{ startTime: '18:00', endTime: '22:00' }],
     } as CreateAvailabilityDto;
 
-    const mockAvailabilityEntity = {
-      id: id,
-      groupId: groupId,
-      userId: userId,
-      date: new Date('2026-10-14T00:00:00Z'),
-      timeslotStart: new Date('2026-10-14T18:00:00Z'),
-      timeslotEnd: new Date('2026-10-14T22:00:00Z'),
-    } as Availability;
+    const mockAvailabilityEntities: Availability[] = [
+      new Availability({
+        id,
+        groupId,
+        userId,
+        date: new Date('2026-10-14T00:00:00Z'),
+        timeslotStart: new Date('2026-10-14T18:00:00Z'),
+        timeslotEnd: new Date('2026-10-14T22:00:00Z'),
+      }),
+    ];
 
-    const availabilityResponseDTO = {
-      id: id,
-      groupId: groupId,
-      userId: userId,
-      date: '2026-10-14',
-      startTime: '18:00',
-      endTime: '22:00',
-    } as AvailabilityResponseDto;
+    const expectedResponse: AvailabilityResponseDto[] = [
+      {
+        id,
+        groupId,
+        userId,
+        date: '2026-10-14',
+        startTime: '18:00',
+        endTime: '22:00',
+      },
+    ];
 
-    createAvailabilityUseCaseMock.create.mockResolvedValue(mockAvailabilityEntity);
+    createAvailabilityUseCaseMock.create.mockResolvedValue(mockAvailabilityEntities);
 
     const result = await controller.create(groupId, createAvailabilityDto, authenticatedRequest);
 
-    expect(result).toEqual(availabilityResponseDTO);
+    expect(result).toEqual(expectedResponse);
+    expect(createAvailabilityUseCaseMock.create).toHaveBeenCalledWith({
+      groupId,
+      userId,
+      date: '2026-10-14',
+      intervals: [{ timeslotStart: '18:00', timeslotEnd: '22:00' }],
+    });
   });
 
-  it('should successfully call the useCase without startTime and endTime', async () => {
+  it('should successfully call the useCase with multiple intervals', async () => {
+    const firstId = randomUUID();
+    const secondId = randomUUID();
+
+    const createAvailabilityDto = {
+      date: '2026-10-14',
+      intervals: [
+        { startTime: '09:00', endTime: '12:00' },
+        { startTime: '18:00', endTime: '22:00' },
+      ],
+    } as CreateAvailabilityDto;
+
+    const mockAvailabilityEntities: Availability[] = [
+      new Availability({
+        id: firstId,
+        groupId,
+        userId,
+        date: new Date('2026-10-14T00:00:00Z'),
+        timeslotStart: new Date('2026-10-14T09:00:00Z'),
+        timeslotEnd: new Date('2026-10-14T12:00:00Z'),
+      }),
+      new Availability({
+        id: secondId,
+        groupId,
+        userId,
+        date: new Date('2026-10-14T00:00:00Z'),
+        timeslotStart: new Date('2026-10-14T18:00:00Z'),
+        timeslotEnd: new Date('2026-10-14T22:00:00Z'),
+      }),
+    ];
+
+    const expectedResponse: AvailabilityResponseDto[] = [
+      {
+        id: firstId,
+        groupId,
+        userId,
+        date: '2026-10-14',
+        startTime: '09:00',
+        endTime: '12:00',
+      },
+      {
+        id: secondId,
+        groupId,
+        userId,
+        date: '2026-10-14',
+        startTime: '18:00',
+        endTime: '22:00',
+      },
+    ];
+
+    createAvailabilityUseCaseMock.create.mockResolvedValue(mockAvailabilityEntities);
+
+    const result = await controller.create(groupId, createAvailabilityDto, authenticatedRequest);
+
+    expect(result).toEqual(expectedResponse);
+  });
+
+  it('should successfully call the useCase without intervals', async () => {
     const id = randomUUID();
 
     const createAvailabilityDto = {
-      userId: userId,
       date: '2026-10-14',
+      intervals: [],
     } as CreateAvailabilityDto;
 
-    const mockAvailabilityEntity = {
-      id: id,
-      groupId: groupId,
-      userId: userId,
-      date: new Date('2026-10-14T00:00:00Z'),
-      timeslotStart: null,
-      timeslotEnd: null,
-    } as Availability;
+    const mockAvailabilityEntities: Availability[] = [
+      new Availability({
+        id,
+        groupId,
+        userId,
+        date: new Date('2026-10-14T00:00:00Z'),
+        timeslotStart: null,
+        timeslotEnd: null,
+      }),
+    ];
 
-    const availabilityResponseDto = {
-      id: id,
-      groupId: groupId,
-      userId: userId,
-      date: '2026-10-14',
-      startTime: null,
-      endTime: null,
-    } as AvailabilityResponseDto;
+    const expectedResponse: AvailabilityResponseDto[] = [
+      {
+        id,
+        groupId,
+        userId,
+        date: '2026-10-14',
+        startTime: null,
+        endTime: null,
+      },
+    ];
 
-    createAvailabilityUseCaseMock.create.mockResolvedValue(mockAvailabilityEntity);
+    createAvailabilityUseCaseMock.create.mockResolvedValue(mockAvailabilityEntities);
 
     const result = await controller.create(groupId, createAvailabilityDto, authenticatedRequest);
 
-    expect(result).toEqual(availabilityResponseDto);
+    expect(result).toEqual(expectedResponse);
   });
 
-  it('should throw BadRequestException for startTime not null and endTime null', async () => {
+  it('should throw BadRequestException when the useCase reports invalid data', async () => {
     createAvailabilityUseCaseMock.create.mockRejectedValue(
-      new InvalidAvailabilityError('Data inválida para registrar disponibilidade')
+      new InvalidAvailabilityError('endTime deve ser posterior a startTime')
     );
 
     const createAvailabilityDto = {
-      userId: userId,
       date: '2026-05-14',
-      startTime: '18:00',
+      intervals: [{ startTime: '22:00', endTime: '18:00' }],
     } as CreateAvailabilityDto;
 
     await expect(
@@ -134,9 +202,10 @@ describe('AvailabilityController', () => {
 
   it('rejects a request without an authenticated user', async () => {
     const requestWithoutUser = {} as AuthenticatedRequest;
+    const createAvailabilityDto = { date: '2026-05-14', intervals: [] } as CreateAvailabilityDto;
 
     await expect(
-      controller.create(groupId, { date: '2026-05-14' }, requestWithoutUser)
+      controller.create(groupId, createAvailabilityDto, requestWithoutUser)
     ).rejects.toThrow(UnauthorizedException);
     expect(createAvailabilityUseCaseMock.create).not.toHaveBeenCalled();
   });
@@ -146,8 +215,10 @@ describe('AvailabilityController', () => {
       new AvailabilityAccessDeniedError('User does not belong to this group')
     );
 
+    const createAvailabilityDto = { date: '2026-05-14', intervals: [] } as CreateAvailabilityDto;
+
     await expect(
-      controller.create(groupId, { date: '2026-05-14' }, authenticatedRequest)
+      controller.create(groupId, createAvailabilityDto, authenticatedRequest)
     ).rejects.toThrow(ForbiddenException);
   });
 
@@ -156,8 +227,10 @@ describe('AvailabilityController', () => {
       new AvailabilityGroupNotFoundError('Group not found')
     );
 
+    const createAvailabilityDto = { date: '2026-05-14', intervals: [] } as CreateAvailabilityDto;
+
     await expect(
-      controller.create(groupId, { date: '2026-05-14' }, authenticatedRequest)
+      controller.create(groupId, createAvailabilityDto, authenticatedRequest)
     ).rejects.toThrow(NotFoundException);
   });
 });

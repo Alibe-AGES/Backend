@@ -25,21 +25,20 @@ export class CreateAvailabilityUseCase {
   constructor(private readonly availabilities: AvailabilityRepository) {}
 
   async create(input: CreateAvailabilityInput): Promise<Availability[]> {
-    const hasTimeslotStart = input.intervals != null;
-    const hasTimeslotEnd = input.intervals != null;
-
-    if (hasTimeslotStart !== hasTimeslotEnd) {
-      throw new InvalidAvailabilityError(
-        'startTime e endTime devem estar ambos preenchidos ou nenhum'
-      );
-    }
-
     const date = this.parseDateTime(input.date);
     const intervalsToProcess = input.intervals?.length
       ? input.intervals
       : [{ timeslotStart: null, timeslotEnd: null }];
 
     const availabilitiesToCreate = intervalsToProcess.map((interval) => {
+      const hasTimeslotStart = interval.timeslotStart != null;
+      const hasTimeslotEnd = interval.timeslotEnd != null;
+
+      if (hasTimeslotStart !== hasTimeslotEnd) {
+        throw new InvalidAvailabilityError(
+          'startTime e endTime devem estar ambos preenchidos ou nenhum'
+        );
+      }
       const timeslotStart = interval.timeslotStart
         ? this.parseDateTime(input.date, interval.timeslotStart)
         : null;

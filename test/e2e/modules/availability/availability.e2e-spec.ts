@@ -53,36 +53,72 @@ describe('AvailabilityController (e2e)', () => {
     availabilityRepository.setMembershipResult(true);
   });
 
-  it('registers availability with an optional time interval', async () => {
+  it('registers availability with a single time interval', async () => {
     const response = await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14', startTime: '18:00', endTime: '22:00' })
+      .send({ date: '2026-05-14', intervals: [{ startTime: '18:00', endTime: '22:00' }] })
       .expect(201);
 
-    expect(response.body).toEqual({
-      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
-      groupId: DEMO_GROUP_ID,
-      userId: MOCK_AUTHENTICATED_USER_ID,
-      date: '2026-05-14',
-      startTime: '18:00',
-      endTime: '22:00',
-    });
+    expect(response.body).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        groupId: DEMO_GROUP_ID,
+        userId: MOCK_AUTHENTICATED_USER_ID,
+        date: '2026-05-14',
+        startTime: '18:00',
+        endTime: '22:00',
+      },
+    ]);
   });
 
-  it('registers full-day availability when the interval is omitted', async () => {
+  it('registers availability with multiple time intervals', async () => {
+    const response = await request(app.getHttpServer())
+      .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
+      .send({
+        date: '2026-05-14',
+        intervals: [
+          { startTime: '09:00', endTime: '12:00' },
+          { startTime: '18:00', endTime: '22:00' },
+        ],
+      })
+      .expect(201);
+
+    expect(response.body).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        groupId: DEMO_GROUP_ID,
+        userId: MOCK_AUTHENTICATED_USER_ID,
+        date: '2026-05-14',
+        startTime: '09:00',
+        endTime: '12:00',
+      },
+      {
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        groupId: DEMO_GROUP_ID,
+        userId: MOCK_AUTHENTICATED_USER_ID,
+        date: '2026-05-14',
+        startTime: '18:00',
+        endTime: '22:00',
+      },
+    ]);
+  });
+
+  it('registers full-day availability when intervals is omitted', async () => {
     const response = await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
       .send({ date: '2026-05-14' })
       .expect(201);
 
-    expect(response.body).toEqual({
-      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
-      groupId: DEMO_GROUP_ID,
-      userId: MOCK_AUTHENTICATED_USER_ID,
-      date: '2026-05-14',
-      startTime: null,
-      endTime: null,
-    });
+    expect(response.body).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        groupId: DEMO_GROUP_ID,
+        userId: MOCK_AUTHENTICATED_USER_ID,
+        date: '2026-05-14',
+        startTime: null,
+        endTime: null,
+      },
+    ]);
   });
 
   it('rejects invalid group id format', async () => {
@@ -102,14 +138,14 @@ describe('AvailabilityController (e2e)', () => {
   it('rejects incomplete time interval when only startTime is provided', async () => {
     await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14', startTime: '18:00' })
+      .send({ date: '2026-05-14', intervals: [{ startTime: '18:00' }] })
       .expect(400);
   });
 
   it('rejects inverted time intervals', async () => {
     await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14', startTime: '22:00', endTime: '18:00' })
+      .send({ date: '2026-05-14', intervals: [{ startTime: '22:00', endTime: '18:00' }] })
       .expect(400);
   });
 

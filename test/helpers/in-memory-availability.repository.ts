@@ -31,4 +31,8 @@ export class InMemoryAvailabilityRepository extends AvailabilityRepository {
     this.availabilities.set(availability.id, availability);
     return Promise.resolve(availability);
   }
+
+  createMany(dataList: CreateAvailabilityData[]): Promise<Availability[]> {
+    return Promise.all(dataList.map((data) => this.create(data)));
+  }
 }
