@@ -26,6 +26,11 @@ export class CreateAvailabilityUseCase {
 
   async create(input: CreateAvailabilityInput): Promise<Availability[]> {
     const date = this.parseDateTime(input.date);
+
+    if (date < this.today()) {
+      throw new InvalidAvailabilityError('date deve ser hoje ou uma data futura');
+    }
+
     const intervalsToProcess = input.intervals?.length
       ? input.intervals
       : [{ timeslotStart: null, timeslotEnd: null }];
@@ -77,5 +82,11 @@ export class CreateAvailabilityUseCase {
       return new Date(`${dateStr}T00:00:00.000Z`);
     }
     return new Date(`${dateStr}T${timeStr}:00.000Z`);
+  }
+
+  private today(): Date {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    return today;
   }
 }

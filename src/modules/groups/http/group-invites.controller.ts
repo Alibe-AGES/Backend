@@ -1,5 +1,6 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   GoneException,
   NotFoundException,
@@ -12,6 +13,7 @@ import {
 import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiGoneResponse,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
@@ -22,7 +24,11 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
-import { GetOrCreateGroupInviteLinkUseCase } from '../application/get-or-create-group-invite-link.use-case';
+import {
+  GetOrCreateGroupInviteLinkUseCase,
+  GroupInviteAccessDeniedError,
+  GroupInviteGroupNotFoundError,
+} from '../application/get-or-create-group-invite-link.use-case';
 import {
   InviteLinkExpiredError,
   InviteLinkNotFoundError,
@@ -54,16 +60,28 @@ export class GroupInvitesController {
     type: GetGroupInviteLinkResponseDto,
   })
   @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo.' })
+  @ApiNotFoundResponse({ description: 'Grupo não encontrado.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   async getInviteLink(
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
     @Request() request: AuthenticatedRequest
   ): Promise<GetGroupInviteLinkResponseDto> {
-    // Disponível para a futura validação de acesso ao grupo.
     const userId = request.user?.id;
-    void userId;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
 
-    return this.getOrCreateGroupInviteLinkUseCase.execute(groupId);
+    try {
+      return await this.getOrCreateGroupInviteLinkUseCase.execute(groupId, userId);
+    } catch (error) {
+      if (error instanceof GroupInviteGroupNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      if (error instanceof GroupInviteAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+      throw error;
+    }
   }
 
   /**

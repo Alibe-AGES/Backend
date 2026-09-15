@@ -32,6 +32,14 @@ export class InMemoryGroupRepository extends GroupRepository {
     return Promise.resolve(this.groups.get(id) ?? null);
   }
 
+  findMembership(groupId: string, userId: string): Promise<boolean | null> {
+    if (!this.groups.has(groupId)) {
+      return Promise.resolve(null);
+    }
+
+    return Promise.resolve(this.members.has(`${groupId}:${userId}`));
+  }
+
   createInviteLink(data: CreateGroupInviteLinkData): Promise<GroupInviteLink> {
     const inviteLink = new GroupInviteLink(data);
     this.inviteLinks.push(inviteLink);

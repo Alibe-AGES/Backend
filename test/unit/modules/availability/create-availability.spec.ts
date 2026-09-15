@@ -14,8 +14,13 @@ describe('CreateAvailabilityUseCase', () => {
   let useCase: CreateAvailabilityUseCase;
 
   beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-14T12:00:00.000Z'));
     availabilities = new InMemoryAvailabilityRepository();
     useCase = new CreateAvailabilityUseCase(availabilities);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('registers a single interval', async () => {
@@ -93,6 +98,16 @@ describe('CreateAvailabilityUseCase', () => {
         userId,
         date: '2026-10-15',
         intervals: [{ timeslotStart: '20:00', timeslotEnd: '15:00' }],
+      })
+    ).rejects.toThrow(InvalidAvailabilityError);
+  });
+
+  it('rejects availability for a past date', async () => {
+    await expect(
+      useCase.create({
+        groupId,
+        userId,
+        date: '2026-09-13',
       })
     ).rejects.toThrow(InvalidAvailabilityError);
   });

@@ -54,14 +54,14 @@ export class AvailabilityController {
       fullDay: {
         summary: 'Disponível durante o dia todo',
         value: {
-          date: '2026-05-14',
+          date: '2099-05-14',
           intervals: [],
         },
       },
       interval: {
         summary: 'Disponível em um intervalo',
         value: {
-          date: '2026-05-14',
+          date: '2099-05-14',
           intervals: [{ startTime: '18:00', endTime: '22:00' }],
         },
       },

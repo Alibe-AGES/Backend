@@ -49,6 +49,8 @@ export abstract class GroupRepository {
 
   abstract findByUserId(userId: string): Promise<Group[]>;
 
+  abstract findMembership(groupId: string, userId: string): Promise<boolean | null>;
+
   abstract createInviteLink(data: CreateGroupInviteLinkData): Promise<GroupInviteLink>;
 
   abstract findLatestInviteLinkByGroupId(groupId: string): Promise<GroupInviteLink | null>;

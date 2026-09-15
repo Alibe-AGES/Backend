@@ -1,7 +1,16 @@
-import { GoneException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  GoneException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { GroupInvitesController } from '../../../../src/modules/groups/http/group-invites.controller';
-import { GetOrCreateGroupInviteLinkUseCase } from '../../../../src/modules/groups/application/get-or-create-group-invite-link.use-case';
+import {
+  GetOrCreateGroupInviteLinkUseCase,
+  GroupInviteAccessDeniedError,
+  GroupInviteGroupNotFoundError,
+} from '../../../../src/modules/groups/application/get-or-create-group-invite-link.use-case';
 import {
   InviteLinkExpiredError,
   InviteLinkNotFoundError,
@@ -37,6 +46,48 @@ describe('GroupInvitesController', () => {
     }).compile();
 
     controller = module.get(GroupInvitesController);
+  });
+
+  it('gets the group invite using the authenticated user', async () => {
+    const result = { token: TOKEN, expiresAt: new Date('2026-09-21T00:00:00.000Z') };
+    getOrCreateGroupInviteLinkUseCaseMock.execute.mockResolvedValue(result);
+
+    await expect(
+      controller.getInviteLink('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', authenticatedRequest)
+    ).resolves.toEqual(result);
+    expect(getOrCreateGroupInviteLinkUseCaseMock.execute).toHaveBeenCalledWith(
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      USER_ID
+    );
+  });
+
+  it('rejects getting an invite with 401 when there is no authenticated user', async () => {
+    await expect(
+      controller.getInviteLink('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
+        user: undefined,
+      } as AuthenticatedRequest)
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(getOrCreateGroupInviteLinkUseCaseMock.execute).not.toHaveBeenCalled();
+  });
+
+  it('rejects getting an invite with 403 when the user does not belong to the group', async () => {
+    getOrCreateGroupInviteLinkUseCaseMock.execute.mockRejectedValue(
+      new GroupInviteAccessDeniedError('User does not belong to this group')
+    );
+
+    await expect(
+      controller.getInviteLink('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', authenticatedRequest)
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects getting an invite with 404 when the group does not exist', async () => {
+    getOrCreateGroupInviteLinkUseCaseMock.execute.mockRejectedValue(
+      new GroupInviteGroupNotFoundError('Group not found')
+    );
+
+    await expect(
+      controller.getInviteLink('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', authenticatedRequest)
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('adds the authenticated user to the group and returns the result', async () => {

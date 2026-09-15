@@ -101,6 +101,21 @@ export class PrismaGroupRepository implements GroupRepository {
     return groups.map((group) => new Group(group));
   }
 
+  async findMembership(groupId: string, userId: string): Promise<boolean | null> {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: {
+        users: {
+          where: { userId },
+          select: { userId: true },
+          take: 1,
+        },
+      },
+    });
+
+    return group ? group.users.length > 0 : null;
+  }
+
   async createInviteLink(data: CreateGroupInviteLinkData): Promise<GroupInviteLink> {
     const inviteLink = await this.prisma.inviteLink.create({
       data: {

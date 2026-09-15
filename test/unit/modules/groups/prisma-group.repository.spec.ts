@@ -79,6 +79,33 @@ describe('PrismaGroupRepository', () => {
     await expect(repository.findById('550e8400-e29b-41d4-a716-446655440000')).resolves.toBeNull();
   });
 
+  it('checks whether a user belongs to a group', async () => {
+    const groupId = '550e8400-e29b-41d4-a716-446655440000';
+    const userId = '11111111-1111-4111-8111-111111111111';
+    findUnique.mockResolvedValue({ users: [{ userId }] });
+
+    await expect(repository.findMembership(groupId, userId)).resolves.toBe(true);
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: groupId },
+      select: {
+        users: {
+          where: { userId },
+          select: { userId: true },
+          take: 1,
+        },
+      },
+    });
+  });
+
+  it('reports missing membership and missing groups', async () => {
+    const groupId = '550e8400-e29b-41d4-a716-446655440000';
+    const userId = '11111111-1111-4111-8111-111111111111';
+    findUnique.mockResolvedValueOnce({ users: [] }).mockResolvedValueOnce(null);
+
+    await expect(repository.findMembership(groupId, userId)).resolves.toBe(false);
+    await expect(repository.findMembership(groupId, userId)).resolves.toBeNull();
+  });
+
   it('creates and maps an invite link', async () => {
     const data = {
       id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',

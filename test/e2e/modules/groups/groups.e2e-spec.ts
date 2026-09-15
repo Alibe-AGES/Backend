@@ -77,6 +77,9 @@ describe('Groups mock endpoints (e2e)', () => {
               }
             : null
         ),
+        findMembership: jest.fn().mockImplementation(async (groupId: string) => {
+          return groupId === DEMO_GROUP_ID ? true : null;
+        }),
         create: jest.fn().mockImplementation(async (data) => {
           const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
           return new Group({
@@ -250,7 +253,7 @@ describe('Groups mock endpoints (e2e)', () => {
     ]);
     expect(
       Object.keys(swagger.body.paths['/groups/{groupId}/invite-link'].get.responses).sort()
-    ).toEqual(['200', '400', '500']);
+    ).toEqual(['200', '400', '401', '403', '404', '500']);
     expect(
       Object.keys(swagger.body.paths['/invite-links/{token}/join'].post.responses).sort()
     ).toEqual(['201', '400', '401', '404', '410', '500']);

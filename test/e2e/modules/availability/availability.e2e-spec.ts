@@ -56,7 +56,7 @@ describe('AvailabilityController (e2e)', () => {
   it('registers availability with a single time interval', async () => {
     const response = await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14', intervals: [{ startTime: '18:00', endTime: '22:00' }] })
+      .send({ date: '2099-05-14', intervals: [{ startTime: '18:00', endTime: '22:00' }] })
       .expect(201);
 
     expect(response.body).toEqual([
@@ -64,7 +64,7 @@ describe('AvailabilityController (e2e)', () => {
         id: expect.stringMatching(/^[0-9a-f-]{36}$/),
         groupId: DEMO_GROUP_ID,
         userId: MOCK_AUTHENTICATED_USER_ID,
-        date: '2026-05-14',
+        date: '2099-05-14',
         startTime: '18:00',
         endTime: '22:00',
       },
@@ -75,7 +75,7 @@ describe('AvailabilityController (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
       .send({
-        date: '2026-05-14',
+        date: '2099-05-14',
         intervals: [
           { startTime: '09:00', endTime: '12:00' },
           { startTime: '18:00', endTime: '22:00' },
@@ -88,7 +88,7 @@ describe('AvailabilityController (e2e)', () => {
         id: expect.stringMatching(/^[0-9a-f-]{36}$/),
         groupId: DEMO_GROUP_ID,
         userId: MOCK_AUTHENTICATED_USER_ID,
-        date: '2026-05-14',
+        date: '2099-05-14',
         startTime: '09:00',
         endTime: '12:00',
       },
@@ -96,7 +96,7 @@ describe('AvailabilityController (e2e)', () => {
         id: expect.stringMatching(/^[0-9a-f-]{36}$/),
         groupId: DEMO_GROUP_ID,
         userId: MOCK_AUTHENTICATED_USER_ID,
-        date: '2026-05-14',
+        date: '2099-05-14',
         startTime: '18:00',
         endTime: '22:00',
       },
@@ -106,7 +106,7 @@ describe('AvailabilityController (e2e)', () => {
   it('registers full-day availability when intervals is omitted', async () => {
     const response = await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14' })
+      .send({ date: '2099-05-14' })
       .expect(201);
 
     expect(response.body).toEqual([
@@ -114,7 +114,7 @@ describe('AvailabilityController (e2e)', () => {
         id: expect.stringMatching(/^[0-9a-f-]{36}$/),
         groupId: DEMO_GROUP_ID,
         userId: MOCK_AUTHENTICATED_USER_ID,
-        date: '2026-05-14',
+        date: '2099-05-14',
         startTime: null,
         endTime: null,
       },
@@ -124,7 +124,7 @@ describe('AvailabilityController (e2e)', () => {
   it('rejects invalid group id format', async () => {
     await request(app.getHttpServer())
       .post('/groups/not-a-uuid/availabilities')
-      .send({ date: '2026-05-14' })
+      .send({ date: '2099-05-14' })
       .expect(400);
   });
 
@@ -138,14 +138,14 @@ describe('AvailabilityController (e2e)', () => {
   it('rejects incomplete time interval when only startTime is provided', async () => {
     await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14', intervals: [{ startTime: '18:00' }] })
+      .send({ date: '2099-05-14', intervals: [{ startTime: '18:00' }] })
       .expect(400);
   });
 
   it('rejects inverted time intervals', async () => {
     await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14', intervals: [{ startTime: '22:00', endTime: '18:00' }] })
+      .send({ date: '2099-05-14', intervals: [{ startTime: '22:00', endTime: '18:00' }] })
       .expect(400);
   });
 
@@ -154,7 +154,7 @@ describe('AvailabilityController (e2e)', () => {
 
     await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14' })
+      .send({ date: '2099-05-14' })
       .expect(401);
   });
 
@@ -163,7 +163,7 @@ describe('AvailabilityController (e2e)', () => {
 
     await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14' })
+      .send({ date: '2099-05-14' })
       .expect(403);
   });
 
@@ -172,7 +172,7 @@ describe('AvailabilityController (e2e)', () => {
 
     await request(app.getHttpServer())
       .post(`/groups/${DEMO_GROUP_ID}/availabilities`)
-      .send({ date: '2026-05-14' })
+      .send({ date: '2099-05-14' })
       .expect(404);
   });
 
