@@ -31,6 +31,7 @@ describe('AvailabilityModule integration', () => {
       findUnique: jest.fn(),
     },
     availability: {
+      deleteMany: jest.fn(),
       create: jest.fn(
         (input: {
           data: {

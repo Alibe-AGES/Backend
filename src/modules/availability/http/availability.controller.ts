@@ -70,6 +70,7 @@ export class AvailabilityController {
   @ApiCreatedResponse({
     description: 'Disponibilidade registrada com sucesso.',
     type: AvailabilityResponseDto,
+    isArray: true,
   })
   @ApiBadRequestResponse({
     description: 'groupId, date ou intervalo de horários inválido.',

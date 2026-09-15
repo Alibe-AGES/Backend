@@ -3,23 +3,11 @@ import { z } from 'zod';
 
 const availabilityIntervalSchema = z
   .object({
-    startTime: z.iso.time({ precision: -1 }).optional(),
-    endTime: z.iso.time({ precision: -1 }).optional(),
+    startTime: z.iso.time({ precision: -1 }),
+    endTime: z.iso.time({ precision: -1 }),
   })
   .superRefine((input, context) => {
-    const hasStartTime = input.startTime !== undefined;
-    const hasEndTime = input.endTime !== undefined;
-
-    if (hasStartTime !== hasEndTime) {
-      context.addIssue({
-        code: 'custom',
-        path: hasStartTime ? ['endTime'] : ['startTime'],
-        message: 'startTime e endTime devem ser enviados juntos.',
-      });
-      return;
-    }
-
-    if (input.startTime && input.endTime && input.startTime >= input.endTime) {
+    if (input.startTime >= input.endTime) {
       context.addIssue({
         code: 'custom',
         path: ['endTime'],
