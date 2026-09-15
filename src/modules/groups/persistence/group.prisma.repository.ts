@@ -124,6 +124,20 @@ export class PrismaGroupRepository implements GroupRepository {
     return inviteLink ? new GroupInviteLink(inviteLink) : null;
   }
 
+  async findInviteLinkByToken(token: string): Promise<GroupInviteLink | null> {
+    const inviteLink = await this.prisma.inviteLink.findUnique({ where: { token } });
+
+    return inviteLink ? new GroupInviteLink(inviteLink) : null;
+  }
+
+  async addMember(groupId: string, userId: string): Promise<void> {
+    await this.prisma.userGroup.upsert({
+      where: { userId_groupId: { userId, groupId } },
+      update: {},
+      create: { userId, groupId },
+    });
+  }
+
   async findProfilePictureAccess(
     groupId: string,
     userId: string

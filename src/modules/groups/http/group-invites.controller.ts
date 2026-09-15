@@ -1,15 +1,33 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  GoneException,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Request,
+  UnauthorizedException,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
+  ApiGoneResponse,
   ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { GetOrCreateGroupInviteLinkUseCase } from '../application/get-or-create-group-invite-link.use-case';
+import {
+  InviteLinkExpiredError,
+  InviteLinkNotFoundError,
+  JoinGroupByInviteUseCase,
+} from '../application/join-group-by-invite.use-case';
 import { JoinGroupByInviteResponseDto } from './dto/join-group-by-invite-response.dto';
 import { GetGroupInviteLinkResponseDto } from './dto/get-group-invite-link-response.dto';
 
@@ -17,7 +35,8 @@ import { GetGroupInviteLinkResponseDto } from './dto/get-group-invite-link-respo
 @Controller()
 export class GroupInvitesController {
   constructor(
-    private readonly getOrCreateGroupInviteLinkUseCase: GetOrCreateGroupInviteLinkUseCase
+    private readonly getOrCreateGroupInviteLinkUseCase: GetOrCreateGroupInviteLinkUseCase,
+    private readonly joinGroupByInviteUseCase: JoinGroupByInviteUseCase
   ) {}
 
   /**
@@ -49,28 +68,37 @@ export class GroupInvitesController {
 
   /**
    * POST /invite-links/:token/join
-   * Simula o acesso ao convite. Futuramente, o userId será extraído do usuário autenticado e não
-   * será recebido em path, query ou body.
+   * Valida o token do convite e adiciona o usuário autenticado ao grupo correspondente.
    */
   @Post('invite-links/:token/join')
-  @ApiOperation({ summary: '[Mock] Acessa um grupo utilizando o token do convite' })
+  @ApiOperation({ summary: 'Adiciona o usuário autenticado ao grupo do convite' })
   @ApiParam({ name: 'token', format: 'uuid' })
   @ApiCreatedResponse({
-    description: 'Entrada no grupo simulada com sucesso.',
+    description: 'Usuário adicionado ao grupo com sucesso.',
     type: JoinGroupByInviteResponseDto,
   })
   @ApiBadRequestResponse({ description: 'token deve ser um UUID válido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiNotFoundResponse({ description: 'Convite não encontrado.' })
+  @ApiGoneResponse({ description: 'Convite expirado.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
-  join(
+  async join(
     @Param('token', new ParseUUIDPipe()) token: string,
     @Request() request: AuthenticatedRequest
-  ): JoinGroupByInviteResponseDto {
-    // Será usado para vincular o usuário autenticado ao grupo do convite.
+  ): Promise<JoinGroupByInviteResponseDto> {
     const userId = request.user?.id;
-    void userId;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
 
-    return {
-      token,
-    };
+    try {
+      return await this.joinGroupByInviteUseCase.execute(token, userId);
+    } catch (error) {
+      if (error instanceof InviteLinkNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      if (error instanceof InviteLinkExpiredError) {
+        throw new GoneException(error.message);
+      }
+      throw error;
+    }
   }
 }

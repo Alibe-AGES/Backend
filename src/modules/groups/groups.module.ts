@@ -8,6 +8,7 @@ import { GroupsController } from './http/groups.controller';
 import { GroupInvitesController } from './http/group-invites.controller';
 import { CreateGroupUseCase } from './application/create-group.use-case';
 import { GetOrCreateGroupInviteLinkUseCase } from './application/get-or-create-group-invite-link.use-case';
+import { JoinGroupByInviteUseCase } from './application/join-group-by-invite.use-case';
 import { GroupRepository } from './domain/group.repository';
 import { PrismaGroupRepository } from './persistence/group.prisma.repository';
 
@@ -19,6 +20,7 @@ import { PrismaGroupRepository } from './persistence/group.prisma.repository';
     ListGroupsUseCase,
     GetGroupUseCase,
     GetOrCreateGroupInviteLinkUseCase,
+    JoinGroupByInviteUseCase,
     GetGroupProfilePictureUseCase,
     {
       provide: GroupRepository,

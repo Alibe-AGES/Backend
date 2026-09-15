@@ -11,6 +11,7 @@ import {
 export class InMemoryGroupRepository extends GroupRepository {
   private readonly groups = new Map<string, Group>();
   private readonly inviteLinks: GroupInviteLink[] = [];
+  private readonly members = new Set<string>();
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   findByUserId(_userId: string): Promise<Group[]> {
@@ -43,6 +44,17 @@ export class InMemoryGroupRepository extends GroupRepository {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
 
     return Promise.resolve(latest ?? null);
+  }
+
+  findInviteLinkByToken(token: string): Promise<GroupInviteLink | null> {
+    const inviteLink = this.inviteLinks.find((link) => link.token === token);
+
+    return Promise.resolve(inviteLink ?? null);
+  }
+
+  addMember(groupId: string, userId: string): Promise<void> {
+    this.members.add(`${groupId}:${userId}`);
+    return Promise.resolve();
   }
 
   findProfilePictureAccess(groupId: string): Promise<GroupProfilePictureAccess | null> {

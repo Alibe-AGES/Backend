@@ -53,6 +53,10 @@ export abstract class GroupRepository {
 
   abstract findLatestInviteLinkByGroupId(groupId: string): Promise<GroupInviteLink | null>;
 
+  abstract findInviteLinkByToken(token: string): Promise<GroupInviteLink | null>;
+
+  abstract addMember(groupId: string, userId: string): Promise<void>;
+
   abstract findProfilePictureAccess(
     groupId: string,
     userId: string

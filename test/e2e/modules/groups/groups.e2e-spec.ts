@@ -94,6 +94,13 @@ describe('Groups mock endpoints (e2e)', () => {
           inviteLinksByGroupId.set(data.groupId, inviteLink);
           return inviteLink;
         }),
+        findInviteLinkByToken: jest.fn().mockImplementation(async (token: string) => {
+          for (const inviteLink of inviteLinksByGroupId.values()) {
+            if (inviteLink.token === token) return inviteLink;
+          }
+          return null;
+        }),
+        addMember: jest.fn().mockResolvedValue(undefined),
       })
       .overrideProvider(ExampleRepository)
       .useClass(InMemoryExampleRepository)
@@ -197,6 +204,13 @@ describe('Groups mock endpoints (e2e)', () => {
       });
   });
 
+  it('rejects joining with an invite token that does not exist', async () => {
+    await request(app.getHttpServer())
+      .post('/invite-links/ffffffff-ffff-4fff-8fff-ffffffffffff/join')
+      .send({})
+      .expect(404);
+  });
+
   it('validates invite UUIDs and exposes the current endpoints in Swagger', async () => {
     await request(app.getHttpServer()).get('/groups/not-a-uuid').expect(400);
     await request(app.getHttpServer())
@@ -239,6 +253,6 @@ describe('Groups mock endpoints (e2e)', () => {
     ).toEqual(['200', '400', '500']);
     expect(
       Object.keys(swagger.body.paths['/invite-links/{token}/join'].post.responses).sort()
-    ).toEqual(['201', '400', '500']);
+    ).toEqual(['201', '400', '401', '404', '410', '500']);
   });
 });
