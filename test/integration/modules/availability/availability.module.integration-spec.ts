@@ -25,10 +25,13 @@ describe('AvailabilityModule integration', () => {
   let idCounter = 1;
 
   const prisma = {
+    $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
+
     group: {
       findUnique: jest.fn(),
     },
     availability: {
+      deleteMany: jest.fn(),
       create: jest.fn(
         (input: {
           data: {
@@ -73,35 +76,50 @@ describe('AvailabilityModule integration', () => {
     prisma.group.findUnique.mockResolvedValue({ users: [{ userId }] });
   });
 
-  it('connects controller, use case and Prisma repository for creation with timeslots', async () => {
+  it('connects controller, use case and Prisma repository for creation with multiple timeslots', async () => {
     const controller = moduleFixture.get(AvailabilityController);
 
     const dto = {
       userId,
       date: '2026-10-15',
-      startTime: '15:00',
-      endTime: '20:00',
+      intervals: [
+        {
+          startTime: '15:00',
+          endTime: '16:00',
+        },
+        {
+          startTime: '18:00',
+          endTime: '20:00',
+        },
+      ],
     };
 
     const req = { user: { id: userId } } as any;
 
     const result = await controller.create(groupId, dto, req);
 
-    expect(result).toEqual({
-      id: expect.any(String),
-      groupId,
-      userId,
-      date: '2026-10-15',
-      startTime: '15:00',
-      endTime: '20:00',
-    });
+    expect(result).toHaveLength(2);
 
-    expect(prisma.availability.create).toHaveBeenCalledWith({
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
+    expect(prisma.availability.create).toHaveBeenCalledTimes(2);
+
+    expect(prisma.availability.create).toHaveBeenNthCalledWith(1, {
       data: {
         group: { connect: { id: groupId } },
         user: { connect: { id: userId } },
         date: new Date('2026-10-15T00:00:00.000Z'),
         timeslotStart: new Date('2026-10-15T15:00:00.000Z'),
+        timeslotEnd: new Date('2026-10-15T16:00:00.000Z'),
+      },
+    });
+
+    expect(prisma.availability.create).toHaveBeenNthCalledWith(2, {
+      data: {
+        group: { connect: { id: groupId } },
+        user: { connect: { id: userId } },
+        date: new Date('2026-10-15T00:00:00.000Z'),
+        timeslotStart: new Date('2026-10-15T18:00:00.000Z'),
         timeslotEnd: new Date('2026-10-15T20:00:00.000Z'),
       },
     });
@@ -117,7 +135,7 @@ describe('AvailabilityModule integration', () => {
       },
     });
 
-    expect(rows.size).toBe(1);
+    expect(rows.size).toBe(2);
   });
 
   it('connects use case and Prisma repository for creation without timeslots', async () => {
@@ -129,15 +147,17 @@ describe('AvailabilityModule integration', () => {
       date: '2026-10-15',
     });
 
-    expect(created).toEqual(
+    expect(created).toEqual([
       expect.objectContaining({
         groupId,
         userId,
         date: new Date('2026-10-15T00:00:00.000Z'),
         timeslotStart: null,
         timeslotEnd: null,
-      })
-    );
+      }),
+    ]);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
 
     expect(prisma.availability.create).toHaveBeenCalledWith({
       data: {

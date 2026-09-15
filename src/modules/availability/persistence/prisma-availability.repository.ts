@@ -51,4 +51,39 @@ export class PrismaAvailabilityRepository extends AvailabilityRepository {
   }): Availability {
     return new Availability(data);
   }
+
+  async createMany(dataList: CreateAvailabilityData[]): Promise<Availability[]> {
+    const firstAvailability = dataList[0];
+
+    if (!firstAvailability) {
+      return [];
+    }
+
+    const [, ...createdRecords] = await this.prisma.$transaction([
+      this.prisma.availability.deleteMany({
+        where: {
+          groupId: firstAvailability.groupId,
+          userId: firstAvailability.userId,
+          date: firstAvailability.date,
+        },
+      }),
+      ...dataList.map((data) =>
+        this.prisma.availability.create({
+          data: {
+            group: {
+              connect: { id: data.groupId },
+            },
+            user: {
+              connect: { id: data.userId },
+            },
+            date: data.date,
+            timeslotStart: data.timeslotStart ?? null,
+            timeslotEnd: data.timeslotEnd ?? null,
+          },
+        })
+      ),
+    ]);
+
+    return createdRecords.map((record) => this.toDomain(record));
+  }
 }

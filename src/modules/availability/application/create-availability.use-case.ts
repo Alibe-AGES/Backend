@@ -2,12 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { Availability } from '../domain/availability.entity';
 import { AvailabilityRepository } from '../domain/availability.repository';
 
+export interface CreateAvailabilityIntervalInput {
+  timeslotStart?: string | null;
+  timeslotEnd?: string | null;
+}
+
 export interface CreateAvailabilityInput {
   groupId: string;
   userId: string;
   date: string;
-  timeslotStart?: string | null;
-  timeslotEnd?: string | null;
+  intervals?: CreateAvailabilityIntervalInput[];
 }
 
 export class InvalidAvailabilityError extends Error {}
@@ -20,27 +24,40 @@ export class AvailabilityAccessDeniedError extends Error {}
 export class CreateAvailabilityUseCase {
   constructor(private readonly availabilities: AvailabilityRepository) {}
 
-  async create(input: CreateAvailabilityInput): Promise<Availability> {
-    const hasTimeslotStart = input.timeslotStart != null;
-    const hasTimeslotEnd = input.timeslotEnd != null;
-
-    if (hasTimeslotStart !== hasTimeslotEnd) {
-      throw new InvalidAvailabilityError(
-        'startTime e endTime devem estar ambos preenchidos ou nenhum'
-      );
-    }
-
+  async create(input: CreateAvailabilityInput): Promise<Availability[]> {
     const date = this.parseDateTime(input.date);
-    const timeslotStart = input.timeslotStart
-      ? this.parseDateTime(input.date, input.timeslotStart)
-      : null;
-    const timeslotEnd = input.timeslotEnd
-      ? this.parseDateTime(input.date, input.timeslotEnd)
-      : null;
+    const intervalsToProcess = input.intervals?.length
+      ? input.intervals
+      : [{ timeslotStart: null, timeslotEnd: null }];
 
-    if (timeslotStart && timeslotEnd && timeslotStart >= timeslotEnd) {
-      throw new InvalidAvailabilityError('endTime deve ser posterior a startTime');
-    }
+    const availabilitiesToCreate = intervalsToProcess.map((interval) => {
+      const hasTimeslotStart = interval.timeslotStart != null;
+      const hasTimeslotEnd = interval.timeslotEnd != null;
+
+      if (hasTimeslotStart !== hasTimeslotEnd) {
+        throw new InvalidAvailabilityError(
+          'startTime e endTime devem estar ambos preenchidos ou nenhum'
+        );
+      }
+      const timeslotStart = interval.timeslotStart
+        ? this.parseDateTime(input.date, interval.timeslotStart)
+        : null;
+      const timeslotEnd = interval.timeslotEnd
+        ? this.parseDateTime(input.date, interval.timeslotEnd)
+        : null;
+
+      if (timeslotStart && timeslotEnd && timeslotStart >= timeslotEnd) {
+        throw new InvalidAvailabilityError('endTime deve ser posterior a startTime');
+      }
+
+      return {
+        groupId: input.groupId,
+        userId: input.userId,
+        date,
+        timeslotStart,
+        timeslotEnd,
+      };
+    });
 
     const userIsMember = await this.availabilities.findGroupMembership(input.groupId, input.userId);
 
@@ -52,13 +69,7 @@ export class CreateAvailabilityUseCase {
       throw new AvailabilityAccessDeniedError('User does not belong to this group');
     }
 
-    return this.availabilities.create({
-      groupId: input.groupId,
-      userId: input.userId,
-      date,
-      timeslotStart,
-      timeslotEnd,
-    });
+    return this.availabilities.createMany(availabilitiesToCreate);
   }
 
   private parseDateTime(dateStr: string, timeStr?: string): Date {

@@ -31,4 +31,22 @@ export class InMemoryAvailabilityRepository extends AvailabilityRepository {
     this.availabilities.set(availability.id, availability);
     return Promise.resolve(availability);
   }
+
+  createMany(dataList: CreateAvailabilityData[]): Promise<Availability[]> {
+    const firstAvailability = dataList[0];
+
+    if (firstAvailability) {
+      for (const [id, availability] of this.availabilities) {
+        if (
+          availability.groupId === firstAvailability.groupId &&
+          availability.userId === firstAvailability.userId &&
+          availability.date.getTime() === firstAvailability.date.getTime()
+        ) {
+          this.availabilities.delete(id);
+        }
+      }
+    }
+
+    return Promise.all(dataList.map((data) => this.create(data)));
+  }
 }

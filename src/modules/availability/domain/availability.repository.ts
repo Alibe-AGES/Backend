@@ -13,4 +13,6 @@ export abstract class AvailabilityRepository {
   abstract findGroupMembership(groupId: string, userId: string): Promise<boolean | null>;
 
   abstract create(data: CreateAvailabilityData): Promise<Availability>;
+
+  abstract createMany(data: CreateAvailabilityData[]): Promise<Availability[]>;
 }
