@@ -199,6 +199,9 @@ describe('GroupsModule integration', () => {
         groupId,
       };
 
+      findUnique.mockResolvedValue({
+        users: [{ userId: authenticatedRequest.user?.id }],
+      });
       inviteFindFirst.mockResolvedValueOnce(validInvite);
 
       const current = await controller.getInviteLink(groupId, authenticatedRequest);
