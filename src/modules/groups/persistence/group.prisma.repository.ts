@@ -9,6 +9,9 @@ import {
 } from '../domain/group.repository';
 import { Group } from '../domain/group.entity';
 import { GroupInviteLink } from '../domain/group-invite-link.entity';
+import { group } from 'console';
+import { AvailabilitiesResponseDto } from '../http/dto/get-availabilities-response.dto';
+import { GroupNotFoundError } from '../application/get-group-profile-picture.use-case';
 
 @Injectable()
 export class PrismaGroupRepository implements GroupRepository {
@@ -170,5 +173,61 @@ export class PrismaGroupRepository implements GroupRepository {
     });
 
     return group ? { imageKey: group.profilePic, userIsMember: group.users.length === 1 } : null;
+  }
+
+  async findAvailabilitiesByDate(groupId: string, date: string): Promise<AvailabilitiesResponseDto | null> {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: {
+        users: {
+          select: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profilePic: true,
+                availabilities: {
+                  where: {
+                    groupId: groupId,
+                    date: new Date(`${date}T00:00:00.000Z`)
+                  },
+                  select: {
+                    timeslotStart: true,
+                    timeslotEnd: true, 
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!group) {
+      throw new GroupNotFoundError('Grupo não encontrado');
+    }
+
+    return {
+      date,
+      users: group.users.map(({ user }) => {
+        const availability = user.availabilities[0];
+        const availableAllDay = !availability?.timeslotEnd;
+        
+        const intervals: Array<[string, string]> = user.availabilities
+          .filter((availabiltiy) => availabiltiy.timeslotStart && availabiltiy.timeslotEnd)
+          .map((availability) => [
+            availability.timeslotStart.toISOString().substring(11, 16),
+            availability.timeslotEnd.toISOString().substring(11, 16)
+        ])
+
+        return {
+          id: user.id,
+          name: user.name ?? '',
+          image: user.profilePic ?? null,
+          availableAllDay: availableAllDay,
+          intervals: intervals
+        };
+      }),
+    };
   }
 }
