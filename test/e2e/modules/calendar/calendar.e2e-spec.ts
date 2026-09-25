@@ -37,7 +37,7 @@ describe('Calendar endpoint (e2e)', () => {
       .useClass(InMemoryObjectStorage)
       .compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication({ bodyParser: false });
     setupApplication(app);
     await app.init();
   });
