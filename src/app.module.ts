@@ -8,11 +8,13 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { EventModule } from './modules/event/event.module';
 
 @Module({
   imports: [
     AuthModule,
     ExampleModule,
+    EventModule,
     MonitoringModule,
     GroupsModule,
     CalendarModule,
