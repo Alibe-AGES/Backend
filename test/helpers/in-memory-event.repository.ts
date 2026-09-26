@@ -1,9 +1,9 @@
 import { EventDetails, EventRepository } from '../../src/modules/event/domain/event.repository';
 
 export class InMemoryEventRepository extends EventRepository {
-    private readonly events = new Map<string, EventDetails>();  
+  private readonly events = new Map<string, EventDetails>();
 
-    findById(id: string): Promise<EventDetails | null> {
-        return Promise.resolve(this.events.get(id));
-    }
+  findUnique(id: string): Promise<EventDetails | null> {
+    return Promise.resolve(this.events.get(id));
+  }
 }
