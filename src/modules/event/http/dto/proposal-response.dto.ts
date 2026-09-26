@@ -1,22 +1,22 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { ResponseDto } from "./response-dto";
+import { ApiProperty } from '@nestjs/swagger';
+import { ResponseDto } from './response-dto';
 
 export class ProposalDto {
-    @ApiProperty({ format: 'uuid' })
-    id!: string;
-    
-    @ApiProperty()
-    ownerId!: string;
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
 
-    @ApiProperty()
-    ownerName!: string;
+  @ApiProperty()
+  ownerId!: string;
 
-    @ApiProperty()    
-    ownerProfilePic!: string;
-    
-    @ApiProperty({ type: [ResponseDto] })
-    responses!: Array<ResponseDto>;
+  @ApiProperty()
+  ownerName!: string;
 
-    @ApiProperty()
-    createdAt!: Date;
+  @ApiProperty()
+  ownerProfilePic!: string;
+
+  @ApiProperty({ type: [ResponseDto] })
+  responses!: Array<ResponseDto>;
+
+  @ApiProperty()
+  createdAt!: Date;
 }

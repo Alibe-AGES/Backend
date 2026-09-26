@@ -1,12 +1,12 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 export class LocationResponseDto {
-    @ApiProperty({ format: 'uuid' })
-    id!: string;
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
 
-    @ApiProperty()
-    description!: string;
+  @ApiProperty()
+  description!: string;
 
-    @ApiProperty()
-    manuallyCreated!: boolean;
+  @ApiProperty()
+  manuallyCreated!: boolean;
 }
