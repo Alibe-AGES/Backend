@@ -19,20 +19,44 @@ describe('EventController', () => {
     const result = { id: eventId, proposals: [{ id: 'proposal-id', ownerId: userId }] };
     useCase.execute.mockResolvedValue(result);
 
-    await controller.update(
-      eventId,
-      { name: 'Changed' } as UpdateEventDto,
-      {
-        user: { id: userId },
-      } as AuthenticatedRequest
-    );
+    await controller.update(eventId, { name: 'Changed' } as UpdateEventDto, undefined, {
+      user: { id: userId },
+    } as AuthenticatedRequest);
 
     expect(useCase.execute).toHaveBeenCalledWith(eventId, userId, { name: 'Changed' });
   });
 
+  it('maps the uploaded image to binary use case input', async () => {
+    const result = { id: eventId, proposals: [{ id: 'proposal-id', ownerId: userId }] };
+    const image = {
+      originalname: 'event.png',
+      mimetype: 'image/png',
+      buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+    } as Express.Multer.File;
+    useCase.execute.mockResolvedValue(result);
+
+    await controller.update(eventId, { name: 'Changed' } as UpdateEventDto, image, {
+      user: { id: userId },
+    } as AuthenticatedRequest);
+
+    expect(useCase.execute).toHaveBeenCalledWith(eventId, userId, {
+      name: 'Changed',
+      image: {
+        originalName: 'event.png',
+        contentType: 'image/png',
+        bytes: image.buffer,
+      },
+    });
+  });
+
   it('rejects a request without an authenticated user', async () => {
     await expect(
-      controller.update(eventId, { name: 'Changed' } as UpdateEventDto, {} as AuthenticatedRequest)
+      controller.update(
+        eventId,
+        { name: 'Changed' } as UpdateEventDto,
+        undefined,
+        {} as AuthenticatedRequest
+      )
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(useCase.execute).not.toHaveBeenCalled();
   });
@@ -41,13 +65,9 @@ describe('EventController', () => {
     useCase.execute.mockRejectedValue(new EventAccessDeniedError('Access denied'));
 
     await expect(
-      controller.update(
-        eventId,
-        { name: 'Changed' } as UpdateEventDto,
-        {
-          user: { id: userId },
-        } as AuthenticatedRequest
-      )
+      controller.update(eventId, { name: 'Changed' } as UpdateEventDto, undefined, {
+        user: { id: userId },
+      } as AuthenticatedRequest)
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -55,13 +75,9 @@ describe('EventController', () => {
     useCase.execute.mockRejectedValue(new EventNotFoundError('Event not found'));
 
     await expect(
-      controller.update(
-        eventId,
-        { name: 'Changed' } as UpdateEventDto,
-        {
-          user: { id: userId },
-        } as AuthenticatedRequest
-      )
+      controller.update(eventId, { name: 'Changed' } as UpdateEventDto, undefined, {
+        user: { id: userId },
+      } as AuthenticatedRequest)
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

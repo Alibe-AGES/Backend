@@ -9,13 +9,9 @@ const updateEventSchema = z
     date: z.iso.date().optional(),
     time: z.iso.time({ precision: -1 }).optional(),
     location: z.string().trim().min(1).optional(),
-    image: z.string().nullable().optional(),
     budgetStart: decimalSchema.nullable().optional(),
     budgetEnd: decimalSchema.nullable().optional(),
   })
-  .strict()
-  .refine((input) => Object.keys(input).length > 0, {
-    message: 'At least one event field must be provided',
-  });
+  .strict();
 
 export class UpdateEventDto extends createZodDto(updateEventSchema) {}

@@ -4,16 +4,21 @@ import * as request from 'supertest';
 import { AppModule } from '../../../../src/app.module';
 import { setupApplication } from '../../../../src/app.setup';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { Event } from '../../../../src/modules/events/domain/event.entity';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
+import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryEventRepository } from '../../../helpers/in-memory-event.repository';
-import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
+import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const OWNER_ID = '11111111-1111-4111-8111-111111111111';
+const ORIGINAL_IMAGE_KEY = `events/${EVENT_ID}/images/original.jpg`;
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 describe('Events endpoint (e2e)', () => {
   let app: INestApplication;
+  let storage: ObjectStorage;
   let events: InMemoryEventRepository;
   const previousMockAuthEnabled = process.env.MOCK_AUTH_ENABLED;
   const previousMockAuthUserId = process.env.MOCK_AUTH_USER_ID;
@@ -28,10 +33,13 @@ describe('Events endpoint (e2e)', () => {
       .useValue({})
       .overrideProvider(EventRepository)
       .useClass(InMemoryEventRepository)
+      .overrideProvider(ObjectStorage)
+      .useClass(InMemoryObjectStorage)
       .compile();
 
     app = moduleFixture.createNestApplication();
     events = moduleFixture.get(EventRepository) as InMemoryEventRepository;
+    storage = moduleFixture.get(ObjectStorage);
     setupApplication(app);
     await app.init();
   });
@@ -50,7 +58,7 @@ describe('Events endpoint (e2e)', () => {
         id: EVENT_ID,
         name: 'Jantar',
         timeslot: new Date('2026-10-15T20:00:00.000Z'),
-        image: 'https://example.com/events/jantar.jpg',
+        image: ORIGINAL_IMAGE_KEY,
         budgetStart: '50.00',
         budgetEnd: '120.00',
         status: 'pending',
@@ -70,7 +78,7 @@ describe('Events endpoint (e2e)', () => {
   it('updates an event owned by the authenticated user and returns the updated shape', async () => {
     const response = await request(app.getHttpServer())
       .patch(`/api/events/${EVENT_ID}`)
-      .send({ name: 'Jantar atualizado', image: null, budgetStart: null })
+      .send({ name: 'Jantar atualizado', budgetStart: null })
       .expect(200);
 
     expect(response.body).toMatchObject({
@@ -78,7 +86,7 @@ describe('Events endpoint (e2e)', () => {
       name: 'Jantar atualizado',
       date: '2026-10-15',
       time: '20:00',
-      image: null,
+      image: ORIGINAL_IMAGE_KEY,
       budgetStart: null,
       budgetEnd: '120.00',
       proposal: { id: '55555555-5555-4555-8555-555555555555', ownerId: OWNER_ID },
@@ -90,6 +98,57 @@ describe('Events endpoint (e2e)', () => {
     expect(Date.parse(response.body.updatedAt)).toBeGreaterThan(
       Date.parse(response.body.createdAt)
     );
+  });
+
+  it('receives an image file and persists only its storage key', async () => {
+    const response = await request(app.getHttpServer())
+      .patch(`/api/events/${EVENT_ID}`)
+      .field('name', 'Jantar com nova imagem')
+      .attach('image', PNG_BYTES, {
+        filename: 'event.png',
+        contentType: 'image/png',
+      })
+      .expect(200);
+
+    expect(response.body.name).toBe('Jantar com nova imagem');
+    expect(response.body.image).toMatch(
+      new RegExp(`^events/${EVENT_ID}/images/[0-9a-f-]{36}\\.png$`, 'i')
+    );
+    await expect(storage.findByKey(response.body.image)).resolves.toEqual({
+      bytes: PNG_BYTES,
+      contentType: 'image/png',
+    });
+  });
+
+  it('updates an event when the image is the only supplied field', async () => {
+    const response = await request(app.getHttpServer())
+      .patch(`/api/events/${EVENT_ID}`)
+      .attach('image', PNG_BYTES, {
+        filename: 'event.png',
+        contentType: 'image/png',
+      })
+      .expect(200);
+
+    expect(response.body.image).toMatch(
+      new RegExp(`^events/${EVENT_ID}/images/[0-9a-f-]{36}\\.png$`, 'i')
+    );
+  });
+
+  it('rejects a file that is not an image', async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/events/${EVENT_ID}`)
+      .attach('image', Buffer.from('not-an-image'), {
+        filename: 'event.txt',
+        contentType: 'text/plain',
+      })
+      .expect(400);
+  });
+
+  it('rejects an image supplied as a string', async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/events/${EVENT_ID}`)
+      .send({ image: 'https://example.com/event.png' })
+      .expect(400);
   });
 
   it('rejects an empty body', async () => {
@@ -119,6 +178,22 @@ describe('Events endpoint (e2e)', () => {
       .patch(`/api/events/${EVENT_ID}`)
       .send({ name: 'Sem autenticação' })
       .expect(401);
+  });
+
+  it('documents the image as a binary multipart field in Swagger', async () => {
+    const swagger = await request(app.getHttpServer()).get('/docs-json').expect(200);
+    const operation = swagger.body.paths['/api/events/{eventId}'].patch;
+    const schema = operation.requestBody.content['multipart/form-data'].schema;
+
+    expect(schema.properties.image).toEqual({ type: 'string', format: 'binary' });
+    expect(Object.keys(operation.responses).sort()).toEqual([
+      '200',
+      '400',
+      '401',
+      '403',
+      '404',
+      '413',
+    ]);
   });
 });
 
