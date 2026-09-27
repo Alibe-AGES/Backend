@@ -10,6 +10,7 @@ import { GroupInvitesController } from '../../../../src/modules/groups/http/grou
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryObjectStorage } from '../../../../test/helpers/in-memory-object.storage';
+import { randomUUID } from 'crypto';
 
 const authenticatedRequest = {
   user: { id: '11111111-1111-4111-8111-111111111111' },
@@ -182,6 +183,92 @@ describe('GroupsModule integration', () => {
 
       await expect(
         controller.create({ name: '' } as any, null, authenticatedRequest)
+      ).rejects.toThrow();
+    });
+
+    it('gets availability intervals for some date', async () => {
+      const controller = module.get(GroupsController);
+      const groupId = randomUUID();
+      const dateParam = '2026-06-05';
+
+      findUnique.mockResolvedValue({
+        id: groupId,
+        users: [
+          {
+            user: {
+              id: '11111111-1111-4111-8111-111111111111',
+              name: 'Ana Beatriz Silva',
+              profilePic: null,
+              availabilities: [],
+            },
+          },
+          {
+            user: {
+              id: '22222222-2222-4222-8222-222222222222',
+              name: 'Bruno Henrique Souza',
+              profilePic: null,
+              availabilities: [],
+            },
+          },
+          {
+            user: {
+              id: '33333333-3333-4333-8333-333333333333',
+              name: 'Camila Oliveira',
+              profilePic: null,
+              availabilities: [],
+            },
+          },
+        ],
+      });
+
+      const result = await controller.getAvailabilities(groupId, dateParam, authenticatedRequest);
+
+      expect(result).toEqual({
+        date: dateParam,
+        users: [
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+            name: 'Ana Beatriz Silva',
+            image: null,
+            availableAllDay: true,
+            intervals: [],
+          },
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            name: 'Bruno Henrique Souza',
+            image: null,
+            availableAllDay: true,
+            intervals: [],
+          },
+          {
+            id: '33333333-3333-4333-8333-333333333333',
+            name: 'Camila Oliveira',
+            image: null,
+            availableAllDay: true,
+            intervals: [],
+          },
+        ],
+      });
+    });
+
+    it('Lança GroupNotFoundError para um id inexistente', async () => {
+      const controller = module.get(GroupsController);
+
+      await expect(
+        controller.getAvailabilities(
+          '11111111-1111-4111-8111-111111111111',
+          '2026-05-06',
+          authenticatedRequest
+        )
+      ).rejects.toThrow();
+    });
+
+    it('Lança BadRequestError para um date em formato inválido', async () => {
+      const controller = module.get(GroupsController);
+      const id = randomUUID();
+
+      await expect(
+        controller.getAvailabilities(id, '01/12/2026', authenticatedRequest)
       ).rejects.toThrow();
     });
   });

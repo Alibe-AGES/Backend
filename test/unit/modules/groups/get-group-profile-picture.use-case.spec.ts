@@ -28,6 +28,7 @@ describe('GetGroupProfilePictureUseCase', () => {
       findInviteLinkByToken: jest.fn(),
       addMember: jest.fn(),
       findProfilePictureAccess: jest.fn(),
+      findAvailabilitiesByDate: jest.fn(),
     };
     storage = {
       save: jest.fn(),

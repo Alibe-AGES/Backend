@@ -87,4 +87,20 @@ export class InMemoryGroupRepository extends GroupRepository {
       nextEvent: null,
     });
   }
+
+  findAvailabilitiesByDate(groupId: string, date: string, userId: string) {
+    if (!this.groups.has(groupId)) {
+      return Promise.resolve(null);
+    }
+
+    const isMember = this.members.has(`${groupId}:${userId}`);
+    if (!isMember) {
+      return Promise.resolve(null);
+    }
+
+    return Promise.resolve({
+      id: groupId,
+      users: [],
+    });
+  }
 }
