@@ -3,6 +3,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import {
   UserImageRepository,
   type UserProfilePictureAccess,
+  type UpdatedUserProfilePicture,
 } from '../domain/user-image.repository';
 
 @Injectable()
@@ -41,5 +42,26 @@ export class PrismaUserImageRepository extends UserImageRepository {
       imageKey: targetUser.profilePic,
       requesterCanAccess: targetUserId === requesterUserId || targetUser.groups.length === 1,
     };
+  }
+
+  async updateProfilePicture(
+    userId: string,
+    profilePic: string
+  ): Promise<UpdatedUserProfilePicture | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { profilePic: true },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { profilePic },
+    });
+
+    return { previousImageKey: user.profilePic };
   }
 }

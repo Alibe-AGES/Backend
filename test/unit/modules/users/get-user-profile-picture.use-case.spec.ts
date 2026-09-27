@@ -19,6 +19,7 @@ describe('GetUserProfilePictureUseCase', () => {
   beforeEach(() => {
     users = {
       findProfilePictureAccess: jest.fn(),
+      updateProfilePicture: jest.fn(),
     };
     storage = {
       save: jest.fn(),

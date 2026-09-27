@@ -2,6 +2,8 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+RUN apk add --no-cache su-exec
+
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
@@ -9,6 +11,10 @@ COPY prisma.config.ts ./
 RUN npm ci
 
 COPY . .
+
+RUN chmod +x /app/infra/local/backend-entrypoint.sh
+
+ENTRYPOINT ["/app/infra/local/backend-entrypoint.sh"]
 
 # prisma generate only reads the schema, but prisma.config.ts requires
 # DATABASE_URL to be set just to load — no real connection is made here.
