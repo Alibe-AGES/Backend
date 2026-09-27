@@ -9,6 +9,16 @@ export interface EventProposal {
   ownerId: string;
 }
 
+export type EventStatus = 'pending' | 'confirmed' | 'declined';
+
+export type ProposalAnswer = 'pending' | 'yes' | 'no';
+
+export interface EventProposalResponse {
+  id: string;
+  userId: string;
+  answer: ProposalAnswer;
+}
+
 export interface EventProps {
   id: string;
   name: string | null;

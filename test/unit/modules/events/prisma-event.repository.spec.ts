@@ -129,4 +129,88 @@ describe('PrismaEventRepository', () => {
       select: { id: true },
     });
   });
+
+  it.each([
+    [null, null],
+    [{ users: [] }, false],
+    [{ users: [{ userId: 'owner-id' }] }, true],
+  ])('resolves group membership from %p as %p', async (group, expected) => {
+    const findUnique = jest.fn().mockResolvedValue(group);
+    const prisma = { group: { findUnique } } as unknown as PrismaService;
+    const repository = new PrismaEventRepository(prisma);
+
+    await expect(repository.findGroupMembership(baseRecord.groupId, 'owner-id')).resolves.toBe(
+      expected
+    );
+    expect(findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: baseRecord.groupId } })
+    );
+  });
+
+  it('creates location, event, proposal and owner response inside one transaction', async () => {
+    const createdAt = new Date('2026-09-22T18:30:00.000Z');
+    const ownerResponse = {
+      id: '66666666-6666-4666-8666-666666666666',
+      userId: 'owner-id',
+      answer: 'yes',
+    };
+    const transaction = {
+      location: { create: jest.fn().mockResolvedValue({ id: baseRecord.location.id }) },
+      event: {
+        create: jest.fn().mockResolvedValue({ id: eventId }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(baseRecord),
+      },
+      proposal: { create: jest.fn().mockResolvedValue({ id: baseRecord.proposals[0].id }) },
+      proposalResponse: { create: jest.fn().mockResolvedValue(ownerResponse) },
+    };
+    const $transaction = jest.fn((callback: (tx: typeof transaction) => unknown) =>
+      callback(transaction)
+    );
+    const repository = new PrismaEventRepository({ $transaction } as unknown as PrismaService);
+
+    const result = await repository.create({
+      id: eventId,
+      groupId: baseRecord.groupId,
+      ownerId: 'owner-id',
+      name: 'Event',
+      timeslot: baseRecord.timeslot,
+      location: { description: 'Location', manuallyCreated: true },
+      image: null,
+      budgetStart: '50.00',
+      budgetEnd: null,
+      status: 'pending',
+      ownerAnswer: 'yes',
+      createdAt,
+    });
+
+    expect($transaction).toHaveBeenCalledTimes(1);
+    expect(transaction.location.create).toHaveBeenCalledWith({
+      data: { description: 'Location', manuallyCreated: true },
+      select: { id: true },
+    });
+    expect(transaction.event.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        id: eventId,
+        status: 'pending',
+        groupId: baseRecord.groupId,
+        locationId: baseRecord.location.id,
+      }),
+      select: { id: true },
+    });
+    expect(transaction.proposal.create).toHaveBeenCalledWith({
+      data: { eventId, ownerId: 'owner-id', createdAt },
+      select: { id: true },
+    });
+    expect(transaction.proposalResponse.create).toHaveBeenCalledWith({
+      data: {
+        proposalId: baseRecord.proposals[0].id,
+        userId: 'owner-id',
+        answer: 'yes',
+        createdAt,
+      },
+      select: { id: true, userId: true, answer: true },
+    });
+    expect(result.event).toMatchObject({ id: eventId, budgetStart: '50.00' });
+    expect(result.ownerResponse).toEqual(ownerResponse);
+  });
 });

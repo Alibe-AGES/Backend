@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, OmitType } from '@nestjs/swagger';
 
 export class EventLocationResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -58,4 +58,28 @@ export class EventResponseDto {
 
   @ApiProperty({ type: Date, format: 'date-time' })
   updatedAt!: Date;
+}
+
+export class EventProposalAnswerResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  userId!: string;
+
+  @ApiProperty({ enum: ['pending', 'yes', 'no'] })
+  answer!: string;
+}
+
+export class CreatedEventProposalResponseDto extends EventProposalResponseDto {
+  @ApiProperty({ type: EventProposalAnswerResponseDto })
+  response!: EventProposalAnswerResponseDto;
+}
+
+export class CreatedEventResponseDto extends OmitType(EventResponseDto, [
+  'proposal',
+  'updatedAt',
+] as const) {
+  @ApiProperty({ type: CreatedEventProposalResponseDto })
+  proposal!: CreatedEventProposalResponseDto;
 }

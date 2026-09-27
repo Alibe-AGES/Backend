@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
-const decimalSchema = z.string().regex(/^-?\d+(\.\d{1,30})?$/);
+export const decimalSchema = z.string().regex(/^-?\d+(\.\d{1,30})?$/);
 
 const updateEventSchema = z
   .object({
