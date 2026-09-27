@@ -1,5 +1,7 @@
 import { Event } from '../../src/modules/events/domain/event.entity';
 import {
+  type CreatedEvent,
+  type CreateEventData,
   EventRepository,
   type UpdateEventData,
 } from '../../src/modules/events/domain/event.repository';
@@ -7,9 +9,42 @@ import {
 export class InMemoryEventRepository extends EventRepository {
   private readonly events = new Map<string, Event>();
   private readonly locations = new Map<string, string>();
+  private readonly groups = new Map<string, Set<string>>();
 
   findById(id: string): Promise<Event | null> {
     return Promise.resolve(this.events.get(id) ?? null);
+  }
+
+  findGroupMembership(groupId: string, userId: string): Promise<boolean | null> {
+    const members = this.groups.get(groupId);
+    return Promise.resolve(members ? members.has(userId) : null);
+  }
+
+  create(data: CreateEventData): Promise<CreatedEvent> {
+    const event = new Event({
+      id: data.id,
+      name: data.name,
+      timeslot: data.timeslot,
+      image: data.image,
+      budgetStart: data.budgetStart,
+      budgetEnd: data.budgetEnd,
+      status: data.status,
+      groupId: data.groupId,
+      location: { id: '44444444-4444-4444-8444-444444444444', ...data.location },
+      proposals: [{ id: '55555555-5555-4555-8555-555555555555', ownerId: data.ownerId }],
+      createdAt: data.createdAt,
+      updatedAt: data.createdAt,
+    });
+    this.events.set(event.id, event);
+
+    return Promise.resolve({
+      event,
+      ownerResponse: {
+        id: '66666666-6666-4666-8666-666666666666',
+        userId: data.ownerId,
+        answer: data.ownerAnswer,
+      },
+    });
   }
 
   update(id: string, data: UpdateEventData): Promise<Event> {
@@ -41,5 +76,9 @@ export class InMemoryEventRepository extends EventRepository {
 
   set(event: Event): void {
     this.events.set(event.id, event);
+  }
+
+  setGroupMembers(groupId: string, userIds: string[]): void {
+    this.groups.set(groupId, new Set(userIds));
   }
 }

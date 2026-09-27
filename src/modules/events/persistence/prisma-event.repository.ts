@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { Event } from '../domain/event.entity';
-import { EventRepository, type UpdateEventData } from '../domain/event.repository';
+import {
+  type CreatedEvent,
+  type CreateEventData,
+  EventRepository,
+  type UpdateEventData,
+} from '../domain/event.repository';
 
 const eventInclude = {
   location: true,
@@ -23,6 +28,73 @@ export class PrismaEventRepository extends EventRepository {
   async findById(id: string): Promise<Event | null> {
     const event = await this.prisma.event.findUnique({ where: { id }, include: eventInclude });
     return event ? this.toDomain(event) : null;
+  }
+
+  async findGroupMembership(groupId: string, userId: string): Promise<boolean | null> {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: {
+        users: {
+          where: { userId },
+          select: { userId: true },
+          take: 1,
+        },
+      },
+    });
+
+    return group ? group.users.length > 0 : null;
+  }
+
+  async create(data: CreateEventData): Promise<CreatedEvent> {
+    const { event, ownerResponse } = await this.prisma.$transaction(async (transaction) => {
+      const location = await transaction.location.create({
+        data: {
+          description: data.location.description,
+          manuallyCreated: data.location.manuallyCreated,
+        },
+        select: { id: true },
+      });
+
+      await transaction.event.create({
+        data: {
+          id: data.id,
+          name: data.name,
+          timeslot: data.timeslot,
+          image: data.image,
+          budgetStart: data.budgetStart,
+          budgetEnd: data.budgetEnd,
+          status: data.status,
+          createdAt: data.createdAt,
+          groupId: data.groupId,
+          locationId: location.id,
+        },
+        select: { id: true },
+      });
+
+      const proposal = await transaction.proposal.create({
+        data: { eventId: data.id, ownerId: data.ownerId, createdAt: data.createdAt },
+        select: { id: true },
+      });
+
+      const ownerResponse = await transaction.proposalResponse.create({
+        data: {
+          proposalId: proposal.id,
+          userId: data.ownerId,
+          answer: data.ownerAnswer,
+          createdAt: data.createdAt,
+        },
+        select: { id: true, userId: true, answer: true },
+      });
+
+      const event = await transaction.event.findUniqueOrThrow({
+        where: { id: data.id },
+        include: eventInclude,
+      });
+
+      return { event, ownerResponse };
+    });
+
+    return { event: this.toDomain(event), ownerResponse };
   }
 
   async update(id: string, data: UpdateEventData): Promise<Event> {

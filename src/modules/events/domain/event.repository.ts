@@ -1,4 +1,9 @@
-import { Event } from './event.entity';
+import {
+  Event,
+  type EventProposalResponse,
+  type EventStatus,
+  type ProposalAnswer,
+} from './event.entity';
 
 export interface UpdateEventData {
   name?: string;
@@ -9,8 +14,37 @@ export interface UpdateEventData {
   budgetEnd?: string | null;
 }
 
+export interface CreateEventData {
+  id: string;
+  groupId: string;
+  ownerId: string;
+  name: string;
+  timeslot: Date;
+  location: {
+    description: string;
+    manuallyCreated: boolean;
+  };
+  image: string | null;
+  budgetStart: string | null;
+  budgetEnd: string | null;
+  status: EventStatus;
+  ownerAnswer: ProposalAnswer;
+  createdAt: Date;
+}
+
+export interface CreatedEvent {
+  event: Event;
+  ownerResponse: EventProposalResponse;
+}
+
 export abstract class EventRepository {
   abstract findById(id: string): Promise<Event | null>;
+
+  /** Retorna null quando o grupo não existe. */
+  abstract findGroupMembership(groupId: string, userId: string): Promise<boolean | null>;
+
+  /** Cria location, evento, proposta e resposta do criador de forma atômica. */
+  abstract create(data: CreateEventData): Promise<CreatedEvent>;
 
   abstract update(id: string, data: UpdateEventData): Promise<Event>;
 }

@@ -723,6 +723,31 @@ O grupo deve existir e o usuário autenticado deve participar dele. Grupo inexis
 Os exemplos de requisição e resposta podem ser consultados pelo Swagger em
 <http://localhost:3000/docs>.
 
+### Endpoint de criação de evento
+
+A criação fica no módulo `events`, no mesmo `EventController` da atualização. O grupo vem pela URL
+e o usuário por `request.user`:
+
+```http
+POST /groups/:groupId/events
+```
+
+O body aceita JSON ou `multipart/form-data`. `name`, `date` (`YYYY-MM-DD`), `time` (`HH:mm`) e
+`location` são obrigatórios; `image` (arquivo de até 5 MB), `budgetStart` e `budgetEnd` são
+opcionais. A localização é recebida como texto livre.
+
+Em uma única transação, o repository cria:
+
+1. uma `Location` com `manuallyCreated = true`;
+2. o `Event` com status `pending`;
+3. uma `Proposal` do usuário autenticado;
+4. a `ProposalResponse` desse usuário com resposta `yes`.
+
+Por enquanto toda localização é marcada como manual; isso mudará quando houver integração com um
+provedor de localização. Quando há imagem, ela é salva no storage antes da transação e removida se a
+persistência falhar. Campos obrigatórios ausentes respondem `400`, grupo inexistente `404`, usuário
+fora do grupo `403` e ausência de autenticação `401`.
+
 ### Status HTTP dos endpoints
 
 Os códigos abaixo descrevem o comportamento implementado atualmente. Eles também estão declarados
@@ -737,6 +762,7 @@ nos decorators do Swagger de cada controller.
 | POST   | `/invite-links/:token/join`       | `201`   | `400`, `500`                      |
 | GET    | `/groups/:groupId/calendar`       | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/groups/:groupId/availabilities` | `201`   | `400`, `401`, `403`, `404`, `500` |
+| POST   | `/groups/:groupId/events`         | `201`   | `400`, `401`, `403`, `404`, `413` |
 
 | Status                      | Significado atual                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
