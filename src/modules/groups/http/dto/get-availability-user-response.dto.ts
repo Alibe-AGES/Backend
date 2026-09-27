@@ -1,18 +1,18 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 export class GetAvailabilityUserResponseDto {
-    @ApiProperty({ format: 'uuid' })
-    id!: string;
-    
-    @ApiProperty()
-    name!: string;
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
 
-    @ApiProperty()
-    image!: string;
+  @ApiProperty()
+  name!: string;
 
-    @ApiProperty()
-    availableAllDay!: boolean;
+  @ApiProperty()
+  image!: string;
 
-    @ApiProperty()
-    intervals!: Array<[string, string]>;
+  @ApiProperty()
+  availableAllDay!: boolean;
+
+  @ApiProperty()
+  intervals!: Array<[string, string]>;
 }

@@ -225,7 +225,7 @@ export class GroupsController {
   @Get(':groupId/availabilities')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Obtém os intervalos de disponibilidades para um dia específico' })
-  @ApiParam({ name: 'groupId', format: 'uuid'})
+  @ApiParam({ name: 'groupId', format: 'uuid' })
   @ApiQuery({ name: 'date' })
   @ApiOkResponse({
     description: 'Intervalos encontrados.',
@@ -239,8 +239,9 @@ export class GroupsController {
     @Request() request: AuthenticatedRequest
   ) {
     try {
-      return this.getAvailabilityIntervalsUseCase.execute(groupId, date);
-    } catch(error) {
+      const userId = request.user.id;
+      return this.getAvailabilityIntervalsUseCase.execute(groupId, date, userId);
+    } catch (error) {
       throw error;
     }
   }
