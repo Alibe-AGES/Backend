@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { extname } from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { ObjectStorage } from '../../../shared/storage/object-storage';
 import { Group } from '../domain/group.entity';
 import { GroupRepository } from '../domain/group.repository';
+import { safeExtension } from '../../../shared/utils';
 
 export interface CreateGroupInput {
   name: string;
@@ -40,7 +40,11 @@ export class CreateGroupUseCase {
         throw new InvalidGroupError('Somente imagens são aceitas');
       }
 
-      extension = this.safeExtension(input.image.originalName);
+      extension = safeExtension(input.image.originalName);
+      if (extension == '') {
+        throw new InvalidGroupError('Extensão inválida para imagem');
+      }
+
       profilePic = `groups/${id}/image${extension}`;
     }
 
@@ -63,17 +67,5 @@ export class CreateGroupUseCase {
 
       throw error;
     }
-  }
-
-  private safeExtension(originalName: string): string {
-    const extension = extname(originalName).toLowerCase();
-
-    const allowedExtensions = new Set(['.jpg', '.png', '.webp', '.jpeg', '.svg']);
-
-    if (!allowedExtensions.has(extension)) {
-      throw new InvalidGroupError('Extensão inválida para imagem');
-    }
-
-    return extension;
   }
 }

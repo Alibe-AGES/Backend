@@ -8,11 +8,13 @@ const IMAGE_KEY = `users/${TARGET_USER_ID}/profile-picture.png`;
 describe('PrismaUserImageRepository integration', () => {
   let findUnique: jest.Mock;
   let repository: PrismaUserImageRepository;
+  let update: jest.Mock;
 
   beforeEach(() => {
     findUnique = jest.fn();
+    update = jest.fn();
     repository = new PrismaUserImageRepository({
-      user: { findUnique },
+      user: { findUnique, update },
     } as unknown as PrismaService);
   });
 
@@ -81,5 +83,35 @@ describe('PrismaUserImageRepository integration', () => {
     await expect(
       repository.findProfilePictureAccess(TARGET_USER_ID, REQUESTER_USER_ID)
     ).resolves.toBeNull();
+  });
+
+  it('updates profilePic and returns the previous storage key', async () => {
+    const newImageKey = `users/${TARGET_USER_ID}/profile-pictures/new.png`;
+    findUnique.mockResolvedValue({ profilePic: IMAGE_KEY });
+    update.mockResolvedValue({});
+
+    await expect(repository.updateProfilePicture(TARGET_USER_ID, newImageKey)).resolves.toEqual({
+      previousImageKey: IMAGE_KEY,
+    });
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: TARGET_USER_ID },
+      select: { profilePic: true },
+    });
+    expect(update).toHaveBeenCalledWith({
+      where: { id: TARGET_USER_ID },
+      data: { profilePic: newImageKey },
+    });
+  });
+
+  it('does not update profilePic when the user does not exist', async () => {
+    findUnique.mockResolvedValue(null);
+
+    await expect(
+      repository.updateProfilePicture(
+        TARGET_USER_ID,
+        `users/${TARGET_USER_ID}/profile-pictures/new.png`
+      )
+    ).resolves.toBeNull();
+    expect(update).not.toHaveBeenCalled();
   });
 });

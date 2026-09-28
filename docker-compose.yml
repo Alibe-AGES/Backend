@@ -1,7 +1,6 @@
 services:
   backend:
     container_name: alibe-backend
-    user: node
 
     build:
       context: .
@@ -20,6 +19,7 @@ services:
       - .env
 
     environment:
+      HOME: /tmp
       PORT: ${APP_PORT}
       DATABASE_URL: postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@alibe-db:5432/${DATABASE_NAME}
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
