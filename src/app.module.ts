@@ -14,7 +14,6 @@ import { EventsModule } from './modules/events/events.module';
   imports: [
     AuthModule,
     ExampleModule,
-    EventModule,
     MonitoringModule,
     GroupsModule,
     CalendarModule,

@@ -9,7 +9,7 @@ export class GetEventUseCase {
   constructor(private readonly events: EventRepository) {}
 
   async execute(eventId: string, userId: string): Promise<EventDetailsResponseDto> {
-    const event = await this.events.findUnique(eventId, userId);
+    const event = await this.events.findEventDetails(eventId, userId);
 
     if (!event) {
       throw new EventNotFoundError('Evento não encontrado');

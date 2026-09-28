@@ -5,6 +5,42 @@ import {
   type ProposalAnswer,
 } from './event.entity';
 
+export interface EventDetails {
+  id: string;
+  name: string;
+  image: string;
+  timeslot: Date;
+  budgetStart: string;
+  budgetEnd: string;
+  status: string;
+  createdAt: Date;
+  groupId: string;
+  location: {
+    id: string;
+    description: string;
+    manuallyCreated: boolean;
+  };
+  proposals: Array<{
+    id: string;
+    owner: {
+      id: string;
+      name: string;
+      image: string;
+    };
+    responses: Array<{
+      id: string;
+      answer: string;
+      createdAt: Date;
+      user: {
+        id: string;
+        name: string;
+        image: string;
+      };
+    }>;
+    createdAt: Date;
+  }>;
+}
+
 export interface UpdateEventData {
   name?: string;
   timeslot?: Date;
@@ -47,4 +83,6 @@ export abstract class EventRepository {
   abstract create(data: CreateEventData): Promise<CreatedEvent>;
 
   abstract update(id: string, data: UpdateEventData): Promise<Event>;
+
+  abstract findEventDetails(eventId: string, userId: string): Promise<EventDetails | null>;
 }

@@ -200,7 +200,7 @@ export class EventController {
     }
   }
   
-  @Get(':id')
+  @Get('api/events/:id')
   @ApiOperation({ summary: 'Consulta todos os dados de um evento ' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: EventDetailsResponseDto })
