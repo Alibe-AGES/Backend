@@ -36,7 +36,7 @@ export class GetEventUseCase {
         owner: {
           id: proposal.owner.id,
           name: proposal.owner.name,
-          image: proposal.owner.image,
+          image: proposal.owner.image
         },
         responses: proposal.responses.map((response) => ({
           id: response.id,
