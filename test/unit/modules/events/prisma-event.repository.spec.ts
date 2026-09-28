@@ -56,7 +56,7 @@ describe('PrismaEventRepository', () => {
       });
     });
   });
-describe('findEventDetails', () => {
+  describe('findEventDetails', () => {
     it('finds and maps event details correctly', async () => {
       const id = randomUUID();
       const userId = authenticatedRequest.user.id;
@@ -103,7 +103,9 @@ describe('findEventDetails', () => {
       };
 
       findFirstMock.mockResolvedValue(dbEventRow);
-      const prisma = { event: { findFirst: findFirstMock, findUnique: findFirstMock } } as unknown as PrismaService;
+      const prisma = {
+        event: { findFirst: findFirstMock, findUnique: findFirstMock },
+      } as unknown as PrismaService;
       const repository = new PrismaEventRepository(prisma);
 
       await expect(repository.findEventDetails(id, userId)).resolves.toEqual({
@@ -162,11 +164,16 @@ describe('findEventDetails', () => {
 
     it('returns null when the event does not exist', async () => {
       const findFirstMock = jest.fn().mockResolvedValue(null);
-      const prisma = { event: { findFirst: findFirstMock, findUnique: findFirstMock } } as unknown as PrismaService;
+      const prisma = {
+        event: { findFirst: findFirstMock, findUnique: findFirstMock },
+      } as unknown as PrismaService;
       const repository = new PrismaEventRepository(prisma);
 
       await expect(
-        repository.findEventDetails('550e8400-e29b-41d4-a716-446655440000', authenticatedRequest.user.id)
+        repository.findEventDetails(
+          '550e8400-e29b-41d4-a716-446655440000',
+          authenticatedRequest.user.id
+        )
       ).resolves.toBeNull();
     });
   });

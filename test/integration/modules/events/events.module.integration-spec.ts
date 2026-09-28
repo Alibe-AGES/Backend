@@ -3,7 +3,10 @@ import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.serv
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { EventsModule } from '../../../../src/modules/events/events.module';
 import { EventController } from '../../../../src/modules/events/http/event.controller';
-import { EventNotFoundError, GetEventUseCase } from '../../../../src/modules/events/application/get-event.use-case';
+import {
+  EventNotFoundError,
+  GetEventUseCase,
+} from '../../../../src/modules/events/application/get-event.use-case';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import type { CreateEventDto } from '../../../../src/modules/events/http/dto/create-event.dto';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';

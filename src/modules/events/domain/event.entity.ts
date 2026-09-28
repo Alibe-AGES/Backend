@@ -24,7 +24,7 @@ export type ProposalAnswer = 'pending' | 'yes' | 'no';
 export interface EventProposalResponse {
   id: string;
   answer: ProposalAnswer;
-  createdAt?: Date; 
+  createdAt?: Date;
   userId: string;
   user?: OwnerDetails;
 }

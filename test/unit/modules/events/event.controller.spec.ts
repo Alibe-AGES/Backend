@@ -108,7 +108,9 @@ describe('EventController', () => {
       } as Express.Multer.File;
       createUseCaseMock.execute.mockRejectedValue(new Error('stop'));
 
-      await expect(controller.create(groupId, body, image, authenticatedRequest)).rejects.toThrow('stop');
+      await expect(controller.create(groupId, body, image, authenticatedRequest)).rejects.toThrow(
+        'stop'
+      );
 
       expect(createUseCaseMock.execute).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -131,9 +133,9 @@ describe('EventController', () => {
     ])('maps %p to the matching HTTP exception', async (error, exception) => {
       createUseCaseMock.execute.mockRejectedValue(error);
 
-      await expect(controller.create(groupId, body, undefined, authenticatedRequest)).rejects.toBeInstanceOf(
-        exception
-      );
+      await expect(
+        controller.create(groupId, body, undefined, authenticatedRequest)
+      ).rejects.toBeInstanceOf(exception);
     });
   });
 
@@ -142,7 +144,12 @@ describe('EventController', () => {
       const result = { id: eventId, proposals: [{ id: 'proposal-id', ownerId: userId }] };
       updateUseCaseMock.execute.mockResolvedValue(result);
 
-      await controller.update(eventId, { name: 'Changed' } as UpdateEventDto, undefined, authenticatedRequest);
+      await controller.update(
+        eventId,
+        { name: 'Changed' } as UpdateEventDto,
+        undefined,
+        authenticatedRequest
+      );
 
       expect(updateUseCaseMock.execute).toHaveBeenCalledWith(eventId, userId, { name: 'Changed' });
     });
@@ -156,7 +163,12 @@ describe('EventController', () => {
       } as Express.Multer.File;
       updateUseCaseMock.execute.mockResolvedValue(result);
 
-      await controller.update(eventId, { name: 'Changed' } as UpdateEventDto, image, authenticatedRequest);
+      await controller.update(
+        eventId,
+        { name: 'Changed' } as UpdateEventDto,
+        image,
+        authenticatedRequest
+      );
 
       expect(updateUseCaseMock.execute).toHaveBeenCalledWith(eventId, userId, {
         name: 'Changed',
@@ -184,7 +196,12 @@ describe('EventController', () => {
       updateUseCaseMock.execute.mockRejectedValue(new EventAccessDeniedError('Access denied'));
 
       await expect(
-        controller.update(eventId, { name: 'Changed' } as UpdateEventDto, undefined, authenticatedRequest)
+        controller.update(
+          eventId,
+          { name: 'Changed' } as UpdateEventDto,
+          undefined,
+          authenticatedRequest
+        )
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
@@ -192,14 +209,21 @@ describe('EventController', () => {
       updateUseCaseMock.execute.mockRejectedValue(new UpdateEventNotFoundError('Event not found'));
 
       await expect(
-        controller.update(eventId, { name: 'Changed' } as UpdateEventDto, undefined, authenticatedRequest)
+        controller.update(
+          eventId,
+          { name: 'Changed' } as UpdateEventDto,
+          undefined,
+          authenticatedRequest
+        )
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('get', () => {
     it('Chama o useCase com o id de um Event não existente', async () => {
-      getEventUseCaseMock.execute.mockRejectedValue(new GetEventNotFoundError('Evento não encontrado'));
+      getEventUseCaseMock.execute.mockRejectedValue(
+        new GetEventNotFoundError('Evento não encontrado')
+      );
 
       await expect(
         controller.get({ id: 'non-existent-id' } as any, authenticatedRequest)

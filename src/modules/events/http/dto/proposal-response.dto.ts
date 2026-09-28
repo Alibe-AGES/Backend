@@ -6,7 +6,7 @@ export class ProposalDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ type: [OwnerResponseDto]})
+  @ApiProperty({ type: [OwnerResponseDto] })
   owner!: OwnerResponseDto;
 
   @ApiProperty({ type: [ResponseDto] })
