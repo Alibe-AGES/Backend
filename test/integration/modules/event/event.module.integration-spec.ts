@@ -1,9 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { EventModule } from '../../../../src/modules/event/event.module';
-import { EventController } from 'src/modules/event/http/event.controller';
-import { GetEventUseCase } from '../../../../src/modules/event/application/get-event.use-case';
+import { EventController } from '../../../../src/modules/event/http/event.controller';
+import { EventNotFoundError, GetEventUseCase } from '../../../../src/modules/event/application/get-event.use-case';
 import { EventRepository } from '../../../../src/modules/event/domain/event.repository';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 
@@ -125,7 +124,7 @@ describe('EventModule integration', () => {
       findUnique.mockResolvedValue(null);
 
       await expect(controller.get(eventId, authenticatedRequest)).rejects.toThrow(
-        NotFoundException
+        EventNotFoundError
       );
     });
   });

@@ -38,7 +38,7 @@ describe('EventController', () => {
 
     await expect(
       controller.get({ id: 'non-existent-id' } as any, authenticatedRequest)
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toThrow(EventNotFoundError);
   });
 
   it('Caso de sucesso para um input com id existente', async () => {
@@ -88,7 +88,7 @@ describe('EventController', () => {
 
     const result = await controller.get(id as any, authenticatedRequest);
 
-    expect(getEventUseCaseMock.execute).toHaveBeenCalledWith(id);
+    expect(getEventUseCaseMock.execute).toHaveBeenCalledWith(id, authenticatedRequest.user.id);
     expect(result).toBe(event);
   });
 });

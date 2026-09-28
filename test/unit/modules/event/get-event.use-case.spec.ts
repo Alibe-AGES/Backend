@@ -112,9 +112,11 @@ describe('GetEventUseCase', () => {
       proposals: [
         {
           id: '55555555-5555-4555-8555-555555555555',
-          ownerId: '11111111-1111-4111-8111-111111111111',
-          ownerName: 'Ana Beatriz Silva',
-          ownerProfilePic: 'https://example.com/users/ana.jpg',
+          owner: {
+            id: '11111111-1111-4111-8111-111111111111',
+            name: 'Ana Beatriz Silva',
+            image: 'https://example.com/users/ana.jpg',
+          },
           createdAt: '2026-09-22T18:30:00.000Z',
           responses: [
             {
@@ -153,9 +155,11 @@ describe('GetEventUseCase', () => {
       proposals: [
         {
           id: '55555555-5555-4555-8555-555555555555',
-          ownerId: '11111111-1111-4111-8111-111111111111',
-          ownerName: 'Ana Beatriz Silva',
-          ownerProfilePic: 'https://example.com/users/ana.jpg',
+          owner: {
+            id: '11111111-1111-4111-8111-111111111111',
+            name: 'Ana Beatriz Silva',
+            image: 'https://example.com/users/ana.jpg',
+          },
           createdAt: '2026-09-22T18:30:00.000Z',
           responses: [
             {

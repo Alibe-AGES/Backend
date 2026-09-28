@@ -33,9 +33,11 @@ export class GetEventUseCase {
         : null,
       proposals: event.proposals.map((proposal) => ({
         id: proposal.id,
-        ownerId: proposal.owner.id,
-        ownerName: proposal.owner.name,
-        ownerProfilePic: proposal.owner.image,
+        owner: {
+          id: proposal.owner.id,
+          name: proposal.owner.name,
+          image: proposal.owner.image
+        },
         responses: proposal.responses.map((response) => ({
           id: response.id,
           answer: response.answer,

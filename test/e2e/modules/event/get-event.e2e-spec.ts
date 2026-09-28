@@ -4,9 +4,11 @@ import * as request from 'supertest';
 import { AppModule } from '../../../../src/app.module';
 import { setupApplication } from '../../../../src/app.setup';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
-import { S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
+import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { EventRepository } from '../../../../src/modules/event/domain/event.repository';
-import { InMemoryEventRepository } from 'test/helpers/in-memory-event.repository';
+import { InMemoryEventRepository } from '../../../../test/helpers/in-memory-event.repository';
+import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
+import { InMemoryObjectStorage } from '../../../../test/helpers/in-memory-object.storage';
 
 const DEMO_EVENT_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
@@ -19,10 +21,14 @@ describe('EventController (e2e)', () => {
     })
       .overrideProvider(S3_CLIENT)
       .useValue({ get: jest.fn() })
+      .overrideProvider(S3_BUCKET)
+      .useValue('alibe-local-media')
       .overrideProvider(PrismaService)
       .useValue({})
       .overrideProvider(EventRepository)
       .useClass(InMemoryEventRepository)
+      .overrideProvider(ObjectStorage)
+      .useClass(InMemoryObjectStorage)
       .compile();
 
     app = moduleFixture.createNestApplication();
