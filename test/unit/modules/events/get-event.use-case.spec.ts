@@ -1,10 +1,10 @@
-import { InMemoryEventRepository } from '../../../../test/helpers/in-memory-event.repository';
+import { InMemoryEventRepository } from '../../../helpers/in-memory-event.repository';
 import {
   EventNotFoundError,
   GetEventUseCase,
-} from '../../../../src/modules/event/application/get-event.use-case';
-import { EventRepository } from 'src/modules/event/domain/event.repository';
-import { AuthenticatedRequest } from 'src/modules/auth/http/authenticated-user';
+} from '../../../../src/modules/events/application/get-event.use-case';
+import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
+import { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 
 const authenticatedRequest = {
   user: { id: '11111111-1111-4111-8111-111111111111' },
@@ -91,8 +91,8 @@ const EVENT_WITHOUTLOCATION = {
 
 describe('GetEventUseCase', () => {
   it('returns the event details with location', async () => {
-    const findUnique = jest.fn().mockResolvedValue(EVENT_WITHLOCATION_ENTITY);
-    const repository = { findUnique } as unknown as EventRepository;
+    const findEventDetails = jest.fn().mockResolvedValue(EVENT_WITHLOCATION_ENTITY);
+    const repository = { findEventDetails } as unknown as EventRepository;
     const useCase = new GetEventUseCase(repository);
 
     const expectedResponse = {
@@ -138,8 +138,8 @@ describe('GetEventUseCase', () => {
   });
 
   it('returns the event details without location', async () => {
-    const findUnique = jest.fn().mockResolvedValue(EVENT_WITHOUTLOCATION);
-    const repository = { findUnique } as unknown as EventRepository;
+    const findEventDetails = jest.fn().mockResolvedValue(EVENT_WITHOUTLOCATION);
+    const repository = { findEventDetails } as unknown as EventRepository;
     const useCase = new GetEventUseCase(repository);
 
     const expectedResponse = {
