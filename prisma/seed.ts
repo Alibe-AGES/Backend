@@ -1,5 +1,6 @@
 import { AnswerEnum, PrismaClient, StatusEnum } from 'generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { hashPassword } from 'better-auth/crypto';
 import 'dotenv/config';
 
 const adapter = new PrismaPg({
@@ -9,7 +10,7 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({
   adapter,
 });
-const PASSWORD_PLACEHOLDER = 'NOT_IMPLEMENTED';
+const SEEDED_USER_PASSWORD = 'senha-segura';
 const SEEDED_USER_IDS = [
   '11111111-1111-4111-8111-111111111111',
   '22222222-2222-4222-8222-222222222222',
@@ -40,6 +41,9 @@ async function main() {
 
   console.log('Limpando banco...');
 
+  await prisma.verification.deleteMany();
+  await prisma.session.deleteMany();
+  await prisma.account.deleteMany();
   await prisma.folderLocation.deleteMany();
   await prisma.memory.deleteMany();
   await prisma.proposalResponse.deleteMany();
@@ -60,6 +64,8 @@ async function main() {
   // ============================================================
 
   console.log('Criando usuários...');
+
+  const passwordHash = await hashPassword(SEEDED_USER_PASSWORD);
 
   const usersData = [
     {
@@ -146,8 +152,18 @@ async function main() {
       data: {
         id: SEEDED_USER_IDS[index],
         ...userData,
-        passwordHash: PASSWORD_PLACEHOLDER,
+        emailVerified: false,
+        image: null,
         profilePic: null,
+      },
+    });
+
+    await prisma.account.create({
+      data: {
+        accountId: user.id,
+        providerId: 'credential',
+        userId: user.id,
+        password: passwordHash,
       },
     });
 

@@ -83,20 +83,21 @@ O `.env` não deve ser enviado ao Git. O arquivo `.env.template` contém somente
 
 Variáveis atuais:
 
-| Variável                | Responsabilidade                                                |
-| ----------------------- | --------------------------------------------------------------- |
-| `DATABASE_USER`         | Usuário criado no PostgreSQL pelo Docker Compose.               |
-| `DATABASE_PASSWORD`     | Senha do usuário do PostgreSQL.                                 |
-| `DATABASE_NAME`         | Nome do banco da aplicação.                                     |
-| `APP_PORT`              | Porta exposta pela API quando executada pelo Docker Compose.    |
-| `DATABASE_URL`          | URL de conexão utilizada pelo Prisma.                           |
-| `MOCK_AUTH_ENABLED`     | Ativa temporariamente o usuário simulado da Sprint 1.           |
-| `MOCK_AUTH_USER_ID`     | UUID de um usuário criado pela seed e injetado em cada request. |
-| `AWS_REGION`            | Região usada pelo MiniStack e pelos comandos da AWS CLI.        |
-| `AWS_S3_BUCKET`         | Nome do bucket utilizado pela aplicação.                        |
-| `AWS_ENDPOINT_URL`      | Endpoint global dos serviços AWS; presente apenas no MiniStack. |
-| `AWS_ACCESS_KEY_ID`     | Credencial fictícia local; em produção, prefira role ou OIDC.   |
-| `AWS_SECRET_ACCESS_KEY` | Segredo fictício local; nunca versionar um valor real.          |
+| Variável                      | Responsabilidade                                                   |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `DATABASE_USER`               | Usuário criado no PostgreSQL pelo Docker Compose.                  |
+| `DATABASE_PASSWORD`           | Senha do usuário do PostgreSQL.                                    |
+| `DATABASE_NAME`               | Nome do banco da aplicação.                                        |
+| `APP_PORT`                    | Porta exposta pela API quando executada pelo Docker Compose.       |
+| `DATABASE_URL`                | URL de conexão utilizada pelo Prisma.                              |
+| `BETTER_AUTH_SECRET`          | Segredo de alta entropia usado para assinar dados de autenticação. |
+| `BETTER_AUTH_URL`             | URL pública da API utilizada pelo Better Auth.                     |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | Origens web e schemes Expo aceitos, separados por vírgula.         |
+| `AWS_REGION`                  | Região usada pelo MiniStack e pelos comandos da AWS CLI.           |
+| `AWS_S3_BUCKET`               | Nome do bucket utilizado pela aplicação.                           |
+| `AWS_ENDPOINT_URL`            | Endpoint global dos serviços AWS; presente apenas no MiniStack.    |
+| `AWS_ACCESS_KEY_ID`           | Credencial fictícia local; em produção, prefira role ou OIDC.      |
+| `AWS_SECRET_ACCESS_KEY`       | Segredo fictício local; nunca versionar um valor real.             |
 
 Nunca coloque tokens, senhas reais ou credenciais de produção no `.env.template`.
 
@@ -198,7 +199,7 @@ Os endereços abaixo consideram o ambiente local com `docker compose up` em exec
 | -------------------- | -------------------------------------------------- | --------------------------------------------------- |
 | API                  | <http://localhost:3000>                            | URL base do Backend.                                |
 | Endpoint de exemplo  | <http://localhost:3000/example>                    | Verificação rápida da API.                          |
-| Usuário mockado      | <http://localhost:3000/auth/me>                    | Mostra o usuário injetado na request na Sprint 1.   |
+| Better Auth          | <http://localhost:3000/api/auth/get-session>       | Consulta a sessão autenticada ou retorna `null`.    |
 | Imagem de grupo      | `/groups/{groupId}/profile-picture`                | Entrega a foto somente para integrantes do grupo.   |
 | Imagem de usuário    | `/users/{userId}/profile-picture`                  | Entrega a própria foto ou a de participante comum.  |
 | Swagger UI           | <http://localhost:3000/docs>                       | Documentação interativa e teste dos endpoints.      |
@@ -586,43 +587,45 @@ Ao criar um endpoint:
 4. abra `/docs` e confira o contrato gerado;
 5. mantenha o teste E2E de `/docs-json` passando.
 
-### Autenticação temporária da Sprint 1
+### Autenticação com Better Auth
 
-Enquanto a autenticação real não estiver disponível, `MockAuthenticationMiddleware` injeta em
-cada request o mesmo contrato esperado futuramente:
+O Better Auth atende as rotas sob `/api/auth`, usa o adapter Prisma/PostgreSQL e mantém as sessões
+na tabela `session`. A autenticação por e-mail e senha está habilitada com senhas entre 8 e 128
+caracteres e `autoSignIn: false`; portanto, o cadastro não cria sessão automaticamente e continua
+sem revelar se um e-mail já está cadastrado. O plugin Expo está habilitado no servidor para
+armazenar e reenviar o cookie no aplicativo mobile.
 
-```ts
-request.user = { id: process.env.MOCK_AUTH_USER_ID };
-```
+No onboarding, o aplicativo mantém e-mail e senha somente em memória entre as telas. Ao concluir a
+tela de nome e imagem, chama sequencialmente `POST /api/auth/sign-up/email`,
+`POST /api/auth/sign-in/email` e `PUT /users/me/profile-picture`. O login acontece sem exibir outra
+tela; após o cookie ser salvo pelo Better Auth Expo, o upload usa a sessão recém-criada. A senha
+deve ser descartada da memória ao final do fluxo e nunca armazenada no SecureStore.
 
-O mock é controlado exclusivamente pelo ambiente:
-
-```dotenv
-MOCK_AUTH_ENABLED=true
-MOCK_AUTH_USER_ID=11111111-1111-4111-8111-111111111111
-```
-
-O ID padrão pertence à primeira usuária da seed, Ana Beatriz Silva. O segundo usuário, Bruno
-Henrique Souza, possui o ID `22222222-2222-4222-8222-222222222222`. Todos os 15 usuários da seed
-possuem IDs determinísticos; eles podem ser consultados no Adminer.
-
-Para simular outro usuário, altere `MOCK_AUTH_USER_ID` no `.env` e recrie somente o Backend:
-
-```bash
-docker compose up -d --force-recreate backend
-```
-
-O usuário selecionado pode ser conferido em `GET /auth/me`. Controllers que necessitam do usuário
-recebem a request com `@Request() request: AuthenticatedRequest` e acessam `request.user.id`; o
-`userId` nunca é recebido por path, query ou body. Quando a autenticação real for implementada, o
-middleware temporário será desativado e um Guard validará as credenciais, mantendo o mesmo
-`request.user`.
-
-Em produção, mantenha obrigatoriamente:
+As variáveis necessárias são:
 
 ```dotenv
-MOCK_AUTH_ENABLED=false
+BETTER_AUTH_SECRET=gere-um-segredo-com-pelo-menos-32-caracteres
+BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_TRUSTED_ORIGINS=alibe://,alibe://*,http://localhost:8081,exp://,exp://**
 ```
+
+Gere um segredo próprio para cada ambiente, por exemplo com `openssl rand -base64 32`, e nunca
+versione o valor de produção. Os padrões `exp://` devem ser usados somente no desenvolvimento; em
+produção, mantenha apenas o scheme oficial do aplicativo e as origens web reais.
+
+O guard da integração é global. Ele valida a sessão e preenche `request.user` e `request.session`
+antes dos controllers protegidos. Rotas públicas precisam ser marcadas explicitamente com
+`@AllowAnonymous()`. O `userId` não deve ser recebido por path, query ou body quando representar o
+usuário atual.
+
+A seed cria contas de credencial para os usuários de demonstração. Em ambiente exclusivamente
+local, todos utilizam a senha `senha-segura`.
+
+O login é realizado por `POST /api/auth/sign-in/email`, enviando `email`, `password` e,
+opcionalmente, `rememberMe`. Em caso de sucesso, o Better Auth cria o registro em `session` e envia
+o cookie `better-auth.session_token`. No aplicativo, o plugin cliente Better Auth Expo guarda e
+reenvia esse cookie; o campo `token` do JSON não deve ser salvo manualmente. Credenciais inválidas
+retornam `401` com a mesma mensagem para e-mail inexistente ou senha incorreta.
 
 ### Endpoints mockados de grupos
 
@@ -723,6 +726,31 @@ O grupo deve existir e o usuário autenticado deve participar dele. Grupo inexis
 Os exemplos de requisição e resposta podem ser consultados pelo Swagger em
 <http://localhost:3000/docs>.
 
+### Endpoint de criação de evento
+
+A criação fica no módulo `events`, no mesmo `EventController` da atualização. O grupo vem pela URL
+e o usuário por `request.user`:
+
+```http
+POST /groups/:groupId/events
+```
+
+O body aceita JSON ou `multipart/form-data`. `name`, `date` (`YYYY-MM-DD`), `time` (`HH:mm`) e
+`location` são obrigatórios; `image` (arquivo de até 5 MB), `budgetStart` e `budgetEnd` são
+opcionais. A localização é recebida como texto livre.
+
+Em uma única transação, o repository cria:
+
+1. uma `Location` com `manuallyCreated = true`;
+2. o `Event` com status `pending`;
+3. uma `Proposal` do usuário autenticado;
+4. a `ProposalResponse` desse usuário com resposta `yes`.
+
+Por enquanto toda localização é marcada como manual; isso mudará quando houver integração com um
+provedor de localização. Quando há imagem, ela é salva no storage antes da transação e removida se a
+persistência falhar. Campos obrigatórios ausentes respondem `400`, grupo inexistente `404`, usuário
+fora do grupo `403` e ausência de autenticação `401`.
+
 ### Status HTTP dos endpoints
 
 Os códigos abaixo descrevem o comportamento implementado atualmente. Eles também estão declarados
@@ -737,6 +765,7 @@ nos decorators do Swagger de cada controller.
 | POST   | `/invite-links/:token/join`       | `201`   | `400`, `500`                      |
 | GET    | `/groups/:groupId/calendar`       | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/groups/:groupId/availabilities` | `201`   | `400`, `401`, `403`, `404`, `500` |
+| POST   | `/groups/:groupId/events`         | `201`   | `400`, `401`, `403`, `404`, `413` |
 
 | Status                      | Significado atual                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -798,8 +827,12 @@ Esse comando lê o `prisma/schema.prisma` e gera o cliente TypeScript tipado em 
 > esse comando e o `prisma migrate deploy` são executados automaticamente antes da API. O banco é
 > criado pelo PostgreSQL/Docker; as tabelas são criadas ou alteradas por migrations. O Compose
 > grava o client gerado no mesmo diretório `generated/prisma` usado pelo VS Code, portanto
-> `docker compose up` também mantém as tipagens locais sincronizadas. O serviço roda como o
-> usuário `node` para não criar esses arquivos com proprietário `root`.
+> `docker compose up` também mantém as tipagens locais sincronizadas. Antes de iniciar, o
+> entrypoint corrige automaticamente a propriedade de `generated/` e `dist/`, detecta o UID/GID
+> do proprietário do repositório e executa Prisma e Nest sem privilégios de root. Isso também
+> recupera pastas preexistentes que tenham sido criadas por outro container como `root`. Em
+> ambientes que não expõem corretamente a propriedade do bind mount, `DOCKER_UID` e `DOCKER_GID`
+> podem ser definidos no `.env` para sobrescrever a detecção automática.
 
 Fluxo correto quando alguém adicionar ou alterar um model:
 

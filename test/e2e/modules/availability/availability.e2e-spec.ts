@@ -30,7 +30,7 @@ describe('AvailabilityController (e2e)', () => {
       .useClass(InMemoryAvailabilityRepository)
       .compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication({ bodyParser: false });
     availabilityRepository = moduleFixture.get(
       AvailabilityRepository
     ) as InMemoryAvailabilityRepository;
