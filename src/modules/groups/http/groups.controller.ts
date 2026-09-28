@@ -238,11 +238,8 @@ export class GroupsController {
     @Query('date') date: string,
     @Request() request: AuthenticatedRequest
   ) {
-    try {
-      const userId = request.user.id;
-      return this.getAvailabilityIntervalsUseCase.execute(groupId, date, userId);
-    } catch (error) {
-      throw error;
-    }
+    
+    const userId = request.user.id;
+    return await this.getAvailabilityIntervalsUseCase.execute(groupId, date, userId);
   }
 }
