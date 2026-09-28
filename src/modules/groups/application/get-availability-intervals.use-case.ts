@@ -11,9 +11,9 @@ export class GetAvailabilityIntervalsUseCase {
   async execute(groupId: string, date: string, userId: string): Promise<AvailabilitiesResponseDto> {
     const regex = /^\d{4}-\d{2}-\d{2}$/;
     if (!regex.test(date)) {
-      throw new BadRequestException("Formato inválido de data");
+      throw new BadRequestException('Formato inválido de data');
     }
-    
+
     return await this.groups.findAvailabilitiesByDate(groupId, date, userId);
   }
 }
