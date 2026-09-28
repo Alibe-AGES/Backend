@@ -1,23 +1,20 @@
-import { type MiddlewareConsumer, Module, type NestModule, RequestMethod } from '@nestjs/common';
-import { AuthController } from './http/auth.controller';
-import { MockAuthenticationMiddleware } from './http/mock-authentication.middleware';
+import { Module } from '@nestjs/common';
+import { AuthModule as BetterAuthModule } from '@thallesp/nestjs-better-auth';
+import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
+import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { createAuth } from './auth.config';
 
 @Module({
-  controllers: [AuthController],
+  imports: [
+    PrismaModule,
+    BetterAuthModule.forRootAsync({
+      imports: [PrismaModule],
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) => ({
+        auth: createAuth(prisma),
+        disableTrustedOriginsCors: true,
+      }),
+    }),
+  ],
 })
-export class AuthModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer
-      .apply(MockAuthenticationMiddleware)
-      .exclude(
-        { path: 'metrics', method: RequestMethod.ALL },
-        { path: 'docs', method: RequestMethod.ALL },
-        { path: 'docs/{*path}', method: RequestMethod.ALL },
-        { path: 'docs-json', method: RequestMethod.ALL }
-      )
-      .forRoutes({
-        path: '{*path}',
-        method: RequestMethod.ALL,
-      });
-  }
-}
+export class AuthModule {}
