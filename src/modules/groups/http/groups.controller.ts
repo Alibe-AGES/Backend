@@ -238,7 +238,6 @@ export class GroupsController {
     @Query('date') date: string,
     @Request() request: AuthenticatedRequest
   ) {
-    
     const userId = request.user.id;
     return await this.getAvailabilityIntervalsUseCase.execute(groupId, date, userId);
   }
