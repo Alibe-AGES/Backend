@@ -20,7 +20,7 @@ export class InMemoryEventRepository extends EventRepository {
     const members = this.groups.get(groupId);
     return Promise.resolve(members ? members.has(userId) : null);
   }
- 
+
   create(data: CreateEventData): Promise<CreatedEvent> {
     const event = new Event({
       id: data.id,
@@ -33,27 +33,27 @@ export class InMemoryEventRepository extends EventRepository {
       groupId: data.groupId,
       location: { id: '44444444-4444-4444-8444-444444444444', ...data.location },
       proposals: [
-      {
-        id: '55555555-5555-4555-8555-555555555555',
-        ownerId: data.ownerId,
-        ownerDetails: {
-          name: 'Ana Beatriz Silva', // Mock 
-          image: 'https://example.com/users/ana.jpg', // Mock
-        },
-        responses: [
-          {
-            id: '66666666-6666-4666-8666-666666666666',
-            answer: data.ownerAnswer,
-            createdAt: data.createdAt,
-            userId: data.ownerId,
-            user: {
-              name: 'Ana Beatriz Silva', // Mock
-              image: 'https://example.com/users/ana.jpg', // Mock
-            },
+        {
+          id: '55555555-5555-4555-8555-555555555555',
+          ownerId: data.ownerId,
+          ownerDetails: {
+            name: 'Ana Beatriz Silva', // Mock
+            image: 'https://example.com/users/ana.jpg', // Mock
           },
-        ],
-        createdAt: data.createdAt,
-      },
+          responses: [
+            {
+              id: '66666666-6666-4666-8666-666666666666',
+              answer: data.ownerAnswer,
+              createdAt: data.createdAt,
+              userId: data.ownerId,
+              user: {
+                name: 'Ana Beatriz Silva', // Mock
+                image: 'https://example.com/users/ana.jpg', // Mock
+              },
+            },
+          ],
+          createdAt: data.createdAt,
+        },
       ],
       createdAt: data.createdAt,
       updatedAt: data.createdAt,
@@ -127,7 +127,7 @@ export class InMemoryEventRepository extends EventRepository {
         owner: {
           id: proposal.ownerId,
           name: proposal.ownerDetails.name,
-          image: proposal.ownerDetails.image
+          image: proposal.ownerDetails.image,
         },
         responses: (proposal.responses ?? []).map((response) => ({
           id: response.id,
