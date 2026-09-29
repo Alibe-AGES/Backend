@@ -751,21 +751,43 @@ provedor de localização. Quando há imagem, ela é salva no storage antes da t
 persistência falhar. Campos obrigatórios ausentes respondem `400`, grupo inexistente `404`, usuário
 fora do grupo `403` e ausência de autenticação `401`.
 
+### Endpoints de resposta à proposta do evento
+
+O módulo `proposals` registra a resposta do usuário autenticado (`request.user`) à proposta do
+evento. Quando o evento possui mais de uma proposta, é usada a mais recente.
+
+```http
+POST  /api/events/:eventId/proposal/responses
+PATCH /api/events/:eventId/proposal/responses/me
+```
+
+Ambos recebem `{ "answer": "yes" | "no" }` e retornam `id`, `proposalId`, `userId`, `answer` e
+`createdAt`. Cada usuário possui no máximo uma `ProposalResponse` por proposta (constraint única
+`proposal_id + user_id`); um segundo `POST` responde `409` e a alteração deve ser feita pelo
+`PATCH`. O criador do evento já recebe a resposta `yes` na criação, então para ele somente o `PATCH`
+se aplica.
+
+Evento ou proposta inexistente respondem `404`, usuário fora do grupo do evento `403`, ausência de
+autenticação `401` e `answer` diferente de `yes`/`no` `400`. O `PATCH` também responde `404` quando
+o usuário ainda não respondeu.
+
 ### Status HTTP dos endpoints
 
 Os códigos abaixo descrevem o comportamento implementado atualmente. Eles também estão declarados
 nos decorators do Swagger de cada controller.
 
-| Método | Rota                              | Sucesso | Erros atuais                      |
-| ------ | --------------------------------- | ------- | --------------------------------- |
-| GET    | `/groups`                         | `200`   | `500`                             |
-| GET    | `/groups/:groupId`                | `200`   | `400`, `500`                      |
-| POST   | `/groups`                         | `201`   | `400`, `500`                      |
-| GET    | `/groups/:groupId/invite-link`    | `200`   | `400`, `500`                      |
-| POST   | `/invite-links/:token/join`       | `201`   | `400`, `500`                      |
-| GET    | `/groups/:groupId/calendar`       | `200`   | `400`, `401`, `403`, `404`, `500` |
-| POST   | `/groups/:groupId/availabilities` | `201`   | `400`, `401`, `403`, `404`, `500` |
-| POST   | `/groups/:groupId/events`         | `201`   | `400`, `401`, `403`, `404`, `413` |
+| Método | Rota                                         | Sucesso | Erros atuais                      |
+| ------ | -------------------------------------------- | ------- | --------------------------------- |
+| GET    | `/groups`                                    | `200`   | `500`                             |
+| GET    | `/groups/:groupId`                           | `200`   | `400`, `500`                      |
+| POST   | `/groups`                                    | `201`   | `400`, `500`                      |
+| GET    | `/groups/:groupId/invite-link`               | `200`   | `400`, `500`                      |
+| POST   | `/invite-links/:token/join`                  | `201`   | `400`, `500`                      |
+| GET    | `/groups/:groupId/calendar`                  | `200`   | `400`, `401`, `403`, `404`, `500` |
+| POST   | `/groups/:groupId/availabilities`            | `201`   | `400`, `401`, `403`, `404`, `500` |
+| POST   | `/groups/:groupId/events`                    | `201`   | `400`, `401`, `403`, `404`, `413` |
+| POST   | `/api/events/:eventId/proposal/responses`    | `201`   | `400`, `401`, `403`, `404`, `409` |
+| PATCH  | `/api/events/:eventId/proposal/responses/me` | `200`   | `400`, `401`, `403`, `404`        |
 
 | Status                      | Significado atual                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
