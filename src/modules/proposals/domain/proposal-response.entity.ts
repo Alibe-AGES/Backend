@@ -1,6 +1,5 @@
 export type ProposalAnswer = 'pending' | 'yes' | 'no';
 
-/** Respostas que o próprio usuário pode enviar; `pending` é somente estado inicial. */
 export type UserProposalAnswer = Exclude<ProposalAnswer, 'pending'>;
 
 export interface ProposalResponseProps {
