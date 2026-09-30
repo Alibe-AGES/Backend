@@ -8,6 +8,7 @@ import {
   EventRepository,
   type UpdateEventData,
 } from '../domain/event.repository';
+import { EventDetails } from 'src/modules/events/domain/event.repository';
 
 const eventInclude = {
   location: true,
@@ -127,6 +128,109 @@ export class PrismaEventRepository extends EventRepository {
     });
 
     return this.toDomain(event);
+  }
+
+  async findEventDetails(eventId: string, userId: string): Promise<EventDetails | null> {
+    const event = await this.prisma.event.findUnique({
+      where: {
+        id: eventId,
+        group: {
+          users: {
+            some: {
+              userId: userId,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        timeslot: true,
+        budgetStart: true,
+        budgetEnd: true,
+        status: true,
+        createdAt: true,
+        groupId: true,
+        locationId: true,
+        location: {
+          select: {
+            id: true,
+            description: true,
+            manuallyCreated: true,
+          },
+        },
+        proposals: {
+          select: {
+            id: true,
+            owner: {
+              select: {
+                id: true,
+                name: true,
+                profilePic: true,
+              },
+            },
+            responses: {
+              select: {
+                id: true,
+                answer: true,
+                createdAt: true,
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    profilePic: true,
+                  },
+                },
+              },
+            },
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      return null;
+    }
+
+    return {
+      id: event.id,
+      name: event.name,
+      image: event.image,
+      timeslot: event.timeslot,
+      budgetStart: event.budgetStart.toFixed(2),
+      budgetEnd: event.budgetEnd.toFixed(2),
+      status: event.status,
+      createdAt: event.createdAt,
+      groupId: event.groupId,
+      location: event.location
+        ? {
+            id: event.location.id,
+            description: event.location.description,
+            manuallyCreated: event.location.manuallyCreated,
+          }
+        : null,
+      proposals: event.proposals.map((proposal) => ({
+        id: proposal.id,
+        owner: {
+          id: proposal.owner.id,
+          name: proposal.owner.name,
+          image: proposal.owner.profilePic ?? '',
+        },
+        responses: proposal.responses.map((response) => ({
+          id: response.id,
+          answer: response.answer,
+          createdAt: response.createdAt,
+          user: {
+            id: response.user.id,
+            name: response.user.name,
+            image: response.user.profilePic ?? '',
+          },
+        })),
+        createdAt: proposal.createdAt,
+      })),
+    };
   }
 
   private toDomain(data: EventRecord): Event {

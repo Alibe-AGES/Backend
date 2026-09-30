@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Get,
   HttpCode,
   HttpStatus,
   NotFoundException,
@@ -48,6 +49,8 @@ import type { CreatedEvent } from '../domain/event.repository';
 import { CreateEventDto } from './dto/create-event.dto';
 import { CreatedEventResponseDto, EventResponseDto } from './dto/event-response.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { EventDetailsResponseDto } from './dto/event-details-response.dto';
+import { GetEventUseCase } from '../application/get-event.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -55,6 +58,7 @@ const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 @Controller()
 export class EventController {
   constructor(
+    private readonly getEventUseCase: GetEventUseCase,
     private readonly updateEventUseCase: UpdateEventUseCase,
     private readonly createEventUseCase: CreateEventUseCase
   ) {}
@@ -194,6 +198,21 @@ export class EventController {
 
       throw error;
     }
+  }
+
+  @Get('api/events/:id')
+  @ApiOperation({ summary: 'Consulta todos os dados de um evento ' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: EventDetailsResponseDto })
+  @ApiBadRequestResponse({ description: 'Identificador do evento inválido.' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  async get(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<EventDetailsResponseDto> {
+    const userId = request?.user.id;
+    return await this.getEventUseCase.execute(id, userId);
   }
 
   private toCreatedResponse(

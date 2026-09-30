@@ -1,3 +1,4 @@
+import { EventDetails } from 'src/modules/events/domain/event.repository';
 import { Event } from '../../src/modules/events/domain/event.entity';
 import {
   type CreatedEvent,
@@ -31,7 +32,29 @@ export class InMemoryEventRepository extends EventRepository {
       status: data.status,
       groupId: data.groupId,
       location: { id: '44444444-4444-4444-8444-444444444444', ...data.location },
-      proposals: [{ id: '55555555-5555-4555-8555-555555555555', ownerId: data.ownerId }],
+      proposals: [
+        {
+          id: '55555555-5555-4555-8555-555555555555',
+          ownerId: data.ownerId,
+          ownerDetails: {
+            name: 'Ana Beatriz Silva', // Mock
+            image: 'https://example.com/users/ana.jpg', // Mock
+          },
+          responses: [
+            {
+              id: '66666666-6666-4666-8666-666666666666',
+              answer: data.ownerAnswer,
+              createdAt: data.createdAt,
+              userId: data.ownerId,
+              user: {
+                name: 'Ana Beatriz Silva', // Mock
+                image: 'https://example.com/users/ana.jpg', // Mock
+              },
+            },
+          ],
+          createdAt: data.createdAt,
+        },
+      ],
       createdAt: data.createdAt,
       updatedAt: data.createdAt,
     });
@@ -80,5 +103,47 @@ export class InMemoryEventRepository extends EventRepository {
 
   setGroupMembers(groupId: string, userIds: string[]): void {
     this.groups.set(groupId, new Set(userIds));
+  }
+
+  findEventDetails(id: string): Promise<EventDetails | null> {
+    const event = this.events.get(id);
+
+    if (!event) {
+      return Promise.resolve(null);
+    }
+
+    const eventDetails: EventDetails = {
+      id: event.id,
+      name: event.name,
+      image: event.image,
+      timeslot: event.timeslot,
+      budgetStart: event.budgetStart,
+      budgetEnd: event.budgetEnd,
+      status: event.status,
+      groupId: event.groupId,
+      location: event.location,
+      proposals: event.proposals.map((proposal) => ({
+        id: proposal.id,
+        owner: {
+          id: proposal.ownerId,
+          name: proposal.ownerDetails.name,
+          image: proposal.ownerDetails.image,
+        },
+        responses: (proposal.responses ?? []).map((response) => ({
+          id: response.id,
+          answer: response.answer,
+          createdAt: response.createdAt,
+          user: {
+            id: response.userId,
+            name: response.user?.name ?? '',
+            image: response.user?.image ?? '',
+          },
+        })),
+        createdAt: proposal.createdAt,
+      })),
+      createdAt: event.createdAt,
+    };
+
+    return Promise.resolve(eventDetails);
   }
 }

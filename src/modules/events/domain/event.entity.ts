@@ -4,9 +4,17 @@ export interface EventLocation {
   manuallyCreated: boolean | null;
 }
 
+export interface OwnerDetails {
+  name: string;
+  image: string;
+}
+
 export interface EventProposal {
   id: string;
   ownerId: string;
+  ownerDetails?: OwnerDetails;
+  createdAt?: Date;
+  responses?: EventProposalResponse[];
 }
 
 export type EventStatus = 'pending' | 'confirmed' | 'declined';
@@ -15,8 +23,10 @@ export type ProposalAnswer = 'pending' | 'yes' | 'no';
 
 export interface EventProposalResponse {
   id: string;
-  userId: string;
   answer: ProposalAnswer;
+  createdAt?: Date;
+  userId: string;
+  user?: OwnerDetails;
 }
 
 export interface EventProps {

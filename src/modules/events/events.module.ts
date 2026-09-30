@@ -6,11 +6,13 @@ import { UpdateEventUseCase } from './application/update-event.use-case';
 import { EventRepository } from './domain/event.repository';
 import { EventController } from './http/event.controller';
 import { PrismaEventRepository } from './persistence/prisma-event.repository';
+import { GetEventUseCase } from './application/get-event.use-case';
 
 @Module({
   imports: [PrismaModule, StorageModule],
   controllers: [EventController],
   providers: [
+    GetEventUseCase,
     CreateEventUseCase,
     UpdateEventUseCase,
     {
