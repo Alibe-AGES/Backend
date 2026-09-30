@@ -16,6 +16,7 @@ import {
   UnauthorizedException,
   UploadedFile,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -30,6 +31,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiProduces,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -47,6 +49,8 @@ import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
 import { GroupResponsePresenter } from './presenters/group-response.presenter';
 import { ListGroupsUseCase } from '../application/list-groups.use-case';
+import { AvailabilitiesResponseDto } from './dto/get-availabilities-response.dto';
+import { GetAvailabilityIntervalsUseCase } from '../application/get-availability-intervals.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -55,9 +59,10 @@ const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 export class GroupsController {
   constructor(
     private readonly createGroupUseCase: CreateGroupUseCase,
-    private readonly listGroupsUseCase: ListGroupsUseCase,
     private readonly getGroupUseCase: GetGroupUseCase,
-    private readonly getGroupProfilePictureUseCase: GetGroupProfilePictureUseCase
+    private readonly getGroupProfilePictureUseCase: GetGroupProfilePictureUseCase,
+    private readonly listGroupsUseCase: ListGroupsUseCase,
+    private readonly getAvailabilityIntervalsUseCase: GetAvailabilityIntervalsUseCase
   ) {}
   /**
    * GET /groups
@@ -215,5 +220,25 @@ export class GroupsController {
       }
       throw error;
     }
+  }
+
+  @Get(':groupId/availabilities')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Obtém os intervalos de disponibilidades para um dia específico' })
+  @ApiParam({ name: 'groupId', format: 'uuid' })
+  @ApiQuery({ name: 'date' })
+  @ApiOkResponse({
+    description: 'Intervalos encontrados.',
+    type: AvailabilitiesResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
+  async getAvailabilities(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Query('date') date: string,
+    @Request() request: AuthenticatedRequest
+  ) {
+    const userId = request.user.id;
+    return await this.getAvailabilityIntervalsUseCase.execute(groupId, date, userId);
   }
 }
