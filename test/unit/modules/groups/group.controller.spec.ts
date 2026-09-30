@@ -11,11 +11,16 @@ import { GetGroupUseCase } from '../../../../src/modules/groups/application/get-
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import type { Group } from '../../../../src/modules/groups/domain/group.entity';
 import { randomUUID } from 'crypto';
+import {
+  GetAvailabilityIntervalsUseCase,
+  GroupNotFoundError,
+} from '../../../../src/modules/groups/application/get-availability-intervals.use-case';
 
 describe('GroupsController', () => {
   let controller: GroupsController;
   let createGroupUseCaseMock: { execute: jest.Mock };
   let listGroupsUseCaseMock: { execute: jest.Mock };
+  let getAvailabilityIntervalsUseCase: { execute: jest.Mock };
   let getGroupProfilePictureUseCaseMock: { execute: jest.Mock };
   let getGroupUseCaseMock: { execute: jest.Mock };
 
@@ -27,6 +32,7 @@ describe('GroupsController', () => {
   beforeEach(async () => {
     createGroupUseCaseMock = { execute: jest.fn() };
     listGroupsUseCaseMock = { execute: jest.fn() };
+    getAvailabilityIntervalsUseCase = { execute: jest.fn() };
     getGroupProfilePictureUseCaseMock = { execute: jest.fn() };
     getGroupUseCaseMock = { execute: jest.fn() };
 
@@ -49,99 +55,176 @@ describe('GroupsController', () => {
           provide: GetGroupUseCase,
           useValue: getGroupUseCaseMock,
         },
+        {
+          provide: GetAvailabilityIntervalsUseCase,
+          useValue: getAvailabilityIntervalsUseCase,
+        },
       ],
     }).compile();
     controller = module.get(GroupsController);
   });
+  describe('Endpoint para criar grupo', () => {
+    it('Chama o useCase com profilePic null', async () => {
+      const id = randomUUID();
+      const group = {
+        id: id,
+        name: 'Group of friends',
+        profilePic: null,
+        createdAt: new Date('2026-08-30T00:00:00.000Z'),
+      } as Group;
 
-  it('Chama o useCase com profilePic null', async () => {
-    const id = randomUUID();
-    const group = {
-      id: id,
-      name: 'Group of friends',
-      profilePic: null,
-      createdAt: new Date('2026-08-30T00:00:00.000Z'),
-    } as Group;
+      createGroupUseCaseMock.execute.mockResolvedValue(group);
 
-    createGroupUseCaseMock.execute.mockResolvedValue(group);
+      const result = await controller.create(
+        { name: 'Group of friends' } as any,
+        null,
+        authenticatedRequest
+      );
 
-    const result = await controller.create(
-      { name: 'Group of friends' } as any,
-      null,
-      authenticatedRequest
-    );
+      expect(createGroupUseCaseMock.execute).toHaveBeenCalledWith({
+        name: 'Group of friends',
+        image: null,
+        creatorId: userId,
+      });
 
-    expect(createGroupUseCaseMock.execute).toHaveBeenCalledWith({
-      name: 'Group of friends',
-      image: null,
-      creatorId: userId,
+      expect(result).toEqual({
+        id: group.id,
+        name: group.name,
+        profilePic: group.profilePic,
+        createdAt: group.createdAt,
+      });
     });
 
-    expect(result).toEqual({
-      id: group.id,
-      name: group.name,
-      profilePic: group.profilePic,
-      createdAt: group.createdAt,
+    it('Caso de sucesso para um input com nome e imagem válidos', async () => {
+      const file = {
+        originalname: 'photo.png',
+        mimetype: 'image/png',
+        buffer: Buffer.from([1, 2, 3]),
+      } as Express.Multer.File;
+
+      const id = randomUUID();
+      const group = {
+        id: id,
+        name: 'Group with photo',
+        profilePic: `groups/${id}/image.png`,
+        createdAt: new Date('2026-08-30T00:00:00.000Z'),
+      } as Group;
+
+      createGroupUseCaseMock.execute.mockResolvedValue(group);
+
+      const result = await controller.create(
+        { name: 'Group with photo' } as any,
+        file,
+        authenticatedRequest
+      );
+
+      expect(createGroupUseCaseMock.execute).toHaveBeenCalledWith({
+        name: 'Group with photo',
+        image: {
+          originalName: 'photo.png',
+          contentType: 'image/png',
+          bytes: file.buffer,
+        },
+        creatorId: userId,
+      });
+      expect(result.profilePic).toBe(`/groups/${group.id}/profile-picture`);
+    });
+
+    it('Retorna BadRequestException para nome em branco', async () => {
+      createGroupUseCaseMock.execute.mockRejectedValue(
+        new InvalidGroupError('Nome deve conter entre 1 e 500 caracteres')
+      );
+
+      await expect(
+        controller.create({ name: '' } as any, null, authenticatedRequest)
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
-  it('Caso de sucesso para um input com nome e imagem válidos', async () => {
-    const file = {
-      originalname: 'photo.png',
-      mimetype: 'image/png',
-      buffer: Buffer.from([1, 2, 3]),
-    } as Express.Multer.File;
+  describe('Endpoint para get group', () => {
+    it('delegates group details to the get group use case', async () => {
+      const details = {
+        id: randomUUID(),
+        name: 'Group of friends',
+        profilePic: null,
+        createdAt: new Date('2026-08-30T00:00:00.000Z'),
+        participants: [],
+        nextEvent: null,
+      };
+      getGroupUseCaseMock.execute.mockResolvedValue(details);
 
-    const id = randomUUID();
-    const group = {
-      id: id,
-      name: 'Group with photo',
-      profilePic: `groups/${id}/image.png`,
-      createdAt: new Date('2026-08-30T00:00:00.000Z'),
-    } as Group;
-
-    createGroupUseCaseMock.execute.mockResolvedValue(group);
-
-    const result = await controller.create(
-      { name: 'Group with photo' } as any,
-      file,
-      authenticatedRequest
-    );
-
-    expect(createGroupUseCaseMock.execute).toHaveBeenCalledWith({
-      name: 'Group with photo',
-      image: {
-        originalName: 'photo.png',
-        contentType: 'image/png',
-        bytes: file.buffer,
-      },
-      creatorId: userId,
+      await expect(controller.getById(details.id)).resolves.toBe(details);
+      expect(getGroupUseCaseMock.execute).toHaveBeenCalledWith(details.id);
     });
-    expect(result.profilePic).toBe(`/groups/${group.id}/profile-picture`);
   });
 
-  it('Retorna BadRequestException para nome em branco', async () => {
-    createGroupUseCaseMock.execute.mockRejectedValue(
-      new InvalidGroupError('Nome deve conter entre 1 e 500 caracteres')
-    );
+  describe('Endpoint para get de intervalos de disponibilidade', () => {
+    it('Busca corretamente para um id existente e data válida', async () => {
+      const groupId = randomUUID();
+      const dateParam = '2026-06-05';
 
-    await expect(
-      controller.create({ name: '' } as any, null, authenticatedRequest)
-    ).rejects.toThrow(BadRequestException);
-  });
+      const expectedResponse = {
+        date: dateParam,
+        users: [
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+            name: 'Ana Beatriz Silva',
+            image: null,
+            availableAllDay: true,
+            intervals: [],
+          },
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            name: 'Bruno Henrique Souza',
+            image: null,
+            availableAllDay: true,
+            intervals: [],
+          },
+          {
+            id: '33333333-3333-4333-8333-333333333333',
+            name: 'Camila Oliveira',
+            image: null,
+            availableAllDay: true,
+            intervals: [],
+          },
+        ],
+      };
 
-  it('delegates group details to the get group use case', async () => {
-    const details = {
-      id: randomUUID(),
-      name: 'Group of friends',
-      profilePic: null,
-      createdAt: new Date('2026-08-30T00:00:00.000Z'),
-      participants: [],
-      nextEvent: null,
-    };
-    getGroupUseCaseMock.execute.mockResolvedValue(details);
+      getAvailabilityIntervalsUseCase.execute.mockResolvedValue(expectedResponse);
+      const result = await controller.getAvailabilities(groupId, dateParam, authenticatedRequest);
 
-    await expect(controller.getById(details.id)).resolves.toBe(details);
-    expect(getGroupUseCaseMock.execute).toHaveBeenCalledWith(details.id);
+      expect(result).toEqual(expectedResponse);
+      expect(result.date).toEqual(dateParam);
+    });
+
+    it('Lança GroupNotFoundError para um id inexistente', async () => {
+      getAvailabilityIntervalsUseCase.execute.mockRejectedValue(
+        new GroupNotFoundError('Grupo não encontrado')
+      );
+
+      await expect(
+        controller.getAvailabilities(
+          '11111111-1111-4111-8111-111111111111',
+          '2026-06-05',
+          authenticatedRequest
+        )
+      ).rejects.toThrow(GroupNotFoundError);
+    });
+
+    it('Lança BadRequestException para um date em formato inválido', async () => {
+      const invalidDateFormat = '2026/11/23';
+
+      getAvailabilityIntervalsUseCase.execute.mockRejectedValue(
+        new BadRequestException('Formato inválido de data')
+      );
+
+      await expect(
+        controller.getAvailabilities(
+          '11111111-1111-4111-8111-111111111111',
+          invalidDateFormat,
+          authenticatedRequest
+        )
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 });

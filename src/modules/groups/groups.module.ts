@@ -11,17 +11,19 @@ import { GetOrCreateGroupInviteLinkUseCase } from './application/get-or-create-g
 import { JoinGroupByInviteUseCase } from './application/join-group-by-invite.use-case';
 import { GroupRepository } from './domain/group.repository';
 import { PrismaGroupRepository } from './persistence/group.prisma.repository';
+import { GetAvailabilityIntervalsUseCase } from './application/get-availability-intervals.use-case';
 
 @Module({
   imports: [PrismaModule, StorageModule],
   controllers: [GroupsController, GroupInvitesController],
   providers: [
     CreateGroupUseCase,
-    ListGroupsUseCase,
+    GetAvailabilityIntervalsUseCase,
     GetGroupUseCase,
     GetOrCreateGroupInviteLinkUseCase,
     JoinGroupByInviteUseCase,
     GetGroupProfilePictureUseCase,
+    ListGroupsUseCase,
     {
       provide: GroupRepository,
       useClass: PrismaGroupRepository,

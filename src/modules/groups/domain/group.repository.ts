@@ -63,4 +63,6 @@ export abstract class GroupRepository {
     groupId: string,
     userId: string
   ): Promise<GroupProfilePictureAccess | null>;
+
+  abstract findAvailabilitiesByDate(groupId: string, date: string, userId: string);
 }

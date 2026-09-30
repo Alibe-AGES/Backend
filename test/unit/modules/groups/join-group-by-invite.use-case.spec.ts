@@ -26,6 +26,7 @@ describe('JoinGroupByInviteUseCase', () => {
       findInviteLinkByToken: jest.fn(),
       addMember: jest.fn(),
       findProfilePictureAccess: jest.fn(),
+      findAvailabilitiesByDate: jest.fn(),
     };
     useCase = new JoinGroupByInviteUseCase(groups);
   });
