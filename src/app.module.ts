@@ -9,6 +9,7 @@ import { AvailabilityModule } from './modules/availability/availability.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { EventsModule } from './modules/events/events.module';
+import { ProposalsModule } from './modules/proposals/proposals.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { EventsModule } from './modules/events/events.module';
     AvailabilityModule,
     UsersModule,
     EventsModule,
+    ProposalsModule,
   ],
   providers: [
     {
