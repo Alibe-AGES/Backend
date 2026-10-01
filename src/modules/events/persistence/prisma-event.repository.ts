@@ -5,11 +5,12 @@ import { Event } from '../domain/event.entity';
 import {
   type CreatedEvent,
   type CreateEventData,
+  type EventDetails,
+  type EventDetailsAccess,
   type EventImageAccess,
   EventRepository,
   type UpdateEventData,
 } from '../domain/event.repository';
-import { EventDetails } from 'src/modules/events/domain/event.repository';
 
 const eventInclude = {
   location: true,
@@ -158,18 +159,9 @@ export class PrismaEventRepository extends EventRepository {
     return this.toDomain(event);
   }
 
-  async findEventDetails(eventId: string, userId: string): Promise<EventDetails | null> {
+  async findEventDetails(eventId: string, userId: string): Promise<EventDetailsAccess | null> {
     const event = await this.prisma.event.findUnique({
-      where: {
-        id: eventId,
-        group: {
-          users: {
-            some: {
-              userId: userId,
-            },
-          },
-        },
-      },
+      where: { id: eventId },
       select: {
         id: true,
         name: true,
@@ -179,8 +171,17 @@ export class PrismaEventRepository extends EventRepository {
         budgetEnd: true,
         status: true,
         createdAt: true,
+        updatedAt: true,
         groupId: true,
-        locationId: true,
+        group: {
+          select: {
+            users: {
+              where: { userId },
+              select: { userId: true },
+              take: 1,
+            },
+          },
+        },
         location: {
           select: {
             id: true,
@@ -189,6 +190,8 @@ export class PrismaEventRepository extends EventRepository {
           },
         },
         proposals: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
           select: {
             id: true,
             owner: {
@@ -199,6 +202,7 @@ export class PrismaEventRepository extends EventRepository {
               },
             },
             responses: {
+              orderBy: { createdAt: 'asc' },
               select: {
                 id: true,
                 answer: true,
@@ -222,7 +226,13 @@ export class PrismaEventRepository extends EventRepository {
       return null;
     }
 
-    return {
+    const proposal = event.proposals[0];
+
+    if (!proposal) {
+      throw new Error('Evento sem proposta associada');
+    }
+
+    const details: EventDetails = {
       id: event.id,
       name: event.name,
       image: event.image,
@@ -231,6 +241,7 @@ export class PrismaEventRepository extends EventRepository {
       budgetEnd: event.budgetEnd.toFixed(2),
       status: event.status,
       createdAt: event.createdAt,
+      updatedAt: event.updatedAt,
       groupId: event.groupId,
       location: event.location
         ? {
@@ -239,12 +250,12 @@ export class PrismaEventRepository extends EventRepository {
             manuallyCreated: event.location.manuallyCreated,
           }
         : null,
-      proposals: event.proposals.map((proposal) => ({
+      proposal: {
         id: proposal.id,
         owner: {
           id: proposal.owner.id,
           name: proposal.owner.name,
-          image: proposal.owner.profilePic ?? '',
+          image: proposal.owner.profilePic,
         },
         responses: proposal.responses.map((response) => ({
           id: response.id,
@@ -253,11 +264,16 @@ export class PrismaEventRepository extends EventRepository {
           user: {
             id: response.user.id,
             name: response.user.name,
-            image: response.user.profilePic ?? '',
+            image: response.user.profilePic,
           },
         })),
         createdAt: proposal.createdAt,
-      })),
+      },
+    };
+
+    return {
+      event: details,
+      userIsMember: event.group.users.length > 0,
     };
   }
 

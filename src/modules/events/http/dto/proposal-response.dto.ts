@@ -6,12 +6,12 @@ export class ProposalDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ type: [OwnerResponseDto] })
+  @ApiProperty({ type: OwnerResponseDto })
   owner!: OwnerResponseDto;
 
   @ApiProperty({ type: [ResponseDto] })
   responses!: Array<ResponseDto>;
 
-  @ApiProperty()
+  @ApiProperty({ type: Date, format: 'date-time' })
   createdAt!: Date;
 }

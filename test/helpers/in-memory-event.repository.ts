@@ -1,8 +1,9 @@
-import { EventDetails } from 'src/modules/events/domain/event.repository';
 import { Event } from '../../src/modules/events/domain/event.entity';
 import {
   type CreatedEvent,
   type CreateEventData,
+  type EventDetails,
+  type EventDetailsAccess,
   type EventImageAccess,
   EventRepository,
   type UpdateEventData,
@@ -119,11 +120,17 @@ export class InMemoryEventRepository extends EventRepository {
     this.groups.set(groupId, new Set(userIds));
   }
 
-  findEventDetails(id: string): Promise<EventDetails | null> {
+  findEventDetails(id: string, userId: string): Promise<EventDetailsAccess | null> {
     const event = this.events.get(id);
 
     if (!event) {
       return Promise.resolve(null);
+    }
+
+    const proposal = event.proposals[0];
+
+    if (!proposal?.ownerDetails || !proposal.createdAt) {
+      return Promise.reject(new Error('Evento sem proposta associada'));
     }
 
     const eventDetails: EventDetails = {
@@ -131,12 +138,12 @@ export class InMemoryEventRepository extends EventRepository {
       name: event.name,
       image: event.image,
       timeslot: event.timeslot,
-      budgetStart: event.budgetStart,
-      budgetEnd: event.budgetEnd,
-      status: event.status,
+      budgetStart: event.budgetStart as string,
+      budgetEnd: event.budgetEnd as string,
+      status: event.status as EventDetails['status'],
       groupId: event.groupId,
       location: event.location,
-      proposals: event.proposals.map((proposal) => ({
+      proposal: {
         id: proposal.id,
         owner: {
           id: proposal.ownerId,
@@ -146,18 +153,22 @@ export class InMemoryEventRepository extends EventRepository {
         responses: (proposal.responses ?? []).map((response) => ({
           id: response.id,
           answer: response.answer,
-          createdAt: response.createdAt,
+          createdAt: response.createdAt as Date,
           user: {
             id: response.userId,
             name: response.user?.name ?? '',
-            image: response.user?.image ?? '',
+            image: response.user?.image ?? null,
           },
         })),
         createdAt: proposal.createdAt,
-      })),
+      },
       createdAt: event.createdAt,
+      updatedAt: event.updatedAt,
     };
 
-    return Promise.resolve(eventDetails);
+    return Promise.resolve({
+      event: eventDetails,
+      userIsMember: this.groups.get(event.groupId)?.has(userId) ?? false,
+    });
   }
 }

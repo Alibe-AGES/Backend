@@ -4,9 +4,9 @@ export class LocationResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty()
-  description!: string;
+  @ApiProperty({ nullable: true })
+  description!: string | null;
 
-  @ApiProperty()
-  manuallyCreated!: boolean;
+  @ApiProperty({ nullable: true })
+  manuallyCreated!: boolean | null;
 }

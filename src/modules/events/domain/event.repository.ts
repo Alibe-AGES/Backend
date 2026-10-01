@@ -7,38 +7,44 @@ import {
 
 export interface EventDetails {
   id: string;
-  name: string;
-  image: string;
-  timeslot: Date;
+  name: string | null;
+  image: string | null;
+  timeslot: Date | null;
   budgetStart: string;
   budgetEnd: string;
-  status: string;
-  createdAt: Date;
+  status: EventStatus;
+  createdAt: Date | null;
+  updatedAt: Date;
   groupId: string;
   location: {
     id: string;
-    description: string;
-    manuallyCreated: boolean;
-  };
-  proposals: Array<{
+    description: string | null;
+    manuallyCreated: boolean | null;
+  } | null;
+  proposal: {
     id: string;
     owner: {
       id: string;
       name: string;
-      image: string;
+      image: string | null;
     };
     responses: Array<{
       id: string;
-      answer: string;
+      answer: ProposalAnswer;
       createdAt: Date;
       user: {
         id: string;
         name: string;
-        image: string;
+        image: string | null;
       };
     }>;
     createdAt: Date;
-  }>;
+  };
+}
+
+export interface EventDetailsAccess {
+  event: EventDetails;
+  userIsMember: boolean;
 }
 
 export interface UpdateEventData {
@@ -89,7 +95,7 @@ export abstract class EventRepository {
 
   abstract update(id: string, data: UpdateEventData): Promise<Event>;
 
-  abstract findEventDetails(eventId: string, userId: string): Promise<EventDetails | null>;
+  abstract findEventDetails(eventId: string, userId: string): Promise<EventDetailsAccess | null>;
 
   abstract findImageAccess(eventId: string, userId: string): Promise<EventImageAccess | null>;
 }

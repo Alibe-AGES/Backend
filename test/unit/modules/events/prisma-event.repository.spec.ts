@@ -57,21 +57,23 @@ describe('PrismaEventRepository', () => {
     });
   });
   describe('findEventDetails', () => {
-    it('finds and maps event details correctly', async () => {
+    it('finds event details and reports group membership', async () => {
       const id = randomUUID();
       const userId = authenticatedRequest.user.id;
-      const findFirstMock = jest.fn();
+      const findUnique = jest.fn();
 
       const dbEventRow = {
         id,
         name: 'Jantar de aniversário',
+        image: 'events/event/image.png',
         timeslot,
         budgetStart: 50.0,
         budgetEnd: 120.0,
         status: 'pending',
         groupId: '33333333-3333-4333-8333-333333333333',
-        locationId: '44444444-4444-4444-8444-444444444444',
         createdAt,
+        updatedAt: createdAt,
+        group: { users: [{ userId }] },
         location: {
           id: '44444444-4444-4444-8444-444444444444',
           description: 'Rua dos Andradas, 1234, Porto Alegre',
@@ -83,7 +85,7 @@ describe('PrismaEventRepository', () => {
             owner: {
               id: userId,
               name: 'Ana Beatriz Silva',
-              profilePic: 'https://example.com/users/ana.jpg',
+              profilePic: 'users/ana/profile-picture.jpg',
             },
             responses: [
               {
@@ -93,7 +95,7 @@ describe('PrismaEventRepository', () => {
                 user: {
                   id: userId,
                   name: 'Ana Beatriz Silva',
-                  profilePic: 'https://example.com/users/ana.jpg',
+                  profilePic: 'users/ana/profile-picture.jpg',
                 },
               },
             ],
@@ -102,33 +104,33 @@ describe('PrismaEventRepository', () => {
         ],
       };
 
-      findFirstMock.mockResolvedValue(dbEventRow);
-      const prisma = {
-        event: { findFirst: findFirstMock, findUnique: findFirstMock },
-      } as unknown as PrismaService;
+      findUnique.mockResolvedValue(dbEventRow);
+      const prisma = { event: { findUnique } } as unknown as PrismaService;
       const repository = new PrismaEventRepository(prisma);
 
       await expect(repository.findEventDetails(id, userId)).resolves.toEqual({
-        id,
-        name: 'Jantar de aniversário',
-        timeslot,
-        budgetStart: '50.00',
-        budgetEnd: '120.00',
-        status: 'pending',
-        createdAt,
-        groupId: '33333333-3333-4333-8333-333333333333',
-        location: {
-          id: '44444444-4444-4444-8444-444444444444',
-          description: 'Rua dos Andradas, 1234, Porto Alegre',
-          manuallyCreated: true,
-        },
-        proposals: [
-          {
+        event: {
+          id,
+          name: 'Jantar de aniversário',
+          image: 'events/event/image.png',
+          timeslot,
+          budgetStart: '50.00',
+          budgetEnd: '120.00',
+          status: 'pending',
+          createdAt,
+          updatedAt: createdAt,
+          groupId: '33333333-3333-4333-8333-333333333333',
+          location: {
+            id: '44444444-4444-4444-8444-444444444444',
+            description: 'Rua dos Andradas, 1234, Porto Alegre',
+            manuallyCreated: true,
+          },
+          proposal: {
             id: '55555555-5555-4555-8555-555555555555',
             owner: {
               id: userId,
               name: 'Ana Beatriz Silva',
-              image: 'https://example.com/users/ana.jpg',
+              image: 'users/ana/profile-picture.jpg',
             },
             responses: [
               {
@@ -138,36 +140,59 @@ describe('PrismaEventRepository', () => {
                 user: {
                   id: userId,
                   name: 'Ana Beatriz Silva',
-                  image: 'https://example.com/users/ana.jpg',
+                  image: 'users/ana/profile-picture.jpg',
                 },
               },
             ],
             createdAt,
           },
-        ],
+        },
+        userIsMember: true,
       });
 
-      expect(findFirstMock).toHaveBeenCalledWith({
-        where: {
-          id,
-          group: {
-            users: {
-              some: {
-                userId,
-              },
-            },
-          },
-        },
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id },
         select: expect.any(Object),
       });
     });
 
+    it('returns access with false membership for a user outside the group', async () => {
+      const findUnique = jest.fn().mockResolvedValue({
+        id: eventId,
+        name: 'Event',
+        image: null,
+        timeslot,
+        budgetStart: 50,
+        budgetEnd: 120,
+        status: 'pending',
+        createdAt,
+        updatedAt: createdAt,
+        groupId: baseRecord.groupId,
+        group: { users: [] },
+        location: baseRecord.location,
+        proposals: [
+          {
+            id: 'proposal-id',
+            owner: { id: 'owner-id', name: 'Owner', profilePic: null },
+            responses: [],
+            createdAt,
+          },
+        ],
+      });
+      const repository = new PrismaEventRepository({
+        event: { findUnique },
+      } as unknown as PrismaService);
+
+      const access = await repository.findEventDetails(eventId, 'outside-user');
+
+      expect(access?.userIsMember).toBe(false);
+    });
+
     it('returns null when the event does not exist', async () => {
-      const findFirstMock = jest.fn().mockResolvedValue(null);
-      const prisma = {
-        event: { findFirst: findFirstMock, findUnique: findFirstMock },
-      } as unknown as PrismaService;
-      const repository = new PrismaEventRepository(prisma);
+      const findUnique = jest.fn().mockResolvedValue(null);
+      const repository = new PrismaEventRepository({
+        event: { findUnique },
+      } as unknown as PrismaService);
 
       await expect(
         repository.findEventDetails(

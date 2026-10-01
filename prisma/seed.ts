@@ -520,7 +520,6 @@ async function main() {
 
   const proposalsData = [
     { eventIndex: 0, ownerIndex: 0 },
-    { eventIndex: 0, ownerIndex: 2 },
     { eventIndex: 1, ownerIndex: 6 },
     { eventIndex: 2, ownerIndex: 12 },
     { eventIndex: 3, ownerIndex: 1 },
@@ -557,45 +556,42 @@ async function main() {
 
   const proposalResponses = [
     // Proposal 0 -> Event 0 -> Grupo Faculdade
+    [0, 0, AnswerEnum.yes],
     [0, 1, AnswerEnum.yes],
     [0, 2, AnswerEnum.yes],
     [0, 3, AnswerEnum.pending],
     [0, 4, AnswerEnum.no],
+    [0, 5, AnswerEnum.pending],
 
-    // Proposal 1 -> Event 0
-    [1, 0, AnswerEnum.yes],
-    [1, 1, AnswerEnum.yes],
-    [1, 5, AnswerEnum.pending],
+    // Proposal 1 -> Event 1 -> Grupo Cinema
+    [1, 2, AnswerEnum.yes],
+    [1, 6, AnswerEnum.yes],
+    [1, 8, AnswerEnum.no],
+    [1, 9, AnswerEnum.pending],
 
-    // Proposal 2 -> Event 1 -> Grupo Cinema
-    [2, 2, AnswerEnum.yes],
-    [2, 6, AnswerEnum.yes],
-    [2, 8, AnswerEnum.no],
-    [2, 9, AnswerEnum.pending],
+    // Proposal 2 -> Event 2 -> Rolês
+    [2, 0, AnswerEnum.yes],
+    [2, 4, AnswerEnum.yes],
+    [2, 6, AnswerEnum.pending],
+    [2, 10, AnswerEnum.no],
 
-    // Proposal 3 -> Event 2 -> Rolês
-    [3, 0, AnswerEnum.yes],
-    [3, 4, AnswerEnum.yes],
-    [3, 6, AnswerEnum.pending],
-    [3, 10, AnswerEnum.no],
+    // Proposal 3 -> Event 3 -> Trabalho
+    [3, 1, AnswerEnum.yes],
+    [3, 3, AnswerEnum.pending],
+    [3, 5, AnswerEnum.no],
+    [3, 7, AnswerEnum.yes],
 
-    // Proposal 4 -> Event 3 -> Trabalho
-    [4, 1, AnswerEnum.yes],
-    [4, 3, AnswerEnum.pending],
-    [4, 5, AnswerEnum.no],
-    [4, 7, AnswerEnum.yes],
+    // Proposal 4 -> Event 4 -> Colégio
+    [4, 0, AnswerEnum.no],
+    [4, 2, AnswerEnum.yes],
+    [4, 7, AnswerEnum.pending],
+    [4, 8, AnswerEnum.yes],
 
-    // Proposal 5 -> Event 4 -> Colégio
-    [5, 0, AnswerEnum.no],
-    [5, 2, AnswerEnum.yes],
-    [5, 7, AnswerEnum.pending],
-    [5, 8, AnswerEnum.yes],
-
-    // Proposal 6 -> Event 5 -> Faculdade
-    [6, 0, AnswerEnum.pending],
-    [6, 1, AnswerEnum.yes],
-    [6, 4, AnswerEnum.no],
-    [6, 6, AnswerEnum.yes],
+    // Proposal 5 -> Event 5 -> Faculdade
+    [5, 0, AnswerEnum.pending],
+    [5, 1, AnswerEnum.yes],
+    [5, 4, AnswerEnum.no],
+    [5, 6, AnswerEnum.yes],
   ];
 
   for (const [proposalIndex, userIndex, answer] of proposalResponses) {

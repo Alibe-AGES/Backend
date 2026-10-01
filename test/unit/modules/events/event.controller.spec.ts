@@ -5,8 +5,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { randomUUID } from 'crypto';
-
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import {
   CreateEventUseCase,
@@ -14,7 +12,9 @@ import {
   EventGroupNotFoundError,
   InvalidEventCreationError,
 } from '../../../../src/modules/events/application/create-event.use-case';
+import { GetEventImageUseCase } from '../../../../src/modules/events/application/get-event-image.use-case';
 import {
+  EventDetailsAccessDeniedError,
   EventNotFoundError as GetEventNotFoundError,
   GetEventUseCase,
 } from '../../../../src/modules/events/application/get-event.use-case';
@@ -51,6 +51,7 @@ describe('EventController', () => {
         { provide: UpdateEventUseCase, useValue: updateUseCaseMock },
         { provide: CreateEventUseCase, useValue: createUseCaseMock },
         { provide: GetEventUseCase, useValue: getEventUseCaseMock },
+        { provide: GetEventImageUseCase, useValue: { execute: jest.fn() } },
       ],
     }).compile();
 
@@ -220,65 +221,100 @@ describe('EventController', () => {
   });
 
   describe('get', () => {
-    it('Chama o useCase com o id de um Event não existente', async () => {
-      getEventUseCaseMock.execute.mockRejectedValue(
-        new GetEventNotFoundError('Evento não encontrado')
-      );
+    const eventDetails = {
+      id: eventId,
+      name: 'Jantar de aniversário',
+      image: 'events/22222222-2222-4222-8222-222222222222/image.png',
+      timeslot: new Date('2026-10-15T20:00:00.000Z'),
+      budgetStart: '50.00',
+      budgetEnd: '120.00',
+      status: 'pending',
+      groupId: '33333333-3333-4333-8333-333333333333',
+      location: {
+        id: '44444444-4444-4444-8444-444444444444',
+        description: 'Rua dos Andradas, 1234, Porto Alegre',
+        manuallyCreated: true,
+      },
+      proposal: {
+        id: '55555555-5555-4555-8555-555555555555',
+        owner: {
+          id: userId,
+          name: 'Ana Beatriz Silva',
+          image: 'users/11111111-1111-4111-8111-111111111111/profile-picture.jpg',
+        },
+        responses: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            answer: 'yes',
+            createdAt: new Date('2026-09-22T18:30:00.000Z'),
+            user: {
+              id: userId,
+              name: 'Ana Beatriz Silva',
+              image: 'users/11111111-1111-4111-8111-111111111111/profile-picture.jpg',
+            },
+          },
+        ],
+        createdAt: new Date('2026-09-22T18:30:00.000Z'),
+      },
+      createdAt: new Date('2026-09-22T18:30:00.000Z'),
+      updatedAt: new Date('2026-09-23T14:00:00.000Z'),
+    };
 
-      await expect(
-        controller.get({ id: 'non-existent-id' } as any, authenticatedRequest)
-      ).rejects.toThrow(GetEventNotFoundError);
-    });
+    it('maps the complete event contract and protected image URLs', async () => {
+      getEventUseCaseMock.execute.mockResolvedValue(eventDetails);
 
-    it('Caso de sucesso para um input com id existente', async () => {
-      const id = randomUUID();
+      const result = await controller.get(eventId, authenticatedRequest);
 
-      const event = {
-        id: id,
+      expect(getEventUseCaseMock.execute).toHaveBeenCalledWith(eventId, userId);
+      expect(result).toEqual({
+        id: eventId,
         name: 'Jantar de aniversário',
         date: '2026-10-15',
         time: '20:00',
-        image: 'https://example.com/events/jantar.jpg',
+        image: '/api/events/22222222-2222-4222-8222-222222222222/image',
         budgetStart: '50.00',
         budgetEnd: '120.00',
         status: 'pending',
         groupId: '33333333-3333-4333-8333-333333333333',
-        location: {
-          id: '44444444-4444-4444-8444-444444444444',
-          description: 'Rua dos Andradas, 1234, Porto Alegre',
-          manuallyCreated: true,
-        },
+        location: eventDetails.location,
         proposal: {
-          id: '55555555-5555-4555-8555-555555555555',
+          ...eventDetails.proposal,
           owner: {
-            id: '11111111-1111-4111-8111-111111111111',
-            name: 'Ana Beatriz Silva',
-            image: 'https://example.com/users/ana.jpg',
+            ...eventDetails.proposal.owner,
+            image: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
           },
           responses: [
             {
-              id: '66666666-6666-4666-8666-666666666666',
-              answer: 'yes',
-              createdAt: '2026-09-22T18:30:00.000Z',
+              ...eventDetails.proposal.responses[0],
               user: {
-                id: '11111111-1111-4111-8111-111111111111',
-                name: 'Ana Beatriz Silva',
-                image: 'https://example.com/users/ana.jpg',
+                ...eventDetails.proposal.responses[0].user,
+                image: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
               },
             },
           ],
-          createdAt: '2026-09-22T18:30:00.000Z',
         },
-        createdAt: '2026-09-22T18:30:00.000Z',
-        updatedAt: '2026-09-23T14:00:00.000Z',
-      };
+        createdAt: eventDetails.createdAt,
+        updatedAt: eventDetails.updatedAt,
+      });
+    });
 
-      getEventUseCaseMock.execute.mockResolvedValue(event);
+    it.each([
+      [new GetEventNotFoundError('Evento não encontrado'), NotFoundException],
+      [
+        new EventDetailsAccessDeniedError('O usuário não pertence ao grupo do evento'),
+        ForbiddenException,
+      ],
+    ])('maps %p to the matching HTTP exception', async (error, exception) => {
+      getEventUseCaseMock.execute.mockRejectedValue(error);
 
-      const result = await controller.get(id as any, authenticatedRequest);
+      await expect(controller.get(eventId, authenticatedRequest)).rejects.toBeInstanceOf(exception);
+    });
 
-      expect(getEventUseCaseMock.execute).toHaveBeenCalledWith(id, authenticatedRequest.user.id);
-      expect(result).toBe(event);
+    it('rejects a request without an authenticated user', async () => {
+      await expect(controller.get(eventId, {} as AuthenticatedRequest)).rejects.toBeInstanceOf(
+        UnauthorizedException
+      );
+      expect(getEventUseCaseMock.execute).not.toHaveBeenCalled();
     });
   });
 });

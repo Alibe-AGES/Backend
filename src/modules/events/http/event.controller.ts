@@ -21,8 +21,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiConsumes,
+  ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
@@ -55,16 +57,22 @@ import {
   UpdateEventUseCase,
 } from '../application/update-event.use-case';
 import { Event } from '../domain/event.entity';
-import type { CreatedEvent } from '../domain/event.repository';
+import type { CreatedEvent, EventDetails } from '../domain/event.repository';
 import { CreateEventDto } from './dto/create-event.dto';
 import { CreatedEventResponseDto, EventResponseDto } from './dto/event-response.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { EventDetailsResponseDto } from './dto/event-details-response.dto';
-import { GetEventUseCase } from '../application/get-event.use-case';
+import {
+  EventDetailsAccessDeniedError,
+  EventNotFoundError as GetEventNotFoundError,
+  GetEventUseCase,
+} from '../application/get-event.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
 @ApiTags('Events')
+@ApiCookieAuth('better-auth')
+@ApiBearerAuth('better-auth-bearer')
 @Controller()
 export class EventController {
   constructor(
@@ -260,19 +268,77 @@ export class EventController {
     }
   }
 
-  @Get('api/events/:id')
-  @ApiOperation({ summary: 'Consulta todos os dados de um evento ' })
-  @ApiParam({ name: 'id', format: 'uuid' })
+  @Get('api/events/:eventId')
+  @ApiOperation({ summary: 'Consulta todos os dados de um evento' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
   @ApiOkResponse({ type: EventDetailsResponseDto })
   @ApiBadRequestResponse({ description: 'Identificador do evento inválido.' })
-  @ApiNotFoundResponse({ description: 'Evento não encontrado' })
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar o evento.' })
   async get(
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
     @Request() request: AuthenticatedRequest
   ): Promise<EventDetailsResponseDto> {
-    const userId = request?.user.id;
-    return await this.getEventUseCase.execute(id, userId);
+    const userId = request.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    try {
+      const event = await this.getEventUseCase.execute(eventId, userId);
+      return this.toDetailsResponse(event);
+    } catch (error) {
+      if (error instanceof GetEventNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      if (error instanceof EventDetailsAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  private toDetailsResponse(event: EventDetails): EventDetailsResponseDto {
+    return {
+      id: event.id,
+      name: event.name,
+      date: event.timeslot?.toISOString().slice(0, 10) ?? null,
+      time: event.timeslot?.toISOString().slice(11, 16) ?? null,
+      image: event.image ? `/api/events/${event.id}/image` : null,
+      budgetStart: event.budgetStart,
+      budgetEnd: event.budgetEnd,
+      status: event.status,
+      groupId: event.groupId,
+      location: event.location,
+      proposal: {
+        id: event.proposal.id,
+        owner: {
+          id: event.proposal.owner.id,
+          name: event.proposal.owner.name,
+          image: event.proposal.owner.image
+            ? `/users/${event.proposal.owner.id}/profile-picture`
+            : null,
+        },
+        responses: event.proposal.responses.map((response) => ({
+          id: response.id,
+          answer: response.answer,
+          createdAt: response.createdAt,
+          user: {
+            id: response.user.id,
+            name: response.user.name,
+            image: response.user.image ? `/users/${response.user.id}/profile-picture` : null,
+          },
+        })),
+        createdAt: event.proposal.createdAt,
+      },
+      createdAt: event.createdAt,
+      updatedAt: event.updatedAt,
+    };
   }
 
   private toCreatedResponse(

@@ -1,12 +1,10 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { EventsModule } from '../../../../src/modules/events/events.module';
 import { EventController } from '../../../../src/modules/events/http/event.controller';
-import {
-  EventNotFoundError,
-  GetEventUseCase,
-} from '../../../../src/modules/events/application/get-event.use-case';
+import { GetEventUseCase } from '../../../../src/modules/events/application/get-event.use-case';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import type { CreateEventDto } from '../../../../src/modules/events/http/dto/create-event.dto';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
@@ -124,17 +122,22 @@ describe('EventsModule integration', () => {
     it('returns event details when event exists and user belongs to the group', async () => {
       const controller = moduleFixture.get(EventController);
       const eventId = '22222222-2222-4222-8222-222222222222';
+      const timeslot = new Date('2026-10-15T20:00:00.000Z');
+      const createdAt = new Date('2026-08-01T00:00:00.000Z');
+      const updatedAt = new Date('2026-08-03T00:00:00.000Z');
 
-      const mockEventRow = {
+      findUnique.mockResolvedValue({
         id: eventId,
         name: 'Jantar da Turma',
-        timeslot: new Date('2026-10-15T20:00:00.000Z'),
-        budgetStart: 50.0,
-        budgetEnd: 100.0,
+        image: 'events/event/image.png',
+        timeslot,
+        budgetStart: 50,
+        budgetEnd: 100,
         status: 'confirmed',
-        createdAt: new Date('2026-08-01'),
+        createdAt,
+        updatedAt,
         groupId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        locationId: 'location-123',
+        group: { users: [{ userId }] },
         location: {
           id: 'location-123',
           description: 'Restaurante Central',
@@ -149,60 +152,56 @@ describe('EventsModule integration', () => {
               profilePic: 'users/profile.png',
             },
             responses: [],
-            createdAt: new Date('2026-08-02'),
+            createdAt: new Date('2026-08-02T00:00:00.000Z'),
           },
         ],
-      };
-
-      findUnique.mockResolvedValue(mockEventRow);
+      });
 
       const result = await controller.get(eventId, authenticatedRequest);
 
       expect(result).toEqual({
         id: eventId,
         name: 'Jantar da Turma',
-        timeslot: mockEventRow.timeslot,
+        date: '2026-10-15',
+        time: '20:00',
+        image: '/api/events/22222222-2222-4222-8222-222222222222/image',
         budgetStart: '50.00',
         budgetEnd: '100.00',
         status: 'confirmed',
-        createdAt: mockEventRow.createdAt,
         groupId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        location: mockEventRow.location,
-        proposals: [
-          {
-            id: 'proposal-1',
-            owner: {
-              id: userId,
-              name: 'Ana Souza',
-              image: 'users/profile.png',
-            },
-            responses: [],
-            createdAt: mockEventRow.proposals[0].createdAt,
+        location: {
+          id: 'location-123',
+          description: 'Restaurante Central',
+          manuallyCreated: false,
+        },
+        proposal: {
+          id: 'proposal-1',
+          owner: {
+            id: userId,
+            name: 'Ana Souza',
+            image: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
           },
-        ],
+          responses: [],
+          createdAt: new Date('2026-08-02T00:00:00.000Z'),
+        },
+        createdAt,
+        updatedAt,
       });
 
       expect(findUnique).toHaveBeenCalledWith({
-        where: {
-          id: eventId,
-          group: {
-            users: {
-              some: { userId },
-            },
-          },
-        },
+        where: { id: eventId },
         select: expect.any(Object),
       });
     });
 
-    it('throws NotFoundException when event does not exist or user is not in group', async () => {
+    it('maps a missing event to NotFoundException', async () => {
       const controller = moduleFixture.get(EventController);
       const eventId = '99999999-9999-4999-8999-999999999999';
 
       findUnique.mockResolvedValue(null);
 
-      await expect(controller.get(eventId, authenticatedRequest)).rejects.toThrow(
-        EventNotFoundError
+      await expect(controller.get(eventId, authenticatedRequest)).rejects.toBeInstanceOf(
+        NotFoundException
       );
     });
   });
