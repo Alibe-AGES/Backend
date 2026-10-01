@@ -40,6 +40,17 @@ export interface GroupProfilePictureAccess {
   userIsMember: boolean;
 }
 
+export interface GroupAvailabilitiesByDate {
+  date: string;
+  users: Array<{
+    id: string;
+    name: string;
+    profilePic: string | null;
+    availableAllDay: boolean;
+    intervals: Array<[string, string]>;
+  }>;
+}
+
 export abstract class GroupRepository {
   abstract create(data: CreateGroupData): Promise<Group>;
 
@@ -64,5 +75,9 @@ export abstract class GroupRepository {
     userId: string
   ): Promise<GroupProfilePictureAccess | null>;
 
-  abstract findAvailabilitiesByDate(groupId: string, date: string, userId: string);
+  abstract findAvailabilitiesByDate(
+    groupId: string,
+    date: string,
+    userId: string
+  ): Promise<GroupAvailabilitiesByDate | null>;
 }

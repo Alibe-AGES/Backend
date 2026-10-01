@@ -1,13 +1,32 @@
 import {
   GetAvailabilityIntervalsUseCase,
   GroupNotFoundError,
+  InvalidAvailabilityDateError,
 } from '../../../../src/modules/groups/application/get-availability-intervals.use-case';
-import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
-import { AvailabilitiesResponseDto } from '../../../../src/modules/groups/http/dto/get-availabilities-response.dto';
+import {
+  type GroupAvailabilitiesByDate,
+  GroupRepository,
+} from '../../../../src/modules/groups/domain/group.repository';
 
-const userId = '11111111-1111-4111-8111-111111111111';
+const USER_ID = '11111111-1111-4111-8111-111111111111';
 const GROUP_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const DATE = '2026-09-26';
+
+const availabilities: GroupAvailabilitiesByDate = {
+  date: DATE,
+  users: [
+    {
+      id: USER_ID,
+      profilePic: null,
+      name: 'John Doe',
+      availableAllDay: false,
+      intervals: [
+        ['09:00', '12:00'],
+        ['14:00', '18:00'],
+      ],
+    },
+  ],
+};
 
 describe('GetAvailabilityIntervalsUseCase', () => {
   let groups: jest.Mocked<GroupRepository>;
@@ -30,35 +49,28 @@ describe('GetAvailabilityIntervalsUseCase', () => {
     useCase = new GetAvailabilityIntervalsUseCase(groups);
   });
 
-  it('Retorna as disponibilidades para um dado grupo', async () => {
-    const mockAvailabilities: AvailabilitiesResponseDto = {
-      date: DATE,
-      users: [
-        {
-          id: '11111111-1111-4111-8111-111111111111',
-          image: null,
-          name: 'John Doe',
-          availableAllDay: false,
-          intervals: [
-            ['09:00', '12:00'],
-            ['14:00', '18:00'],
-          ],
-        },
-      ],
-    };
+  it('returns the availability data for a valid date', async () => {
+    groups.findAvailabilitiesByDate.mockResolvedValue(availabilities);
 
-    groups.findAvailabilitiesByDate.mockResolvedValue(mockAvailabilities);
-
-    await expect(useCase.execute(GROUP_ID, DATE, userId)).resolves.toEqual(mockAvailabilities);
-    expect(groups.findAvailabilitiesByDate).toHaveBeenCalledWith(GROUP_ID, DATE, userId);
+    await expect(useCase.execute(GROUP_ID, DATE, USER_ID)).resolves.toBe(availabilities);
+    expect(groups.findAvailabilitiesByDate).toHaveBeenCalledWith(GROUP_ID, DATE, USER_ID);
   });
 
-  it('reports a group that does not exist', async () => {
-    groups.findAvailabilitiesByDate.mockRejectedValue(new GroupNotFoundError());
+  it('reports a group that cannot be accessed', async () => {
+    groups.findAvailabilitiesByDate.mockResolvedValue(null);
 
-    await expect(useCase.execute(GROUP_ID, DATE, userId)).rejects.toBeInstanceOf(
+    await expect(useCase.execute(GROUP_ID, DATE, USER_ID)).rejects.toBeInstanceOf(
       GroupNotFoundError
     );
-    expect(groups.findAvailabilitiesByDate).toHaveBeenCalledWith(GROUP_ID, DATE, userId);
   });
+
+  it.each(['2026/09/26', '2026-99-99', '2026-02-31'])(
+    'rejects the invalid date %s before consulting the repository',
+    async (date) => {
+      await expect(useCase.execute(GROUP_ID, date, USER_ID)).rejects.toBeInstanceOf(
+        InvalidAvailabilityDateError
+      );
+      expect(groups.findAvailabilitiesByDate).not.toHaveBeenCalled();
+    }
+  );
 });

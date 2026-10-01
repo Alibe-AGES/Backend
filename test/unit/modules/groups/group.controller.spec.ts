@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
 import {
   CreateGroupUseCase,
@@ -14,6 +14,7 @@ import { randomUUID } from 'crypto';
 import {
   GetAvailabilityIntervalsUseCase,
   GroupNotFoundError,
+  InvalidAvailabilityDateError,
 } from '../../../../src/modules/groups/application/get-availability-intervals.use-case';
 
 describe('GroupsController', () => {
@@ -159,18 +160,40 @@ describe('GroupsController', () => {
   });
 
   describe('Endpoint para get de intervalos de disponibilidade', () => {
-    it('Busca corretamente para um id existente e data válida', async () => {
+    it('maps availability data and protected profile-picture URLs', async () => {
       const groupId = randomUUID();
       const dateParam = '2026-06-05';
 
-      const expectedResponse = {
+      getAvailabilityIntervalsUseCase.execute.mockResolvedValue({
         date: dateParam,
         users: [
           {
             id: '11111111-1111-4111-8111-111111111111',
             name: 'Ana Beatriz Silva',
-            image: null,
+            profilePic: 'users/ana/profile-picture.png',
+            availableAllDay: false,
+            intervals: [],
+          },
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            name: 'Bruno Henrique Souza',
+            profilePic: null,
             availableAllDay: true,
+            intervals: [],
+          },
+        ],
+      });
+
+      await expect(
+        controller.getAvailabilities(groupId, dateParam, authenticatedRequest)
+      ).resolves.toEqual({
+        date: dateParam,
+        users: [
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+            name: 'Ana Beatriz Silva',
+            image: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
+            availableAllDay: false,
             intervals: [],
           },
           {
@@ -180,21 +203,13 @@ describe('GroupsController', () => {
             availableAllDay: true,
             intervals: [],
           },
-          {
-            id: '33333333-3333-4333-8333-333333333333',
-            name: 'Camila Oliveira',
-            image: null,
-            availableAllDay: true,
-            intervals: [],
-          },
         ],
-      };
-
-      getAvailabilityIntervalsUseCase.execute.mockResolvedValue(expectedResponse);
-      const result = await controller.getAvailabilities(groupId, dateParam, authenticatedRequest);
-
-      expect(result).toEqual(expectedResponse);
-      expect(result.date).toEqual(dateParam);
+      });
+      expect(getAvailabilityIntervalsUseCase.execute).toHaveBeenCalledWith(
+        groupId,
+        dateParam,
+        userId
+      );
     });
 
     it('Lança GroupNotFoundError para um id inexistente', async () => {
@@ -208,14 +223,14 @@ describe('GroupsController', () => {
           '2026-06-05',
           authenticatedRequest
         )
-      ).rejects.toThrow(GroupNotFoundError);
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('Lança BadRequestException para um date em formato inválido', async () => {
       const invalidDateFormat = '2026/11/23';
 
       getAvailabilityIntervalsUseCase.execute.mockRejectedValue(
-        new BadRequestException('Formato inválido de data')
+        new InvalidAvailabilityDateError('Formato inválido de data')
       );
 
       await expect(

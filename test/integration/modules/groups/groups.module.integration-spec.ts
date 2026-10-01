@@ -186,7 +186,7 @@ describe('GroupsModule integration', () => {
       ).rejects.toThrow();
     });
 
-    it('gets availability intervals for some date', async () => {
+    it('distinguishes unavailable, full-day and interval availability', async () => {
       const controller = module.get(GroupsController);
       const groupId = randomUUID();
       const dateParam = '2026-06-05';
@@ -198,7 +198,7 @@ describe('GroupsModule integration', () => {
             user: {
               id: '11111111-1111-4111-8111-111111111111',
               name: 'Ana Beatriz Silva',
-              profilePic: null,
+              profilePic: 'users/ana/profile-picture.png',
               availabilities: [],
             },
           },
@@ -207,7 +207,7 @@ describe('GroupsModule integration', () => {
               id: '22222222-2222-4222-8222-222222222222',
               name: 'Bruno Henrique Souza',
               profilePic: null,
-              availabilities: [],
+              availabilities: [{ timeslotStart: null, timeslotEnd: null }],
             },
           },
           {
@@ -215,22 +215,27 @@ describe('GroupsModule integration', () => {
               id: '33333333-3333-4333-8333-333333333333',
               name: 'Camila Oliveira',
               profilePic: null,
-              availabilities: [],
+              availabilities: [
+                {
+                  timeslotStart: new Date('2026-06-05T14:00:00.000Z'),
+                  timeslotEnd: new Date('2026-06-05T20:00:00.000Z'),
+                },
+              ],
             },
           },
         ],
       });
 
-      const result = await controller.getAvailabilities(groupId, dateParam, authenticatedRequest);
-
-      expect(result).toEqual({
+      await expect(
+        controller.getAvailabilities(groupId, dateParam, authenticatedRequest)
+      ).resolves.toEqual({
         date: dateParam,
         users: [
           {
             id: '11111111-1111-4111-8111-111111111111',
             name: 'Ana Beatriz Silva',
-            image: null,
-            availableAllDay: true,
+            image: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
+            availableAllDay: false,
             intervals: [],
           },
           {
@@ -244,8 +249,8 @@ describe('GroupsModule integration', () => {
             id: '33333333-3333-4333-8333-333333333333',
             name: 'Camila Oliveira',
             image: null,
-            availableAllDay: true,
-            intervals: [],
+            availableAllDay: false,
+            intervals: [['14:00', '20:00']],
           },
         ],
       });

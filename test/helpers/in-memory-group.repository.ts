@@ -6,6 +6,7 @@ import {
   type CreateGroupInviteLinkData,
   type GroupProfilePictureAccess,
   type GroupDetails,
+  type GroupAvailabilitiesByDate,
 } from '../../src/modules/groups/domain/group.repository';
 
 export class InMemoryGroupRepository extends GroupRepository {
@@ -88,7 +89,11 @@ export class InMemoryGroupRepository extends GroupRepository {
     });
   }
 
-  findAvailabilitiesByDate(groupId: string, date: string, userId: string) {
+  findAvailabilitiesByDate(
+    groupId: string,
+    date: string,
+    userId: string
+  ): Promise<GroupAvailabilitiesByDate | null> {
     if (!this.groups.has(groupId)) {
       return Promise.resolve(null);
     }
@@ -99,7 +104,7 @@ export class InMemoryGroupRepository extends GroupRepository {
     }
 
     return Promise.resolve({
-      id: groupId,
+      date,
       users: [],
     });
   }

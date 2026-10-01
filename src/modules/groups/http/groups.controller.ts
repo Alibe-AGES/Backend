@@ -50,7 +50,11 @@ import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
 import { GroupResponsePresenter } from './presenters/group-response.presenter';
 import { ListGroupsUseCase } from '../application/list-groups.use-case';
 import { AvailabilitiesResponseDto } from './dto/get-availabilities-response.dto';
-import { GetAvailabilityIntervalsUseCase } from '../application/get-availability-intervals.use-case';
+import {
+  GetAvailabilityIntervalsUseCase,
+  GroupNotFoundError as AvailabilityGroupNotFoundError,
+  InvalidAvailabilityDateError,
+} from '../application/get-availability-intervals.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -237,8 +241,36 @@ export class GroupsController {
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
     @Query('date') date: string,
     @Request() request: AuthenticatedRequest
-  ) {
+  ): Promise<AvailabilitiesResponseDto> {
     const userId = request.user.id;
-    return await this.getAvailabilityIntervalsUseCase.execute(groupId, date, userId);
+
+    try {
+      const availabilities = await this.getAvailabilityIntervalsUseCase.execute(
+        groupId,
+        date,
+        userId
+      );
+
+      return {
+        date: availabilities.date,
+        users: availabilities.users.map((user) => ({
+          id: user.id,
+          name: user.name,
+          image: user.profilePic ? `/users/${user.id}/profile-picture` : null,
+          availableAllDay: user.availableAllDay,
+          intervals: user.intervals,
+        })),
+      };
+    } catch (error) {
+      if (error instanceof InvalidAvailabilityDateError) {
+        throw new BadRequestException(error.message);
+      }
+
+      if (error instanceof AvailabilityGroupNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      throw error;
+    }
   }
 }

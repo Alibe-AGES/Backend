@@ -3,14 +3,13 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import {
   CreateGroupData,
   CreateGroupInviteLinkData,
+  GroupAvailabilitiesByDate,
   GroupProfilePictureAccess,
   GroupDetails,
   GroupRepository,
 } from '../domain/group.repository';
 import { Group } from '../domain/group.entity';
 import { GroupInviteLink } from '../domain/group-invite-link.entity';
-import { AvailabilitiesResponseDto } from '../http/dto/get-availabilities-response.dto';
-import { GroupNotFoundError } from '../application/get-group-profile-picture.use-case';
 
 @Injectable()
 export class PrismaGroupRepository implements GroupRepository {
@@ -178,7 +177,7 @@ export class PrismaGroupRepository implements GroupRepository {
     groupId: string,
     date: string,
     userId: string
-  ): Promise<AvailabilitiesResponseDto | null> {
+  ): Promise<GroupAvailabilitiesByDate | null> {
     const group = await this.prisma.group.findUnique({
       where: {
         id: groupId,
@@ -213,29 +212,32 @@ export class PrismaGroupRepository implements GroupRepository {
       },
     });
 
-    if (!group) {
-      throw new GroupNotFoundError('Grupo não encontrado');
-    }
+    if (!group) return null;
 
     return {
       date,
       users: group.users.map(({ user }) => {
-        const availability = user?.availabilities[0];
-        const availableAllDay = !availability?.timeslotEnd;
+        const availableAllDay = user.availabilities.some(
+          ({ timeslotStart, timeslotEnd }) => !timeslotStart && !timeslotEnd
+        );
 
-        const intervals: Array<[string, string]> = user?.availabilities
-          .filter((availabiltiy) => availabiltiy.timeslotStart && availabiltiy.timeslotEnd)
-          .map((availability) => [
-            availability.timeslotStart.toISOString().substring(11, 16),
-            availability.timeslotEnd.toISOString().substring(11, 16),
-          ]);
+        const intervals = user.availabilities.flatMap(({ timeslotStart, timeslotEnd }) =>
+          timeslotStart && timeslotEnd
+            ? [
+                [
+                  timeslotStart.toISOString().substring(11, 16),
+                  timeslotEnd.toISOString().substring(11, 16),
+                ] as [string, string],
+              ]
+            : []
+        );
 
         return {
           id: user.id,
-          name: user.name ?? '',
-          image: user.profilePic ?? null,
-          availableAllDay: availableAllDay,
-          intervals: intervals,
+          name: user.name,
+          profilePic: user.profilePic,
+          availableAllDay,
+          intervals,
         };
       }),
     };
