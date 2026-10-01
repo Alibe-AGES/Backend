@@ -3,6 +3,7 @@ import { Event } from '../../src/modules/events/domain/event.entity';
 import {
   type CreatedEvent,
   type CreateEventData,
+  type EventImageAccess,
   EventRepository,
   type UpdateEventData,
 } from '../../src/modules/events/domain/event.repository';
@@ -19,6 +20,19 @@ export class InMemoryEventRepository extends EventRepository {
   findGroupMembership(groupId: string, userId: string): Promise<boolean | null> {
     const members = this.groups.get(groupId);
     return Promise.resolve(members ? members.has(userId) : null);
+  }
+
+  findImageAccess(eventId: string, userId: string): Promise<EventImageAccess | null> {
+    const event = this.events.get(eventId);
+
+    if (!event) {
+      return Promise.resolve(null);
+    }
+
+    return Promise.resolve({
+      imageKey: event.image,
+      userIsMember: this.groups.get(event.groupId)?.has(userId) ?? false,
+    });
   }
 
   create(data: CreateEventData): Promise<CreatedEvent> {

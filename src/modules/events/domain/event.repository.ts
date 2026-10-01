@@ -73,6 +73,11 @@ export interface CreatedEvent {
   ownerResponse: EventProposalResponse;
 }
 
+export interface EventImageAccess {
+  imageKey: string | null;
+  userIsMember: boolean;
+}
+
 export abstract class EventRepository {
   abstract findById(id: string): Promise<Event | null>;
 
@@ -85,4 +90,6 @@ export abstract class EventRepository {
   abstract update(id: string, data: UpdateEventData): Promise<Event>;
 
   abstract findEventDetails(eventId: string, userId: string): Promise<EventDetails | null>;
+
+  abstract findImageAccess(eventId: string, userId: string): Promise<EventImageAccess | null>;
 }

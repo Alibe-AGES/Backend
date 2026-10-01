@@ -748,8 +748,10 @@ Em uma única transação, o repository cria:
 
 Por enquanto toda localização é marcada como manual; isso mudará quando houver integração com um
 provedor de localização. Quando há imagem, ela é salva no storage antes da transação e removida se a
-persistência falhar. Campos obrigatórios ausentes respondem `400`, grupo inexistente `404`, usuário
-fora do grupo `403` e ausência de autenticação `401`.
+persistência falhar. A key do storage permanece interna; as respostas de criação e atualização
+expõem `/api/events/:eventId/image`. Essa rota entrega os bytes apenas para usuários autenticados
+que participam do grupo do evento. Campos obrigatórios ausentes respondem `400`, grupo inexistente
+`404`, usuário fora do grupo `403` e ausência de autenticação `401`.
 
 ### Endpoints de resposta à proposta do evento
 
@@ -786,6 +788,7 @@ nos decorators do Swagger de cada controller.
 | GET    | `/groups/:groupId/calendar`                  | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/groups/:groupId/availabilities`            | `201`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/groups/:groupId/events`                    | `201`   | `400`, `401`, `403`, `404`, `413` |
+| GET    | `/api/events/:eventId/image`                 | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/api/events/:eventId/proposal/responses`    | `201`   | `400`, `401`, `403`, `404`, `409` |
 | PATCH  | `/api/events/:eventId/proposal/responses/me` | `200`   | `400`, `401`, `403`, `404`        |
 

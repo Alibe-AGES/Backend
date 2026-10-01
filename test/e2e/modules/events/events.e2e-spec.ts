@@ -86,7 +86,7 @@ describe('Events endpoint (e2e)', () => {
       name: 'Jantar atualizado',
       date: '2026-10-15',
       time: '20:00',
-      image: ORIGINAL_IMAGE_KEY,
+      image: `/api/events/${EVENT_ID}/image`,
       budgetStart: null,
       budgetEnd: '120.00',
       proposal: { id: '55555555-5555-4555-8555-555555555555', ownerId: OWNER_ID },
@@ -111,10 +111,13 @@ describe('Events endpoint (e2e)', () => {
       .expect(200);
 
     expect(response.body.name).toBe('Jantar com nova imagem');
-    expect(response.body.image).toMatch(
+    expect(response.body.image).toBe(`/api/events/${EVENT_ID}/image`);
+
+    const updatedEvent = await events.findById(EVENT_ID);
+    expect(updatedEvent?.image).toMatch(
       new RegExp(`^events/${EVENT_ID}/images/[0-9a-f-]{36}\\.png$`, 'i')
     );
-    await expect(storage.findByKey(response.body.image)).resolves.toEqual({
+    await expect(storage.findByKey(updatedEvent?.image ?? '')).resolves.toEqual({
       bytes: PNG_BYTES,
       contentType: 'image/png',
     });
@@ -129,9 +132,7 @@ describe('Events endpoint (e2e)', () => {
       })
       .expect(200);
 
-    expect(response.body.image).toMatch(
-      new RegExp(`^events/${EVENT_ID}/images/[0-9a-f-]{36}\\.png$`, 'i')
-    );
+    expect(response.body.image).toBe(`/api/events/${EVENT_ID}/image`);
   });
 
   it('rejects a file that is not an image', async () => {

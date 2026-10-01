@@ -103,10 +103,13 @@ describe('Create event endpoint (e2e)', () => {
       .attach('image', PNG_BYTES, { filename: 'event.png', contentType: 'image/png' })
       .expect(201);
 
-    expect(response.body.image).toMatch(
+    expect(response.body.image).toBe(`/api/events/${response.body.id}/image`);
+
+    const createdEvent = await events.findById(response.body.id);
+    expect(createdEvent?.image).toMatch(
       new RegExp(`^events/${response.body.id}/images/[0-9a-f-]{36}\\.png$`, 'i')
     );
-    await expect(storage.findByKey(response.body.image)).resolves.toEqual({
+    await expect(storage.findByKey(createdEvent?.image ?? '')).resolves.toEqual({
       bytes: PNG_BYTES,
       contentType: 'image/png',
     });

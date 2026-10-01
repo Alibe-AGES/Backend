@@ -268,6 +268,49 @@ describe('PrismaEventRepository', () => {
     });
   });
 
+  describe('findImageAccess', () => {
+    it('returns the image key and membership for an existing event', async () => {
+      const findUnique = jest.fn().mockResolvedValue({
+        image: `events/${eventId}/images/event.png`,
+        group: { users: [{ userId: authenticatedRequest.user.id }] },
+      });
+      const prisma = { event: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      await expect(
+        repository.findImageAccess(eventId, authenticatedRequest.user.id)
+      ).resolves.toEqual({
+        imageKey: `events/${eventId}/images/event.png`,
+        userIsMember: true,
+      });
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id: eventId },
+        select: {
+          image: true,
+          group: {
+            select: {
+              users: {
+                where: { userId: authenticatedRequest.user.id },
+                select: { userId: true },
+                take: 1,
+              },
+            },
+          },
+        },
+      });
+    });
+
+    it('returns null when the event does not exist', async () => {
+      const findUnique = jest.fn().mockResolvedValue(null);
+      const prisma = { event: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      await expect(
+        repository.findImageAccess(eventId, authenticatedRequest.user.id)
+      ).resolves.toBeNull();
+    });
+  });
+
   describe('create', () => {
     it('creates location, event, proposal and owner response inside one transaction', async () => {
       const ownerResponse = {

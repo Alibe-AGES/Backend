@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   NotFoundException,
@@ -12,6 +13,7 @@ import {
   Patch,
   Post,
   Request,
+  StreamableFile,
   UnauthorizedException,
   UploadedFile,
   UseInterceptors,
@@ -23,15 +25,23 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiPayloadTooLargeResponse,
+  ApiProduces,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
+import {
+  EventForImageNotFoundError,
+  EventImageAccessDeniedError,
+  EventImageNotFoundError,
+  GetEventImageUseCase,
+} from '../application/get-event-image.use-case';
 import {
   CreateEventUseCase,
   EventGroupAccessDeniedError,
@@ -59,6 +69,7 @@ const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 export class EventController {
   constructor(
     private readonly getEventUseCase: GetEventUseCase,
+    private readonly getEventImageUseCase: GetEventImageUseCase,
     private readonly updateEventUseCase: UpdateEventUseCase,
     private readonly createEventUseCase: CreateEventUseCase
   ) {}
@@ -200,6 +211,55 @@ export class EventController {
     }
   }
 
+  /**
+   * GET /api/events/:eventId/image
+   * Entrega a imagem somente quando o usuário autenticado pertence ao grupo do evento.
+   */
+  @Get('api/events/:eventId/image')
+  @Header('Cache-Control', 'private, max-age=300')
+  @ApiOperation({ summary: 'Obtém a imagem de um evento visível ao usuário autenticado' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
+  @ApiProduces('image/png', 'image/jpeg', 'image/webp')
+  @ApiOkResponse({
+    description: 'Conteúdo binário da imagem.',
+    content: { 'image/*': { schema: { type: 'string', format: 'binary' } } },
+  })
+  @ApiBadRequestResponse({ description: 'eventId deve ser um UUID válido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
+  @ApiNotFoundResponse({ description: 'Evento ou imagem não encontrado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar banco ou storage.' })
+  async getImage(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<StreamableFile> {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    try {
+      const image = await this.getEventImageUseCase.execute(eventId, userId);
+
+      return new StreamableFile(Buffer.from(image.bytes), {
+        type: image.contentType,
+        disposition: 'inline',
+        length: image.bytes.byteLength,
+      });
+    } catch (error) {
+      if (error instanceof EventImageAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+
+      if (error instanceof EventForImageNotFoundError || error instanceof EventImageNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
   @Get('api/events/:id')
   @ApiOperation({ summary: 'Consulta todos os dados de um evento ' })
   @ApiParam({ name: 'id', format: 'uuid' })
@@ -227,7 +287,7 @@ export class EventController {
       name: event.name,
       date: event.timeslot?.toISOString().slice(0, 10) ?? null,
       time: event.timeslot?.toISOString().slice(11, 16) ?? null,
-      image: event.image,
+      image: event.image ? `/api/events/${event.id}/image` : null,
       budgetStart: event.budgetStart,
       budgetEnd: event.budgetEnd,
       status: event.status,
@@ -250,7 +310,7 @@ export class EventController {
       name: event.name,
       date: event.timeslot?.toISOString().slice(0, 10) ?? null,
       time: event.timeslot?.toISOString().slice(11, 16) ?? null,
-      image: event.image,
+      image: event.image ? `/api/events/${event.id}/image` : null,
       budgetStart: event.budgetStart,
       budgetEnd: event.budgetEnd,
       status: event.status,

@@ -5,6 +5,7 @@ import { Event } from '../domain/event.entity';
 import {
   type CreatedEvent,
   type CreateEventData,
+  type EventImageAccess,
   EventRepository,
   type UpdateEventData,
 } from '../domain/event.repository';
@@ -44,6 +45,33 @@ export class PrismaEventRepository extends EventRepository {
     });
 
     return group ? group.users.length > 0 : null;
+  }
+
+  async findImageAccess(eventId: string, userId: string): Promise<EventImageAccess | null> {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        image: true,
+        group: {
+          select: {
+            users: {
+              where: { userId },
+              select: { userId: true },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      return null;
+    }
+
+    return {
+      imageKey: event.image,
+      userIsMember: event.group.users.length > 0,
+    };
   }
 
   async create(data: CreateEventData): Promise<CreatedEvent> {
