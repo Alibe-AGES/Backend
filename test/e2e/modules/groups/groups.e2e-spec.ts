@@ -147,7 +147,7 @@ describe('Groups mock endpoints (e2e)', () => {
         {
           id: '11111111-1111-4111-8111-111111111111',
           name: 'Ana Souza',
-          profilePic: 'users/ana/image.jpg',
+          profilePic: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
         },
         {
           id: '22222222-2222-4222-8222-222222222222',

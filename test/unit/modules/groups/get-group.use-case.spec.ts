@@ -39,7 +39,13 @@ describe('GetGroupUseCase', () => {
     await expect(useCase.execute(groupId)).resolves.toEqual({
       ...details,
       profilePic: `/groups/${groupId}/profile-picture`,
-      participants: [details.participants[0], { ...details.participants[1], name: '' }],
+      participants: [
+        {
+          ...details.participants[0],
+          profilePic: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
+        },
+        { ...details.participants[1], name: '' },
+      ],
     });
     expect(findDetailsById).toHaveBeenCalledWith(groupId);
   });
@@ -56,7 +62,13 @@ describe('GetGroupUseCase', () => {
     await expect(useCase.execute(groupId)).resolves.toEqual({
       ...details,
       profilePic: null,
-      participants: [details.participants[0], { ...details.participants[1], name: '' }],
+      participants: [
+        {
+          ...details.participants[0],
+          profilePic: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
+        },
+        { ...details.participants[1], name: '' },
+      ],
       nextEvent: null,
     });
   });

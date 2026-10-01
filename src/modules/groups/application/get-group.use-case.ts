@@ -23,7 +23,7 @@ export class GetGroupUseCase {
       participants: group.participants.map((participant) => ({
         id: participant.id,
         name: participant.name ?? '',
-        profilePic: participant.profilePic,
+        profilePic: participant.profilePic ? '/users/' + participant.id + '/profile-picture' : null,
       })),
       nextEvent: group.nextEvent
         ? {
