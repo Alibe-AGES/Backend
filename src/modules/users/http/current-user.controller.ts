@@ -35,7 +35,12 @@ export class CurrentUserController {
     }
 
     try {
-      return await this.getCurrentUserSummary.execute(userId);
+      const summary = await this.getCurrentUserSummary.execute(userId);
+
+      return {
+        ...summary,
+        profilePic: summary.profilePic ? `/users/${summary.id}/profile-picture` : null,
+      };
     } catch (error) {
       if (error instanceof CurrentUserNotFoundError) {
         throw new NotFoundException(error.message);

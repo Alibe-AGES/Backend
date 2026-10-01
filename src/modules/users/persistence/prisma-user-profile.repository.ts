@@ -16,7 +16,7 @@ export class PrismaUserProfileRepository extends UserProfileRepository {
         name: true,
         email: true,
         createdAt: true,
-        image: true,
+        profilePic: true,
       },
     });
 

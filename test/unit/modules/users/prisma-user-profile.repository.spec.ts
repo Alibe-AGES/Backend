@@ -11,7 +11,7 @@ describe('PrismaUserProfileRepository', () => {
       name: 'Ana Beatriz Silva',
       email: 'ana.silva@example.com',
       createdAt: new Date('2026-09-01T12:00:00.000Z'),
-      image: 'https://example.com/ana.jpg',
+      profilePic: 'users/11111111-1111-4111-8111-111111111111/profile-picture.png',
     };
     const findUnique = jest.fn().mockResolvedValue(user);
     const count = jest.fn().mockResolvedValueOnce(8).mockResolvedValueOnce(2);
@@ -28,7 +28,7 @@ describe('PrismaUserProfileRepository', () => {
 
     expect(findUnique).toHaveBeenCalledWith({
       where: { id: userId },
-      select: { id: true, name: true, email: true, createdAt: true, image: true },
+      select: { id: true, name: true, email: true, createdAt: true, profilePic: true },
     });
     expect(count).toHaveBeenNthCalledWith(1, {
       where: {

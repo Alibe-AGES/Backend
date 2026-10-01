@@ -42,6 +42,11 @@ export function createAuth(prisma: PrismaService, environment = process.env) {
       provider: 'postgresql',
       transaction: true,
     }),
+    user: {
+      fields: {
+        image: 'profilePic',
+      },
+    },
     emailAndPassword: {
       enabled: true,
       autoSignIn: false,

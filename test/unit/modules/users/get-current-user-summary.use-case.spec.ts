@@ -11,7 +11,7 @@ describe('GetCurrentUserSummaryUseCase', () => {
       name: 'Ana Beatriz Silva',
       email: 'ana.silva@example.com',
       createdAt: new Date('2026-09-01T12:00:00.000Z'),
-      image: null,
+      profilePic: null,
       completedEvents: 8,
       eventsInDecision: 2,
     };

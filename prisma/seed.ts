@@ -153,7 +153,6 @@ async function main() {
         id: SEEDED_USER_IDS[index],
         ...userData,
         emailVerified: false,
-        image: null,
         profilePic: null,
       },
     });

@@ -32,6 +32,7 @@ describe('AuthModule integration', () => {
         maxPasswordLength: 128,
       })
     );
+    expect(auth.options.user?.fields).toEqual({ image: 'profilePic' });
     expect(auth.options.plugins?.map((plugin) => plugin.id)).toEqual(
       expect.arrayContaining(['expo', 'bearer'])
     );

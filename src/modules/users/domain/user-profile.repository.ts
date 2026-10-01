@@ -3,7 +3,7 @@ export interface CurrentUserSummary {
   name: string;
   email: string;
   createdAt: Date;
-  image: string | null;
+  profilePic: string | null;
   completedEvents: number;
   eventsInDecision: number;
 }

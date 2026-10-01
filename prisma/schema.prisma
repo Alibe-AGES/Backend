@@ -28,7 +28,6 @@ model User {
   name          String
   email         String    @unique
   emailVerified Boolean   @default(false) @map("email_verified")
-  image         String?
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   profilePic    String?   @map("profile_pic")

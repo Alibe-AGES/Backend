@@ -20,5 +20,5 @@ export class CurrentUserResponseDto {
   createdAt!: Date;
 
   @ApiProperty({ nullable: true })
-  image!: string | null;
+  profilePic!: string | null;
 }

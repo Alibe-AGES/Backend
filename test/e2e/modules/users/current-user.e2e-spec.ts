@@ -49,7 +49,7 @@ describe('Current user endpoint (e2e)', () => {
       completedEvents: 8,
       eventsInDecision: 2,
       createdAt: new Date('2026-09-01T12:00:00.000Z'),
-      image: 'https://example.com/ana.jpg',
+      profilePic: 'users/11111111-1111-4111-8111-111111111111/profile-picture.png',
     });
   });
 
@@ -64,7 +64,7 @@ describe('Current user endpoint (e2e)', () => {
       completedEvents: 8,
       eventsInDecision: 2,
       createdAt: '2026-09-01T12:00:00.000Z',
-      image: 'https://example.com/ana.jpg',
+      profilePic: `/users/${AUTHENTICATED_USER_ID}/profile-picture`,
     });
     expect(response.body).not.toHaveProperty('password');
     expect(response.body).not.toHaveProperty('passwordHash');
