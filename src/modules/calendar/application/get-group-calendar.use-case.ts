@@ -12,6 +12,7 @@ export interface GroupCalendarDay {
   date: string;
   scheduledEventIds: string[];
   proposalIds: string[];
+  proposalEventIds: { proposalId: string; eventId: string }[];
   availableUserIds: string[];
   completedEventIds: string[];
   allUsersAvailable: boolean;
@@ -20,6 +21,7 @@ export interface GroupCalendarDay {
 interface MutableCalendarDay {
   scheduledEventIds: Set<string>;
   proposalIds: Set<string>;
+  proposalEventIds: Map<string, string>;
   availableUserIds: Set<string>;
   completedEventIds: Set<string>;
 }
@@ -79,7 +81,10 @@ export class GetGroupCalendarUseCase {
 
       if (event.proposalIds.length > 0) {
         const day = this.getOrCreateDay(days, date);
-        event.proposalIds.forEach((proposalId) => day.proposalIds.add(proposalId));
+        event.proposalIds.forEach((proposalId) => {
+          day.proposalIds.add(proposalId);
+          day.proposalEventIds.set(proposalId, event.id);
+        });
       }
     }
 
@@ -107,6 +112,9 @@ export class GetGroupCalendarUseCase {
           proposalIds: [...day.proposalIds].sort((firstId, secondId) =>
             firstId.localeCompare(secondId)
           ),
+          proposalEventIds: [...day.proposalEventIds.entries()]
+            .sort(([firstId], [secondId]) => firstId.localeCompare(secondId))
+            .map(([proposalId, eventId]) => ({ proposalId, eventId })),
           availableUserIds,
           completedEventIds: [...day.completedEventIds].sort((firstId, secondId) =>
             firstId.localeCompare(secondId)
@@ -128,6 +136,7 @@ export class GetGroupCalendarUseCase {
     const day = {
       scheduledEventIds: new Set<string>(),
       proposalIds: new Set<string>(),
+      proposalEventIds: new Map<string, string>(),
       availableUserIds: new Set<string>(),
       completedEventIds: new Set<string>(),
     };

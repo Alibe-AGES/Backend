@@ -10,8 +10,8 @@ export interface EventDetails {
   name: string | null;
   image: string | null;
   timeslot: Date | null;
-  budgetStart: string;
-  budgetEnd: string;
+  budgetStart: string | null;
+  budgetEnd: string | null;
   status: EventStatus;
   createdAt: Date | null;
   updatedAt: Date;

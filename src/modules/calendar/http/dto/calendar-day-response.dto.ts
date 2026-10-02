@@ -21,6 +21,19 @@ export class CalendarDayResponseDto {
   proposalIds!: string[];
 
   @ApiProperty({
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        proposalId: { type: 'string', format: 'uuid' },
+        eventId: { type: 'string', format: 'uuid' },
+      },
+    },
+    description: 'Associação entre cada proposta e o encontro que contém seus detalhes.',
+  })
+  proposalEventIds!: { proposalId: string; eventId: string }[];
+
+  @ApiProperty({
     type: String,
     format: 'uuid',
     isArray: true,
