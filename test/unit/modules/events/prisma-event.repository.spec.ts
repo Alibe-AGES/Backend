@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
+import { AuthenticatedRequest } from 'src/modules/auth/http/authenticated-user';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { PrismaEventRepository } from '../../../../src/modules/events/persistence/prisma-event.repository';
-import { AuthenticatedRequest } from 'src/modules/auth/http/authenticated-user';
 
 const authenticatedRequest = {
   user: { id: '11111111-1111-4111-8111-111111111111' },
@@ -186,6 +186,39 @@ describe('PrismaEventRepository', () => {
       const access = await repository.findEventDetails(eventId, 'outside-user');
 
       expect(access?.userIsMember).toBe(false);
+    });
+
+    it('preserves null budget bounds when loading event details', async () => {
+      const userId = authenticatedRequest.user.id;
+      const findUnique = jest.fn().mockResolvedValue({
+        id: eventId,
+        name: 'Event without budget',
+        image: null,
+        timeslot,
+        budgetStart: null,
+        budgetEnd: null,
+        status: 'pending',
+        createdAt,
+        updatedAt: createdAt,
+        groupId: baseRecord.groupId,
+        group: { users: [{ userId }] },
+        location: null,
+        proposals: [
+          {
+            id: 'proposal-id',
+            owner: { id: userId, name: 'Owner', profilePic: null },
+            responses: [],
+            createdAt,
+          },
+        ],
+      });
+      const repository = new PrismaEventRepository({
+        event: { findUnique },
+      } as unknown as PrismaService);
+
+      const result = await repository.findEventDetails(eventId, userId);
+
+      expect(result?.event).toMatchObject({ budgetStart: null, budgetEnd: null });
     });
 
     it('returns null when the event does not exist', async () => {

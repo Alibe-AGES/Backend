@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ProposalDto } from './proposal-response.dto';
 import { LocationResponseDto } from './location-response.dto';
+import { ProposalDto } from './proposal-response.dto';
 
 export class EventDetailsResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -21,11 +21,11 @@ export class EventDetailsResponseDto {
   })
   image!: string | null;
 
-  @ApiProperty({ example: '50.00' })
-  budgetStart!: string;
+  @ApiProperty({ example: '50.00', nullable: true })
+  budgetStart!: string | null;
 
-  @ApiProperty({ example: '150.00' })
-  budgetEnd!: string;
+  @ApiProperty({ example: '150.00', nullable: true })
+  budgetEnd!: string | null;
 
   @ApiProperty({ enum: ['pending', 'confirmed', 'declined'] })
   status!: 'pending' | 'confirmed' | 'declined';

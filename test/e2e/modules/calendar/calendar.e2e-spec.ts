@@ -5,8 +5,8 @@ import { AppModule } from '../../../../src/app.module';
 import { setupApplication } from '../../../../src/app.setup';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
-import { ExampleRepository } from '../../../../src/modules/example/domain/example.repository';
 import { CalendarRepository } from '../../../../src/modules/calendar/domain/calendar.repository';
+import { ExampleRepository } from '../../../../src/modules/example/domain/example.repository';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryExampleRepository } from '../../../helpers/in-memory-example.repository';
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
@@ -109,6 +109,9 @@ describe('Calendar endpoint (e2e)', () => {
         expect.objectContaining({
           date: '2026-05-19',
           proposalIds: ['44444444-4444-4444-8444-444444444444'],
+          proposalEventIds: [
+            { proposalId: '44444444-4444-4444-8444-444444444444', eventId: 'event-proposed' },
+          ],
         }),
         expect.objectContaining({
           date: '2026-05-22',
@@ -184,6 +187,7 @@ describe('Calendar endpoint (e2e)', () => {
         'completedEventIds',
         'date',
         'proposalIds',
+        'proposalEventIds',
         'scheduledEventIds',
       ].sort()
     );
