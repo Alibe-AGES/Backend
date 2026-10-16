@@ -10,4 +10,5 @@ export interface CurrentUserSummary {
 
 export abstract class UserProfileRepository {
   abstract findCurrentUserSummary(userId: string, now: Date): Promise<CurrentUserSummary | null>;
+  abstract updateExpoPushToken(userId: string, token: string): Promise<void>;
 }

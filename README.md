@@ -200,6 +200,7 @@ Os endereços abaixo consideram o ambiente local com `docker compose up` em exec
 | API                  | <http://localhost:3000>                            | URL base do Backend.                                |
 | Endpoint de exemplo  | <http://localhost:3000/example>                    | Verificação rápida da API.                          |
 | Better Auth          | <http://localhost:3000/api/auth/get-session>       | Consulta a sessão autenticada ou retorna `null`.    |
+| Token de push        | `PUT /api/users/me/push-token`                     | Associa um Expo Push Token ao usuário autenticado.  |
 | Imagem de grupo      | `/groups/{groupId}/profile-picture`                | Entrega a foto somente para integrantes do grupo.   |
 | Imagem de usuário    | `/users/{userId}/profile-picture`                  | Entrega a própria foto ou a de participante comum.  |
 | Swagger UI           | <http://localhost:3000/docs>                       | Documentação interativa e teste dos endpoints.      |
@@ -220,6 +221,18 @@ docker compose exec backend npx prisma studio --hostname 0.0.0.0 --port 5555
 ```
 
 No Adminer, use `alibe-db` como servidor. Dentro da rede do Compose, containers utilizam nomes de serviços como `alibe-db`, `backend` e `prometheus`; no navegador e em programas executados diretamente no computador, utilize `localhost` e a porta publicada.
+
+### Tokens de notificação
+
+O aplicativo registra o token do Expo Push Service com `PUT /api/users/me/push-token` depois de
+um cadastro ou login bem-sucedido. A rota exige uma sessão Better Auth válida e não recebe um
+identificador de usuário no body; o usuário sempre vem da sessão autenticada.
+
+O token fica na coluna `user.expo_push_token`. Um novo cadastro ou login sobrescreve o token
+anterior do usuário. Antes de associar um token a outra conta, o Backend remove esse mesmo token da
+conta anterior, evitando que notificações antigas sejam entregues ao usuário errado. A migration
+precisa ser aplicada com `prisma migrate deploy` antes de executar uma versão do Backend que utilize
+essa rota.
 
 ## Infraestrutura AWS com MiniStack e CloudFormation
 

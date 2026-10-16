@@ -10,14 +10,17 @@ import { CurrentUserController } from './http/current-user.controller';
 import { UsersController } from './http/users.controller';
 import { PrismaUserProfileRepository } from './persistence/prisma-user-profile.repository';
 import { PrismaUserImageRepository } from './persistence/prisma-user-image.repository';
+import { RegisterPushTokenUseCase } from './application/register-push-token.use-case';
+import { PushTokensController } from './http/push-tokens.controller';
 
 @Module({
   imports: [PrismaModule, StorageModule],
-  controllers: [UsersController, CurrentUserController],
+  controllers: [UsersController, CurrentUserController, PushTokensController],
   providers: [
     GetUserProfilePictureUseCase,
     UpdateUserProfilePictureUseCase,
     GetCurrentUserSummaryUseCase,
+    RegisterPushTokenUseCase,
     {
       provide: UserProfileRepository,
       useClass: PrismaUserProfileRepository,
