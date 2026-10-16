@@ -11,6 +11,7 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 - [Configuração inicial](#configuração-inicial)
 - [Executando com Docker](#executando-com-docker)
 - [URLs importantes](#urls-importantes)
+- [Infraestrutura AWS com MiniStack e CloudFormation](#infraestrutura-aws-com-ministack-e-cloudformation)
 - [Observabilidade local](#observabilidade-local)
 - [Documentação da API com Swagger](#documentação-da-api-com-swagger)
 - [Executando a API localmente](#executando-a-api-localmente)
@@ -36,6 +37,9 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 - Docker e Docker Compose
 - GitHub Actions
 - SonarQube Cloud
+- AWS CloudFormation
+- AWS SDK for JavaScript v3 (`@aws-sdk/client-s3`)
+- MiniStack para emulação local de serviços AWS
 
 ## Requisitos
 
@@ -79,13 +83,21 @@ O `.env` não deve ser enviado ao Git. O arquivo `.env.template` contém somente
 
 Variáveis atuais:
 
-| Variável            | Responsabilidade                                             |
-| ------------------- | ------------------------------------------------------------ |
-| `DATABASE_USER`     | Usuário criado no PostgreSQL pelo Docker Compose.            |
-| `DATABASE_PASSWORD` | Senha do usuário do PostgreSQL.                              |
-| `DATABASE_NAME`     | Nome do banco da aplicação.                                  |
-| `APP_PORT`          | Porta exposta pela API quando executada pelo Docker Compose. |
-| `DATABASE_URL`      | URL de conexão utilizada pelo Prisma.                        |
+| Variável                      | Responsabilidade                                                   |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `DATABASE_USER`               | Usuário criado no PostgreSQL pelo Docker Compose.                  |
+| `DATABASE_PASSWORD`           | Senha do usuário do PostgreSQL.                                    |
+| `DATABASE_NAME`               | Nome do banco da aplicação.                                        |
+| `APP_PORT`                    | Porta exposta pela API quando executada pelo Docker Compose.       |
+| `DATABASE_URL`                | URL de conexão utilizada pelo Prisma.                              |
+| `BETTER_AUTH_SECRET`          | Segredo de alta entropia usado para assinar dados de autenticação. |
+| `BETTER_AUTH_URL`             | URL pública da API utilizada pelo Better Auth.                     |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | Origens web e schemes Expo aceitos, separados por vírgula.         |
+| `AWS_REGION`                  | Região usada pelo MiniStack e pelos comandos da AWS CLI.           |
+| `AWS_S3_BUCKET`               | Nome do bucket utilizado pela aplicação.                           |
+| `AWS_ENDPOINT_URL`            | Endpoint global dos serviços AWS; presente apenas no MiniStack.    |
+| `AWS_ACCESS_KEY_ID`           | Credencial fictícia local; em produção, prefira role ou OIDC.      |
+| `AWS_SECRET_ACCESS_KEY`       | Segredo fictício local; nunca versionar um valor real.             |
 
 Nunca coloque tokens, senhas reais ou credenciais de produção no `.env.template`.
 
@@ -99,20 +111,19 @@ Esta é a maneira recomendada para começar, porque API, PostgreSQL e Adminer ut
 cp .env.template .env
 ```
 
-Na execução completamente pelo Docker, esta URL está correta:
+O `.env.template` mantém uma URL apropriada para comandos executados diretamente no computador:
+
+```dotenv
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/alibe
+```
+
+Ao iniciar o Backend pelo Docker Compose, o serviço `backend` sobrescreve somente dentro do container a `DATABASE_URL` com:
 
 ```dotenv
 DATABASE_URL=postgres://postgres:postgres@alibe-db:5432/alibe
 ```
 
-Cada parte significa:
-
-```text
-postgres:// usuario : senha    @ host     : porta / banco
-postgres:// postgres: postgres @ alibe-db : 5432  / alibe
-```
-
-`alibe-db` é o nome do serviço PostgreSQL no `docker-compose.yml`. O Docker fornece DNS interno entre os containers, então o container `backend` encontra o banco por esse nome. Essa URL só é correta para processos dentro da rede do Compose; ao executar a API diretamente no computador, use `localhost` como host. O Prisma aceita os protocolos `postgres://` e `postgresql://`.
+`alibe-db` é o DNS interno do serviço PostgreSQL na rede do Compose. Dessa forma, o mesmo código utiliza `localhost` no computador e `alibe-db` dentro do container, sem modificar a URL em tempo de execução. O Prisma aceita os protocolos `postgres://` e `postgresql://`.
 
 ### 2. Construir e iniciar os serviços
 
@@ -126,17 +137,42 @@ Para executar em segundo plano:
 docker compose up --build -d
 ```
 
+Ao iniciar o ambiente pelo Docker Compose, o Backend aguarda o PostgreSQL ficar saudável e
+executa automaticamente:
+
+```text
+prisma generate
+        ↓
+prisma migrate deploy
+        ↓
+nest start --watch
+```
+
+`prisma generate` sincroniza o cliente tipado dentro do container. `prisma migrate deploy`
+aplica somente as migrations versionadas que ainda estiverem pendentes; ele não cria uma nova
+migration e não reaplica migrations concluídas.
+
+Assim, quem apenas clona ou atualiza o projeto precisa somente executar
+`docker compose up --build`. Quem altera o `schema.prisma` continua responsável por criar uma
+nova migration com `prisma migrate dev`, validar o SQL gerado e versionar a pasta criada em
+`prisma/migrations/` junto com o código correspondente.
+
 ### 3. Testar a API
 
 ```bash
-curl http://localhost:3000/example
+curl -X POST http://localhost:3000/example \
+    -F "description=Exemplo com PostgreSQL e S3" \
+    -F "image=@./minha-imagem.png"
 ```
 
 Resposta esperada:
 
 ```json
 {
-  "message": "Example module is working"
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "description": "Exemplo com PostgreSQL e S3",
+  "imageUrl": "/example/550e8400-e29b-41d4-a716-446655440000/image",
+  "createdAt": "2026-08-30T00:00:00.000Z"
 }
 ```
 
@@ -153,7 +189,7 @@ docker compose down
 docker compose up --build
 ```
 
-Não utilize `docker compose down -v` ou `docker compose down --volumes` na rotina do projeto. Esses comandos apagam os dados locais do PostgreSQL, o histórico do Prometheus e o estado do Grafana.
+Não utilize `docker compose down -v` ou `docker compose down --volumes` na rotina do projeto. Esses comandos apagam os dados locais do PostgreSQL, o histórico do Prometheus, o estado do Grafana e os recursos persistidos pelo MiniStack.
 
 ## URLs importantes
 
@@ -163,6 +199,9 @@ Os endereços abaixo consideram o ambiente local com `docker compose up` em exec
 | -------------------- | -------------------------------------------------- | --------------------------------------------------- |
 | API                  | <http://localhost:3000>                            | URL base do Backend.                                |
 | Endpoint de exemplo  | <http://localhost:3000/example>                    | Verificação rápida da API.                          |
+| Better Auth          | <http://localhost:3000/api/auth/get-session>       | Consulta a sessão autenticada ou retorna `null`.    |
+| Imagem de grupo      | `/groups/{groupId}/profile-picture`                | Entrega a foto somente para integrantes do grupo.   |
+| Imagem de usuário    | `/users/{userId}/profile-picture`                  | Entrega a própria foto ou a de participante comum.  |
 | Swagger UI           | <http://localhost:3000/docs>                       | Documentação interativa e teste dos endpoints.      |
 | OpenAPI JSON         | <http://localhost:3000/docs-json>                  | Contrato OpenAPI consumível por outras ferramentas. |
 | Métricas do Backend  | <http://localhost:3000/metrics>                    | Métricas brutas no formato Prometheus.              |
@@ -170,6 +209,7 @@ Os endereços abaixo consideram o ambiente local com `docker compose up` em exec
 | Grafana              | <http://localhost:3001>                            | Página inicial do Grafana.                          |
 | Dashboard do Backend | <http://localhost:3001/d/alibe-backend-monitoring> | Monitoramento do Backend.                           |
 | Adminer              | <http://localhost:8080>                            | Interface para inspecionar o PostgreSQL.            |
+| MiniStack            | <http://localhost:4566>                            | Endpoint local compatível com APIs da AWS.          |
 | PostgreSQL           | `localhost:5432`                                   | Conexão ao banco a partir do computador.            |
 | Prisma Studio        | <http://localhost:5555>                            | Interface do Prisma, quando iniciada manualmente.   |
 
@@ -180,6 +220,314 @@ docker compose exec backend npx prisma studio --hostname 0.0.0.0 --port 5555
 ```
 
 No Adminer, use `alibe-db` como servidor. Dentro da rede do Compose, containers utilizam nomes de serviços como `alibe-db`, `backend` e `prometheus`; no navegador e em programas executados diretamente no computador, utilize `localhost` e a porta publicada.
+
+## Infraestrutura AWS com MiniStack e CloudFormation
+
+O projeto utiliza o MiniStack para simular serviços da AWS no ambiente local. Ele fica disponível em <http://localhost:4566>, enquanto a infraestrutura é descrita de forma versionável pelo template [`infra/cloudformation/alibe.yml`](infra/cloudformation/alibe.yml).
+
+Atualmente, o template cria um bucket S3 privado para mídias, com versionamento, criptografia AES-256, bloqueio de acesso público, tags de projeto e ambiente e outputs com o nome e o ARN do bucket.
+
+### Pré-requisitos
+
+- Docker Compose em execução;
+- AWS CLI instalada, verificável com `aws --version`;
+- `AWS_REGION=us-east-2` configurada no `.env` a partir do `.env.template`.
+
+### Executar localmente
+
+Suba o MiniStack:
+
+```bash
+docker compose up -d ministack
+docker compose logs -f ministack
+```
+
+Em outro terminal, na raiz do Backend, faça o deploy da stack local:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 cloudformation deploy \
+    --template-file infra/cloudformation/alibe.yml \
+    --stack-name alibe-local \
+    --parameter-overrides MediaBucketName=alibe-local-media \
+    --region us-east-2
+```
+
+As credenciais `test` são fictícias e servem somente para o emulador local. O parâmetro `Environment` não aparece nesse comando porque seu valor padrão no template é `local`.
+
+Para confirmar que a stack foi criada e consultar seus outputs:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 cloudformation describe-stacks \
+    --stack-name alibe-local \
+    --region us-east-2
+```
+
+Para listar os buckets disponíveis no ambiente local:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 s3api list-buckets \
+    --region us-east-2
+```
+
+Para enviar um arquivo local existente ao bucket:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 s3 cp \
+    teste-s3.txt s3://alibe-local-media/teste-s3.txt
+```
+
+Para listar os arquivos armazenados no bucket:
+
+```bash
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_DEFAULT_REGION=us-east-2 \
+aws --endpoint-url=http://localhost:4566 s3 ls \
+    s3://alibe-local-media/
+```
+
+O volume `ministack-data` preserva o estado local entre reinicializações. `docker compose down` mantém esse volume; `docker compose down -v` o remove.
+
+### Integração do Backend com S3
+
+O SDK oficial `@aws-sdk/client-s3` está encapsulado em `src/infrastructure/storage/`:
+
+```text
+storage/
+├── s3-client.provider.ts    # Monta o S3Client somente com configuração
+├── s3-storage.service.ts    # Upload e download de objetos
+└── storage.module.ts        # Registra e exporta o serviço no NestJS
+```
+
+O código é único para todos os ambientes. Não existe verificação de `NODE_ENV` nem implementação separada para MiniStack: a presença ou ausência das variáveis altera apenas a configuração entregue ao mesmo `S3Client`.
+
+| Execução                        | Endpoint                | Path style | Credenciais                                                |
+| ------------------------------- | ----------------------- | ---------- | ---------------------------------------------------------- |
+| Backend no Docker Compose       | `http://ministack:4566` | `true`     | `test` / `test`, somente local                             |
+| Backend executado no computador | `http://localhost:4566` | `true`     | `test` / `test`, somente local                             |
+| AWS real                        | variável ausente        | ausente    | cadeia padrão do SDK: profile, variáveis, OIDC ou IAM role |
+
+Quando `AWS_ENDPOINT_URL` está configurada, o client S3 ativa path-style internamente porque esse formato é exigido pelo MiniStack. O desenvolvedor não precisa configurar uma segunda variável para esse detalhe do adapter.
+
+Na AWS real, configure `AWS_REGION` e `AWS_S3_BUCKET`, remova `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` do ambiente quando a autenticação vier de role ou OIDC. O SDK passa automaticamente a usar o endpoint e a cadeia de credenciais padrão da AWS, sem mudança no código-fonte.
+
+Um módulo que precise armazenar arquivos importa `StorageModule` e seu caso de uso depende do contrato geral `ObjectStorage`, nunca do SDK ou do `S3StorageService` concreto:
+
+```ts
+constructor(
+  private readonly repository: ExampleRepository,
+  private readonly storage: ObjectStorage,
+) {}
+```
+
+O contrato disponibiliza `save`, `findByKey` e `delete`. O `delete` permite compensar falhas: se a imagem for enviada ao S3, mas o Prisma falhar ao criar o registro, o caso de uso remove o objeto órfão.
+
+Os campos usados pelo armazenamento são:
+
+| Campo         | Significado                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `key`         | Nome único do objeto dentro do bucket, equivalente ao caminho interno do arquivo.               |
+| `bytes`       | Conteúdo binário enviado ao S3. No exemplo, são os bytes da imagem recebida pela API.           |
+| `contentType` | Tipo MIME, como `image/png`. Ele permite que o navegador interprete a resposta como uma imagem. |
+
+No download são devolvidos apenas `bytes` e `contentType`. ETag, versionamento, metadata, tamanho e data da alteração ficam fora do contrato enquanto não houver um caso de uso que precise deles.
+
+### Exemplo com PostgreSQL e S3
+
+O módulo `example` salva a descrição e a chave da imagem no PostgreSQL, enquanto os bytes ficam no S3:
+
+```text
+Controller HTTP
+    -> CreateExampleUseCase
+        -> ObjectStorage
+            -> S3StorageService -> S3 ou MiniStack
+        -> ExampleRepository
+            -> PrismaExampleRepository -> PostgreSQL
+```
+
+O model Prisma possui `id`, `description`, `imageKey` e `createdAt`. Somente a chave, como `examples/{id}/image.png`, é persistida no banco; uma URL do MiniStack ou da AWS não é salva porque pode mudar entre ambientes.
+
+Crie um exemplo pelo Swagger em <http://localhost:3000/docs> ou pelo terminal:
+
+```bash
+curl -X POST http://localhost:3000/example \
+    -F "description=Exemplo com PostgreSQL e S3" \
+    -F "image=@./minha-imagem.png"
+```
+
+Exemplo de resposta:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "description": "Exemplo com PostgreSQL e S3",
+  "imageUrl": "/example/550e8400-e29b-41d4-a716-446655440000/image",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}
+```
+
+Consulte os dados ou baixe a imagem:
+
+```bash
+curl http://localhost:3000/example/550e8400-e29b-41d4-a716-446655440000
+
+curl http://localhost:3000/example/550e8400-e29b-41d4-a716-446655440000/image \
+    --output imagem-baixada.png
+```
+
+O upload utiliza `multipart/form-data`, exige os campos `description` e `image`, aceita apenas MIME `image/*` e limita o arquivo a 5 MB.
+
+### Imagens autenticadas de grupos
+
+A foto de perfil de um grupo pode ser consumida pela rota:
+
+```http
+GET /groups/{groupId}/profile-picture
+```
+
+O cliente não informa a key do S3. A API:
+
+1. obtém o usuário de `request.user.id`;
+2. busca o grupo pelo `groupId`;
+3. verifica a relação `user_group`;
+4. lê a key armazenada em `Group.profilePic`;
+5. busca o objeto no S3 e devolve seus bytes com o `Content-Type` original.
+
+Isso impede que o cliente altere uma key para tentar acessar imagens de outro grupo. O endpoint
+pode responder:
+
+| Status | Significado                                        |
+| ------ | -------------------------------------------------- |
+| `200`  | Imagem retornada como conteúdo binário.            |
+| `400`  | `groupId` não é um UUID válido.                    |
+| `401`  | Usuário não autenticado.                           |
+| `403`  | Usuário autenticado não pertence ao grupo.         |
+| `404`  | Grupo, referência ou objeto da imagem inexistente. |
+
+Para consumir essa rota, o cliente utiliza o `id` do grupo; não precisa enviar a key do S3:
+
+```tsx
+<Image
+  source={{
+    uri: `${API_BASE_URL}/groups/${group.id}/profile-picture`,
+  }}
+/>
+```
+
+Quando a autenticação real utilizar Bearer Token, a requisição da imagem também precisará enviar
+o header:
+
+```tsx
+<Image
+  source={{
+    uri: `${API_BASE_URL}${group.profilePic}`,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  }}
+/>
+```
+
+O banco continua armazenando somente uma key como
+`groups/{groupId}/profile-picture.png`; os bytes permanecem no S3.
+
+### Imagens autenticadas de usuários
+
+A foto de perfil de um usuário é responsabilidade do módulo `users` e possui uma rota própria:
+
+```http
+GET /users/{userId}/profile-picture
+```
+
+O usuário autenticado pode consultar:
+
+- a própria foto;
+- a foto de um usuário que compartilhe pelo menos um grupo com ele.
+
+A API obtém o solicitante por `request.user.id`, consulta a relação `user_group`, lê a key
+armazenada em `User.profilePic` e só então busca os bytes no S3.
+
+| Status | Significado                                              |
+| ------ | -------------------------------------------------------- |
+| `200`  | Imagem retornada como conteúdo binário.                  |
+| `400`  | `userId` não é um UUID válido.                           |
+| `401`  | Usuário não autenticado.                                 |
+| `403`  | Solicitante e usuário consultado não compartilham grupo. |
+| `404`  | Usuário, referência ou objeto da imagem inexistente.     |
+
+Nas respostas que apresentam um usuário, o campo `profilePic` deve conter a rota da API:
+
+```json
+{
+  "id": "22222222-2222-4222-8222-222222222222",
+  "profilePic": "/users/22222222-2222-4222-8222-222222222222/profile-picture"
+}
+```
+
+No React Native, a utilização segue a mesma ideia da imagem de grupo:
+
+```tsx
+<Image
+  source={{
+    uri: `${API_BASE_URL}${user.profilePic}`,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  }}
+/>
+```
+
+O banco armazena somente uma key como `users/{userId}/profile-picture.png`; os bytes permanecem
+no S3.
+
+### Placeholder para uma AWS remota
+
+Antes do deploy real, autentique a AWS CLI por um perfil, SSO ou role e confirme a conta selecionada:
+
+```bash
+aws sts get-caller-identity \
+    --profile YOUR_AWS_PROFILE \
+    --region YOUR_AWS_REGION
+```
+
+Depois, substitua todos os valores iniciados por `YOUR_` antes de executar:
+
+```bash
+AWS_PROFILE=YOUR_AWS_PROFILE \
+AWS_DEFAULT_REGION=YOUR_AWS_REGION \
+aws cloudformation deploy \
+    --template-file infra/cloudformation/alibe.yml \
+    --stack-name YOUR_REMOTE_STACK_NAME \
+    --parameter-overrides \
+        Environment=production \
+        MediaBucketName=YOUR_GLOBALLY_UNIQUE_BUCKET_NAME \
+    --region YOUR_AWS_REGION
+```
+
+Exemplo de significado dos placeholders:
+
+| Placeholder                        | O que informar                                       |
+| ---------------------------------- | ---------------------------------------------------- |
+| `YOUR_AWS_PROFILE`                 | Perfil local autenticado na conta correta.           |
+| `YOUR_AWS_REGION`                  | Região real escolhida, por exemplo `us-east-2`.      |
+| `YOUR_REMOTE_STACK_NAME`           | Nome da stack, por exemplo `alibe-production`.       |
+| `YOUR_GLOBALLY_UNIQUE_BUCKET_NAME` | Nome globalmente único para o bucket S3 de produção. |
+
+No ambiente remoto, não utilize `--endpoint-url`, pois esse argumento direciona os comandos ao emulador local. Também não coloque `AWS_ACCESS_KEY_ID` ou `AWS_SECRET_ACCESS_KEY` reais no README, no Git ou em comandos compartilhados. Em CI, prefira autenticação por OIDC ou secrets protegidos da plataforma.
+
+> **Atenção:** o comando remoto é apenas um modelo e não deve ser executado sem substituir os placeholders, confirmar conta e região e revisar o template. Um deploy remoto cria recursos reais e pode gerar custos.
 
 ## Observabilidade local
 
@@ -239,6 +587,229 @@ Ao criar um endpoint:
 4. abra `/docs` e confira o contrato gerado;
 5. mantenha o teste E2E de `/docs-json` passando.
 
+### Autenticação com Better Auth
+
+O Better Auth atende as rotas sob `/api/auth`, usa o adapter Prisma/PostgreSQL e mantém as sessões
+na tabela `session`. A autenticação por e-mail e senha está habilitada com senhas entre 8 e 128
+caracteres e `autoSignIn: false`; portanto, o cadastro não cria sessão automaticamente e continua
+sem revelar se um e-mail já está cadastrado. O plugin Expo está habilitado no servidor para
+armazenar e reenviar o cookie no aplicativo mobile.
+
+No onboarding, o aplicativo mantém e-mail e senha somente em memória entre as telas. Ao concluir a
+tela de nome e imagem, chama sequencialmente `POST /api/auth/sign-up/email`,
+`POST /api/auth/sign-in/email` e `PUT /users/me/profile-picture`. O login acontece sem exibir outra
+tela; após o cookie ser salvo pelo Better Auth Expo, o upload usa a sessão recém-criada. A senha
+deve ser descartada da memória ao final do fluxo e nunca armazenada no SecureStore.
+
+As variáveis necessárias são:
+
+```dotenv
+BETTER_AUTH_SECRET=gere-um-segredo-com-pelo-menos-32-caracteres
+BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_TRUSTED_ORIGINS=alibe://,alibe://*,http://localhost:8081,exp://,exp://**
+```
+
+Gere um segredo próprio para cada ambiente, por exemplo com `openssl rand -base64 32`, e nunca
+versione o valor de produção. Os padrões `exp://` devem ser usados somente no desenvolvimento; em
+produção, mantenha apenas o scheme oficial do aplicativo e as origens web reais.
+
+O guard da integração é global. Ele valida a sessão e preenche `request.user` e `request.session`
+antes dos controllers protegidos. Rotas públicas precisam ser marcadas explicitamente com
+`@AllowAnonymous()`. O `userId` não deve ser recebido por path, query ou body quando representar o
+usuário atual.
+
+A seed cria contas de credencial para os usuários de demonstração. Em ambiente exclusivamente
+local, todos utilizam a senha `senha-segura`.
+
+O login é realizado por `POST /api/auth/sign-in/email`, enviando `email`, `password` e,
+opcionalmente, `rememberMe`. Em caso de sucesso, o Better Auth cria o registro em `session` e envia
+o cookie `better-auth.session_token`. No aplicativo, o plugin cliente Better Auth Expo guarda e
+reenvia esse cookie; o campo `token` do JSON não deve ser salvo manualmente. Credenciais inválidas
+retornam `401` com a mesma mensagem para e-mail inexistente ou senha incorreta.
+
+### Endpoints mockados de grupos
+
+Por enquanto, o módulo `groups` contém apenas os contratos HTTP já discutidos. Os próprios controllers
+devolvem objetos mockados compatíveis com os DTOs; não existem services, use cases, repositories ou
+persistência neste módulo.
+
+| Método | Rota                           | Contrato mockado                         |
+| ------ | ------------------------------ | ---------------------------------------- |
+| GET    | `/groups`                      | Listagem da tela inicial.                |
+| GET    | `/groups/:groupId`             | Grupo, participantes e próximo encontro. |
+| POST   | `/groups`                      | Resposta de criação de grupo.            |
+| GET    | `/groups/:groupId/invite-link` | Token atual e sua data de expiração.     |
+| POST   | `/invite-links/:token/join`    | Acesso ao grupo pelo token de convite.   |
+
+Neste mock, `GET /groups` devolve todos os grupos sem receber `userId`. Quando a autenticação for
+implementada, o identificador será obtido do usuário autenticado e a mesma rota passará a filtrar
+somente os grupos dos quais ele participa. O `userId` não será enviado em path, query ou body para
+essa listagem.
+
+`GET /groups/:groupId` devolve os dados básicos do grupo e a lista de participantes. O mock expõe
+somente `id`, `name` e `profilePic` de cada participante; dados sensíveis, como `password_hash`,
+nunca fazem parte da resposta. Futuramente, essa consulta utilizará os relacionamentos `user_group`.
+O campo `nextEvent` contém o próximo encontro marcado ou `null` quando o grupo ainda não possui um
+próximo encontro.
+
+`POST /groups` recebe `multipart/form-data` com `name` obrigatório e `profile_pic` opcional. O usuário
+criador não é enviado no body: futuramente ele também será obtido da autenticação. Como este é um
+mock, a imagem não é armazenada e a resposta devolve apenas uma URL ilustrativa.
+
+`GET /groups/:groupId/invite-link` cria um token quando não existe, reutiliza o token enquanto sua
+data de expiração estiver no futuro e cria outro depois do vencimento. Como o estado é somente um
+mock em memória, ele é perdido quando a aplicação reinicia. A resposta contém apenas `token` e
+`expiresAt`.
+
+`POST /invite-links/:token/join` recebe somente o token pela URL e responde somente com o próprio
+`token`. Futuramente, o `userId` será extraído do usuário autenticado e não será enviado em path,
+query ou body.
+
+Os DTOs, exemplos de payload e respostas podem ser consultados e executados em
+<http://localhost:3000/docs>. Outros fluxos serão adicionados somente depois que seus contratos
+forem discutidos.
+
+### Endpoint de calendário
+
+O calendário fica em um módulo próprio porque agrega informações de eventos, propostas,
+disponibilidades, usuários e participantes do grupo. O fluxo segue a arquitetura do projeto:
+
+```text
+CalendarController
+    -> GetGroupCalendarUseCase
+        -> CalendarRepository
+            -> PrismaCalendarRepository -> PostgreSQL
+```
+
+```http
+GET /groups/:groupId/calendar?month=5&year=2026
+```
+
+O `groupId` é recebido pela URL; `month` e `year` são obrigatórios. `month` deve ser um número
+entre 1 e 12 e `year` deve ser um inteiro com quatro dígitos. O `userId` não é recebido em path,
+query ou body: ele vem de `request.user`, preenchido pela autenticação. A consulta só é permitida
+quando o usuário pertence ao grupo e a resposta contém somente dias com informações.
+Os campos `scheduledEventIds`, `proposalIds`, `availableUserIds` e `completedEventIds` são arrays
+de UUIDs, sem objetos intermediários.
+
+Os dados são agrupados por dia, usando datas UTC, com as seguintes regras:
+
+- eventos `confirmed` futuros entram em `scheduledEventIds`;
+- eventos `confirmed` passados entram em `completedEventIds`;
+- propostas de eventos `pending` entram em `proposalIds`;
+- eventos `declined` não aparecem no calendário;
+- `availableUserIds` contém somente participantes do grupo, sem IDs repetidos;
+- `allUsersAvailable` é `true` quando todos os participantes possuem disponibilidade naquele dia.
+
+Quando o mês não possui eventos, propostas ou disponibilidades, a API responde `200` com um array
+vazio. Grupo inexistente responde `404` e tentativa de acesso por alguém que não participa do grupo
+responde `403`.
+
+O contrato completo pode ser consultado pelo Swagger em <http://localhost:3000/docs>.
+
+### Endpoint de disponibilidade
+
+A disponibilidade fica no módulo `availability`, separado do calendário. O endpoint recebe o
+grupo pela URL e obtém o usuário por `request.user`, preenchido pela autenticação:
+
+```http
+POST /groups/:groupId/availabilities
+```
+
+`date` é obrigatória no formato `YYYY-MM-DD`. `startTime` e `endTime` são opcionais no formato
+`HH:mm`, mas devem ser enviados juntos e o horário final deve ser posterior ao inicial. Quando
+ambos são omitidos, a disponibilidade vale para o dia inteiro.
+
+O grupo deve existir e o usuário autenticado deve participar dele. Grupo inexistente responde
+`404`, usuário fora do grupo responde `403` e ausência de autenticação responde `401`.
+
+Os exemplos de requisição e resposta podem ser consultados pelo Swagger em
+<http://localhost:3000/docs>.
+
+### Endpoint de criação de evento
+
+A criação fica no módulo `events`, no mesmo `EventController` da atualização. O grupo vem pela URL
+e o usuário por `request.user`:
+
+```http
+POST /groups/:groupId/events
+```
+
+O body aceita JSON ou `multipart/form-data`. `name`, `date` (`YYYY-MM-DD`), `time` (`HH:mm`) e
+`location` são obrigatórios; `image` (arquivo de até 5 MB), `budgetStart` e `budgetEnd` são
+opcionais. A localização é recebida como texto livre.
+
+Em uma única transação, o repository cria:
+
+1. uma `Location` com `manuallyCreated = true`;
+2. o `Event` com status `pending`;
+3. uma `Proposal` do usuário autenticado;
+4. a `ProposalResponse` desse usuário com resposta `yes`.
+
+Por enquanto toda localização é marcada como manual; isso mudará quando houver integração com um
+provedor de localização. Quando há imagem, ela é salva no storage antes da transação e removida se a
+persistência falhar. A key do storage permanece interna; as respostas de criação e atualização
+expõem `/api/events/:eventId/image`. Essa rota entrega os bytes apenas para usuários autenticados
+que participam do grupo do evento. Campos obrigatórios ausentes respondem `400`, grupo inexistente
+`404`, usuário fora do grupo `403` e ausência de autenticação `401`.
+
+### Endpoints de resposta à proposta do evento
+
+O módulo `proposals` registra a resposta do usuário autenticado (`request.user`) à proposta do
+evento. Quando o evento possui mais de uma proposta, é usada a mais recente.
+
+```http
+POST  /api/events/:eventId/proposal/responses
+PATCH /api/events/:eventId/proposal/responses/me
+```
+
+Ambos recebem `{ "answer": "yes" | "no" }` e retornam `id`, `proposalId`, `userId`, `answer` e
+`createdAt`. Cada usuário possui no máximo uma `ProposalResponse` por proposta (constraint única
+`proposal_id + user_id`); um segundo `POST` responde `409` e a alteração deve ser feita pelo
+`PATCH`. O criador do evento já recebe a resposta `yes` na criação, então para ele somente o `PATCH`
+se aplica.
+
+Evento ou proposta inexistente respondem `404`, usuário fora do grupo do evento `403`, ausência de
+autenticação `401` e `answer` diferente de `yes`/`no` `400`. O `PATCH` também responde `404` quando
+o usuário ainda não respondeu.
+
+### Status HTTP dos endpoints
+
+Os códigos abaixo descrevem o comportamento implementado atualmente. Eles também estão declarados
+nos decorators do Swagger de cada controller.
+
+| Método | Rota                                         | Sucesso | Erros atuais                      |
+| ------ | -------------------------------------------- | ------- | --------------------------------- |
+| GET    | `/groups`                                    | `200`   | `500`                             |
+| GET    | `/groups/:groupId`                           | `200`   | `400`, `500`                      |
+| POST   | `/groups`                                    | `201`   | `400`, `500`                      |
+| GET    | `/groups/:groupId/invite-link`               | `200`   | `400`, `500`                      |
+| POST   | `/invite-links/:token/join`                  | `201`   | `400`, `500`                      |
+| GET    | `/groups/:groupId/calendar`                  | `200`   | `400`, `401`, `403`, `404`, `500` |
+| POST   | `/groups/:groupId/availabilities`            | `201`   | `400`, `401`, `403`, `404`, `500` |
+| POST   | `/groups/:groupId/events`                    | `201`   | `400`, `401`, `403`, `404`, `413` |
+| GET    | `/api/events/:eventId/image`                 | `200`   | `400`, `401`, `403`, `404`, `500` |
+| POST   | `/api/events/:eventId/proposal/responses`    | `201`   | `400`, `401`, `403`, `404`, `409` |
+| PATCH  | `/api/events/:eventId/proposal/responses/me` | `200`   | `400`, `401`, `403`, `404`        |
+
+| Status                      | Significado atual                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `200 OK`                    | Consulta processada e resposta retornada com sucesso.                                                                    |
+| `201 Created`               | Recurso ou vínculo criado com sucesso.                                                                                   |
+| `400 Bad Request`           | UUID inválido, campo obrigatório ausente, data ou intervalo inválido, `month` fora de 1–12 ou `year` sem quatro dígitos. |
+| `500 Internal Server Error` | Falha inesperada não tratada durante o processamento.                                                                    |
+
+Quando autenticação e persistência forem implementadas, os contratos deverão incorporar os códigos
+abaixo junto com o comportamento e os testes correspondentes. Eles ainda não são retornados pelos
+mocks atuais:
+
+| Status futuro      | Situação prevista                               |
+| ------------------ | ----------------------------------------------- |
+| `401 Unauthorized` | Requisição sem autenticação válida.             |
+| `403 Forbidden`    | Usuário autenticado sem acesso ao grupo.        |
+| `404 Not Found`    | Grupo, convite ou outro recurso não encontrado. |
+| `410 Gone`         | Tentativa de usar um convite expirado.          |
+
 ## Executando a API localmente
 
 Use esta opção quando quiser executar o NestJS diretamente no computador e manter apenas o PostgreSQL no Docker.
@@ -251,9 +822,9 @@ npm ci
 
 `npm ci` utiliza exatamente as versões registradas no `package-lock.json` e é o comando utilizado pela CI. Use `npm install <pacote>` apenas quando estiver adicionando ou atualizando uma dependência.
 
-### 2. Ajustar a conexão local
+### 2. Conferir a conexão local
 
-Crie o `.env` e troque o host da `DATABASE_URL` de `alibe-db` para `localhost`:
+O `.env.template` já utiliza `localhost`, então não é necessário trocar o host para executar o Prisma ou a API diretamente no computador:
 
 ```dotenv
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/alibe
@@ -275,7 +846,18 @@ npm run prisma:generate
 
 Esse comando lê o `prisma/schema.prisma` e gera o cliente TypeScript tipado em `generated/prisma`.
 
-> **Importante:** `prisma generate` não precisa que o PostgreSQL esteja rodando, não cria o banco, não cria tabelas e não executa migrations. Execute-o depois de `npm ci` e sempre que o `schema.prisma` mudar. O banco é criado pelo PostgreSQL/Docker; as tabelas são criadas ou alteradas por migrations.
+> **Importante:** `prisma generate` não precisa que o PostgreSQL esteja rodando, não cria o banco,
+> não cria tabelas e não executa migrations. Execute-o depois de `npm ci` e sempre que o
+> `schema.prisma` mudar ao trabalhar diretamente no computador. Na execução pelo Docker Compose,
+> esse comando e o `prisma migrate deploy` são executados automaticamente antes da API. O banco é
+> criado pelo PostgreSQL/Docker; as tabelas são criadas ou alteradas por migrations. O Compose
+> grava o client gerado no mesmo diretório `generated/prisma` usado pelo VS Code, portanto
+> `docker compose up` também mantém as tipagens locais sincronizadas. Antes de iniciar, o
+> entrypoint corrige automaticamente a propriedade de `generated/` e `dist/`, detecta o UID/GID
+> do proprietário do repositório e executa Prisma e Nest sem privilégios de root. Isso também
+> recupera pastas preexistentes que tenham sido criadas por outro container como `root`. Em
+> ambientes que não expõem corretamente a propriedade do bind mount, `DOCKER_UID` e `DOCKER_GID`
+> podem ser definidos no `.env` para sobrescrever a detecção automática.
 
 Fluxo correto quando alguém adicionar ou alterar um model:
 
@@ -307,15 +889,15 @@ PORT=3100 npm run start:dev
 
 ### Responsabilidade de cada local
 
-| Local                                  | Responsabilidade                                                                       |
-| -------------------------------------- | -------------------------------------------------------------------------------------- |
-| `prisma/schema.prisma`                 | Define datasource, generator e modelos persistidos.                                    |
-| `prisma/migrations/`                   | Guarda o histórico versionado das alterações do banco quando migrations forem criadas. |
-| `prisma.config.ts`                     | Informa ao Prisma onde estão schema, migrations e `DATABASE_URL`.                      |
-| `generated/prisma/`                    | Prisma Client gerado automaticamente; não deve ser editado manualmente.                |
-| `src/infrastructure/prisma.service.ts` | Mantém a conexão compartilhada do NestJS com o Prisma.                                 |
-| `src/infrastructure/prisma.module.ts`  | Exporta o `PrismaService` para os módulos que precisam de banco.                       |
-| `src/modules/<módulo>/persistence/`    | Implementa os repositories daquele módulo usando o `PrismaService`.                    |
+| Local                                         | Responsabilidade                                                                       |
+| --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `prisma/schema.prisma`                        | Define datasource, generator e modelos persistidos.                                    |
+| `prisma/migrations/`                          | Guarda o histórico versionado das alterações do banco quando migrations forem criadas. |
+| `prisma.config.ts`                            | Informa ao Prisma onde estão schema, migrations e `DATABASE_URL`.                      |
+| `generated/prisma/`                           | Prisma Client gerado automaticamente; não deve ser editado manualmente.                |
+| `src/infrastructure/prisma/prisma.service.ts` | Mantém a conexão compartilhada do NestJS com o Prisma.                                 |
+| `src/infrastructure/prisma/prisma.module.ts`  | Exporta o `PrismaService` para os módulos que precisam de banco.                       |
+| `src/modules/<módulo>/persistence/`           | Implementa os repositories daquele módulo usando o `PrismaService`.                    |
 
 O `PrismaService` é compartilhado porque representa uma conexão técnica com o banco. Já cada repository permanece no seu módulo porque traduz dados para o domínio específico daquele módulo.
 
@@ -343,7 +925,17 @@ Não crie migrations vazias apenas como exemplo. Uma migration deve representar 
 
 Atualmente os testes do módulo `example` utilizam memória e, portanto, não precisam executar migration. Quando um teste de integração utilizar um repository Prisma real, ele deverá usar um banco exclusivo de teste e a pipeline deverá aplicar `prisma migrate deploy` antes desses testes.
 
-Seeds devem ficar em `prisma/seed.ts` quando forem implementados. O seed deve ser idempotente sempre que possível, ou seja, poder ser executado novamente sem duplicar dados indevidamente. Dados de seed não substituem migrations.
+Seeds ficam em `prisma/seed.ts`. A seed usa a `DATABASE_URL` fornecida pelo ambiente, sem trocar o host no código.
+
+```bash
+# Executar no computador: usa localhost conforme o .env
+npm run prisma:seed
+
+# Executar no container já iniciado: o Compose injeta alibe-db
+docker compose exec backend npm run prisma:seed
+```
+
+A seed deve ser idempotente sempre que possível, ou seja, poder ser executada novamente sem duplicar dados indevidamente. Dados de seed não substituem migrations. A seed atual limpa as tabelas antes de inserir os dados e deve ser usada somente em banco local.
 
 ## Scripts disponíveis
 
@@ -355,6 +947,7 @@ Seeds devem ficar em `prisma/seed.ts` quando forem implementados. O seed deve se
 | `npm run build`                | Compila o projeto para `dist/`.                                              |
 | `npm run start:prod`           | Executa o build compilado em `dist/src/main.js`.                             |
 | `npm run prisma:generate`      | Gera o Prisma Client.                                                        |
+| `npm run prisma:seed`          | Executa a seed no banco configurado pela `DATABASE_URL`.                     |
 | `npm run format`               | Formata os arquivos com Prettier.                                            |
 | `npm run format:check`         | Verifica a formatação sem alterar arquivos.                                  |
 | `npm run lint`                 | Verifica o código TypeScript com ESLint.                                     |
@@ -401,13 +994,21 @@ Backend/
 │   ├── pull_request_template.md
 │   └── workflows/
 │       └── pr-validation.yml
+├── infra/
+│   └── cloudformation/
+│       └── alibe.yml
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/                 # Criada quando existirem migrations
 ├── src/
 │   ├── infrastructure/
-│   │   ├── prisma.module.ts
-│   │   └── prisma.service.ts
+│   │   ├── prisma/
+│   │   │   ├── prisma.module.ts
+│   │   │   └── prisma.service.ts
+│   │   └── storage/
+│   │       ├── s3-client.provider.ts
+│   │       ├── s3-storage.service.ts
+│   │       └── storage.module.ts
 │   ├── modules/
 │   │   └── example/
 │   │       ├── application/
@@ -442,11 +1043,12 @@ Backend/
 | -------------------------- | ------------------------------------------------------------------------------- |
 | `.github/`                 | Regras de contribuição, template de Pull Request e workflows do GitHub Actions. |
 | `docs/`                    | Documentação complementar e diagramas editáveis.                                |
+| `infra/`                   | Templates versionados da infraestrutura, atualmente com AWS CloudFormation.     |
 | `prisma/`                  | Schema e histórico de migrations do banco.                                      |
 | `src/`                     | Código-fonte da aplicação.                                                      |
 | `test/`                    | Testes centralizados e separados por tipo e módulo.                             |
 | `.env.template`            | Contrato das variáveis de ambiente necessárias.                                 |
-| `docker-compose.yml`       | Ambiente de desenvolvimento com Backend, PostgreSQL e Adminer.                  |
+| `docker-compose.yml`       | Serviços locais da aplicação, banco, observabilidade e MiniStack.               |
 | `Dockerfile`               | Etapas de build e imagem de produção da API.                                    |
 | `nest-cli.json`            | Configuração da CLI e do compilador NestJS.                                     |
 | `package.json`             | Dependências e scripts npm.                                                     |
@@ -596,7 +1198,7 @@ Contém adapters que implementam os contratos definidos em `domain/`. Exemplos:
 - `prisma-user.repository.ts` para PostgreSQL com Prisma.
 - `in-memory-user.repository.ts` para um adapter simples ou teste.
 
-O repository Prisma pode importar o `PrismaService` compartilhado de `src/infrastructure/`, mas deve devolver entidades ou resultados compreendidos pelo domínio e pela aplicação.
+O repository Prisma pode importar o `PrismaService` compartilhado de `src/infrastructure/prisma/`, mas deve devolver entidades ou resultados compreendidos pelo domínio e pela aplicação.
 
 #### `<nome>.module.ts`
 
@@ -695,7 +1297,7 @@ Arquivo `src/modules/users/persistence/prisma-user.repository.ts`:
 
 ```ts
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../infrastructure/prisma.service';
+import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { User } from '../domain/user.entity';
 import { UserRepository } from '../domain/user.repository';
 

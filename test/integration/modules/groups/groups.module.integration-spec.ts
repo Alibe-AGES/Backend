@@ -1,0 +1,326 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
+import { GroupsModule } from '../../../../src/modules/groups/groups.module';
+import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
+import { ListGroupsUseCase } from '../../../../src/modules/groups/application/list-groups.use-case';
+import { GetGroupUseCase } from '../../../../src/modules/groups/application/get-group.use-case';
+import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
+import { GroupInvitesController } from '../../../../src/modules/groups/http/group-invites.controller';
+import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
+import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
+import { InMemoryObjectStorage } from '../../../../test/helpers/in-memory-object.storage';
+import { randomUUID } from 'crypto';
+
+const authenticatedRequest = {
+  user: { id: '11111111-1111-4111-8111-111111111111' },
+} as AuthenticatedRequest;
+
+describe('GroupsModule integration', () => {
+  let module: TestingModule;
+  const findMany = jest.fn();
+  const findUnique = jest.fn();
+  const create = jest.fn();
+  const inviteFindFirst = jest.fn();
+  const inviteCreate = jest.fn();
+  const prisma = {
+    group: { findMany, findUnique, create },
+    inviteLink: { findFirst: inviteFindFirst, create: inviteCreate },
+  } as unknown as PrismaService;
+
+  beforeAll(async () => {
+    module = await Test.createTestingModule({
+      imports: [GroupsModule],
+    })
+      .overrideProvider(PrismaService)
+      .useValue(prisma)
+      .overrideProvider(S3_CLIENT)
+      .useValue({ send: jest.fn() })
+      .overrideProvider(S3_BUCKET)
+      .useValue('alibe-local-media')
+      .overrideProvider(ObjectStorage)
+      .useClass(InMemoryObjectStorage)
+      .compile();
+  });
+
+  afterAll(async () => {
+    await module.close();
+  });
+
+  beforeEach(() => {
+    findMany.mockReset();
+    findUnique.mockReset();
+    create.mockReset();
+    inviteFindFirst.mockReset();
+    inviteCreate.mockReset();
+  });
+
+  it('connects the use case, repository and Prisma adapter', async () => {
+    const userId = '11111111-1111-4111-8111-111111111111';
+    const row = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'Turma da Faculdade',
+      profilePic: null,
+      createdAt: new Date('2026-07-12'),
+    };
+    findMany.mockResolvedValue([row]);
+
+    const listGroups = module.get(ListGroupsUseCase);
+    const repository = module.get(GroupRepository);
+
+    await expect(listGroups.execute(userId)).resolves.toEqual([row]);
+    expect(repository).toBeDefined();
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        users: {
+          some: { userId },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  it('registers the groups controllers', () => {
+    expect(module.get(GroupsController)).toBeInstanceOf(GroupsController);
+    expect(module.get(GroupInvitesController)).toBeInstanceOf(GroupInvitesController);
+  });
+
+  it('connects the group details use case to the Prisma repository', async () => {
+    const groupId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const row = {
+      id: groupId,
+      name: 'Amigos da faculdade',
+      profilePic: 'groups/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/image.png',
+      createdAt: new Date('2026-08-01T15:00:00.000Z'),
+    };
+    const participant = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Ana Souza',
+      profilePic: null,
+    };
+    const event = {
+      id: '33333333-3333-4333-8333-333333333333',
+      name: 'Jantar da turma',
+      timeslot: new Date('2026-09-10T20:00:00.000Z'),
+      status: 'confirmed',
+    };
+    findUnique.mockResolvedValue({
+      ...row,
+      users: [{ user: participant }],
+      events: [event],
+    });
+
+    const getGroup = module.get(GetGroupUseCase);
+
+    await expect(getGroup.execute(groupId)).resolves.toEqual({
+      ...row,
+      profilePic: `/groups/${groupId}/profile-picture`,
+      participants: [participant],
+      nextEvent: event,
+    });
+    expect(findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: groupId },
+        include: expect.objectContaining({
+          users: expect.any(Object),
+          events: expect.any(Object),
+        }),
+      })
+    );
+  });
+
+  describe('GroupsController', () => {
+    it('creates a group without image', async () => {
+      const controller = module.get(GroupsController);
+      const createdGroup = {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        name: 'Group of friends',
+        profilePic: null,
+        createdAt: new Date('2026-08-01'),
+      };
+
+      create.mockResolvedValue(createdGroup);
+
+      const result = await controller.create(
+        { name: 'Group of friends' } as any,
+        null,
+        authenticatedRequest
+      );
+
+      expect(result.name).toEqual('Group of friends');
+      expect(result.profilePic).toBeNull();
+    });
+
+    it('creates a group with an uploaded image', async () => {
+      const controller = module.get(GroupsController);
+      const file = {
+        originalname: 'photo.png',
+        mimetype: 'image/png',
+        buffer: Buffer.from([1, 2, 3]),
+      } as Express.Multer.File;
+
+      const createdGroup = {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        name: 'Group with photo',
+        profilePic: file,
+        createdAt: new Date('2026-08-01'),
+      };
+
+      create.mockResolvedValue(createdGroup);
+
+      const result = await controller.create(
+        { name: 'Group with photo' } as any,
+        file,
+        authenticatedRequest
+      );
+
+      expect(result.name).toEqual('Group with photo');
+      expect(result.profilePic).toEqual(`/groups/${result.id}/profile-picture`);
+    });
+
+    it('rejects an invalid name with 400', async () => {
+      const controller = module.get(GroupsController);
+
+      await expect(
+        controller.create({ name: '' } as any, null, authenticatedRequest)
+      ).rejects.toThrow();
+    });
+
+    it('distinguishes unavailable, full-day and interval availability', async () => {
+      const controller = module.get(GroupsController);
+      const groupId = randomUUID();
+      const dateParam = '2026-06-05';
+
+      findUnique.mockResolvedValue({
+        id: groupId,
+        users: [
+          {
+            user: {
+              id: '11111111-1111-4111-8111-111111111111',
+              name: 'Ana Beatriz Silva',
+              profilePic: 'users/ana/profile-picture.png',
+              availabilities: [],
+            },
+          },
+          {
+            user: {
+              id: '22222222-2222-4222-8222-222222222222',
+              name: 'Bruno Henrique Souza',
+              profilePic: null,
+              availabilities: [{ timeslotStart: null, timeslotEnd: null }],
+            },
+          },
+          {
+            user: {
+              id: '33333333-3333-4333-8333-333333333333',
+              name: 'Camila Oliveira',
+              profilePic: null,
+              availabilities: [
+                {
+                  timeslotStart: new Date('2026-06-05T14:00:00.000Z'),
+                  timeslotEnd: new Date('2026-06-05T20:00:00.000Z'),
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      await expect(
+        controller.getAvailabilities(groupId, dateParam, authenticatedRequest)
+      ).resolves.toEqual({
+        date: dateParam,
+        users: [
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+            name: 'Ana Beatriz Silva',
+            image: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
+            availableAllDay: false,
+            intervals: [],
+          },
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            name: 'Bruno Henrique Souza',
+            image: null,
+            availableAllDay: true,
+            intervals: [],
+          },
+          {
+            id: '33333333-3333-4333-8333-333333333333',
+            name: 'Camila Oliveira',
+            image: null,
+            availableAllDay: false,
+            intervals: [['14:00', '20:00']],
+          },
+        ],
+      });
+    });
+
+    it('Lança GroupNotFoundError para um id inexistente', async () => {
+      const controller = module.get(GroupsController);
+
+      await expect(
+        controller.getAvailabilities(
+          '11111111-1111-4111-8111-111111111111',
+          '2026-05-06',
+          authenticatedRequest
+        )
+      ).rejects.toThrow();
+    });
+
+    it('Lança BadRequestError para um date em formato inválido', async () => {
+      const controller = module.get(GroupsController);
+      const id = randomUUID();
+
+      await expect(
+        controller.getAvailabilities(id, '01/12/2026', authenticatedRequest)
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('GroupInvitesController', () => {
+    it('reuses a valid invite and creates a new token after expiration', async () => {
+      const controller = module.get(GroupInvitesController);
+      const groupId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+      const validInvite = {
+        id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        token: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        validity: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+        groupId,
+      };
+
+      findUnique.mockResolvedValue({
+        users: [{ userId: authenticatedRequest.user?.id }],
+      });
+      inviteFindFirst.mockResolvedValueOnce(validInvite);
+
+      const current = await controller.getInviteLink(groupId, authenticatedRequest);
+
+      expect(current.token).toBe(validInvite.token);
+      expect(current.expiresAt).toEqual(validInvite.validity);
+      expect(inviteCreate).not.toHaveBeenCalled();
+
+      const expiredInvite = { ...validInvite, validity: new Date(Date.now() - 1000) };
+      const renewedInvite = {
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        token: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        validity: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+        groupId,
+      };
+
+      inviteFindFirst.mockResolvedValueOnce(expiredInvite);
+      inviteCreate.mockResolvedValueOnce(renewedInvite);
+
+      const renewed = await controller.getInviteLink(groupId, authenticatedRequest);
+
+      expect(renewed.token).toBe(renewedInvite.token);
+      expect(renewed.token).not.toBe(validInvite.token);
+      expect(inviteCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({ groupId }),
+      });
+    });
+  });
+});

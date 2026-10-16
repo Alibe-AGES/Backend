@@ -14,7 +14,7 @@ jest.mock('../../../generated/prisma/client', () => ({
   },
 }));
 
-import { PrismaService } from '../../../src/infrastructure/prisma.service';
+import { PrismaService } from '../../../src/infrastructure/prisma/prisma.service';
 
 describe('PrismaService', () => {
   const originalDatabaseUrl = process.env.DATABASE_URL;

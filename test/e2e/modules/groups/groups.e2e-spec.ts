@@ -1,0 +1,261 @@
+import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import * as request from 'supertest';
+import { AppModule } from '../../../../src/app.module';
+import { setupApplication } from '../../../../src/app.setup';
+import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
+import { ExampleRepository } from '../../../../src/modules/example/domain/example.repository';
+import { Group } from '../../../../src/modules/groups/domain/group.entity';
+import { GroupInviteLink } from '../../../../src/modules/groups/domain/group-invite-link.entity';
+import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
+import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
+import { InMemoryExampleRepository } from '../../../helpers/in-memory-example.repository';
+import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
+
+const DEMO_GROUP_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const inviteLinksByGroupId = new Map<string, GroupInviteLink>();
+
+describe('Groups mock endpoints (e2e)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(S3_CLIENT)
+      .useValue({ send: jest.fn() })
+      .overrideProvider(S3_BUCKET)
+      .useValue('alibe-local-media')
+      .overrideProvider(PrismaService)
+      .useValue({})
+      .overrideProvider(GroupRepository)
+      .useValue({
+        findByUserId: jest.fn().mockResolvedValue([
+          new Group({
+            id: DEMO_GROUP_ID,
+            name: 'Amigos da faculdade',
+            profilePic: `groups/${DEMO_GROUP_ID}/image.png`,
+            createdAt: new Date('2026-08-01T15:00:00.000Z'),
+          }),
+        ]),
+        findById: jest.fn().mockImplementation((id) =>
+          id === DEMO_GROUP_ID
+            ? new Group({
+                id: DEMO_GROUP_ID,
+                name: 'Amigos da faculdade',
+                profilePic: `groups/${DEMO_GROUP_ID}/image.png`,
+                createdAt: new Date('2026-08-01T15:00:00.000Z'),
+              })
+            : null
+        ),
+        findDetailsById: jest.fn().mockImplementation((id) =>
+          id === DEMO_GROUP_ID
+            ? {
+                id: DEMO_GROUP_ID,
+                name: 'Amigos da faculdade',
+                profilePic: `groups/${DEMO_GROUP_ID}/image.png`,
+                createdAt: new Date('2026-08-01T15:00:00.000Z'),
+                participants: [
+                  {
+                    id: '11111111-1111-4111-8111-111111111111',
+                    name: 'Ana Souza',
+                    profilePic: 'users/ana/image.jpg',
+                  },
+                  {
+                    id: '22222222-2222-4222-8222-222222222222',
+                    name: 'Leonardo Silva',
+                    profilePic: null,
+                  },
+                ],
+                nextEvent: {
+                  id: '33333333-3333-4333-8333-333333333333',
+                  name: 'Jantar da turma',
+                  timeslot: new Date('2026-09-10T20:00:00.000Z'),
+                  status: 'confirmed',
+                },
+              }
+            : null
+        ),
+        findMembership: jest.fn().mockImplementation(async (groupId: string) => {
+          return groupId === DEMO_GROUP_ID ? true : null;
+        }),
+        create: jest.fn().mockImplementation(async (data) => {
+          const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+          return new Group({
+            id,
+            name: data.name,
+            profilePic: data.profilePic ?? null,
+            createdAt: new Date('2026-08-01T15:00:00.000Z'),
+          });
+        }),
+        findLatestInviteLinkByGroupId: jest.fn().mockImplementation(async (groupId: string) => {
+          return inviteLinksByGroupId.get(groupId) ?? null;
+        }),
+        createInviteLink: jest.fn().mockImplementation(async (data) => {
+          const inviteLink = new GroupInviteLink(data);
+          inviteLinksByGroupId.set(data.groupId, inviteLink);
+          return inviteLink;
+        }),
+        findInviteLinkByToken: jest.fn().mockImplementation(async (token: string) => {
+          for (const inviteLink of inviteLinksByGroupId.values()) {
+            if (inviteLink.token === token) return inviteLink;
+          }
+          return null;
+        }),
+        addMember: jest.fn().mockResolvedValue(undefined),
+      })
+      .overrideProvider(ExampleRepository)
+      .useClass(InMemoryExampleRepository)
+      .overrideProvider(ObjectStorage)
+      .useClass(InMemoryObjectStorage)
+      .compile();
+
+    app = moduleFixture.createNestApplication({ bodyParser: false });
+    setupApplication(app);
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('lists the groups for the mocked user', async () => {
+    const response = await request(app.getHttpServer()).get('/groups').expect(200);
+
+    expect(response.body).toEqual(
+      expect.arrayContaining([
+        {
+          id: DEMO_GROUP_ID,
+          name: 'Amigos da faculdade',
+          profilePic: `/groups/${DEMO_GROUP_ID}/profile-picture`,
+          createdAt: '2026-08-01T15:00:00.000Z',
+        },
+      ])
+    );
+  });
+
+  it('gets group details, participants and next event from the use case', async () => {
+    const response = await request(app.getHttpServer()).get(`/groups/${DEMO_GROUP_ID}`).expect(200);
+
+    expect(response.body).toEqual({
+      id: DEMO_GROUP_ID,
+      name: 'Amigos da faculdade',
+      profilePic: `/groups/${DEMO_GROUP_ID}/profile-picture`,
+      createdAt: '2026-08-01T15:00:00.000Z',
+      participants: [
+        {
+          id: '11111111-1111-4111-8111-111111111111',
+          name: 'Ana Souza',
+          profilePic: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
+        },
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          name: 'Leonardo Silva',
+          profilePic: null,
+        },
+      ],
+      nextEvent: {
+        id: '33333333-3333-4333-8333-333333333333',
+        name: 'Jantar da turma',
+        timeslot: '2026-09-10T20:00:00.000Z',
+        status: 'confirmed',
+      },
+    });
+  });
+
+  it('creates a mocked group from multipart name and profile_pic', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/groups')
+      .field('name', 'Grupo criado no E2E')
+      .attach('profile_pic', Buffer.from([137, 80, 78, 71]), {
+        filename: 'group.png',
+        contentType: 'image/png',
+      })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      name: 'Grupo criado no E2E',
+      profilePic: expect.stringMatching(/^\/groups\/[0-9a-f-]{36}\/profile-picture$/),
+      createdAt: expect.any(String),
+    });
+
+    await request(app.getHttpServer()).post('/groups').field('name', 'A').expect(400);
+  });
+
+  it('gets a valid invite and accesses it without receiving userId', async () => {
+    const first = await request(app.getHttpServer())
+      .get(`/groups/${DEMO_GROUP_ID}/invite-link`)
+      .expect(200);
+    const current = await request(app.getHttpServer())
+      .get(`/groups/${DEMO_GROUP_ID}/invite-link`)
+      .expect(200);
+
+    expect(first.body).toEqual({
+      token: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      expiresAt: expect.any(String),
+    });
+    expect(current.body.token).toBe(first.body.token);
+
+    await request(app.getHttpServer())
+      .post(`/invite-links/${first.body.token}/join`)
+      .send({})
+      .expect(201)
+      .expect({
+        token: first.body.token,
+      });
+  });
+
+  it('rejects joining with an invite token that does not exist', async () => {
+    await request(app.getHttpServer())
+      .post('/invite-links/ffffffff-ffff-4fff-8fff-ffffffffffff/join')
+      .send({})
+      .expect(404);
+  });
+
+  it('validates invite UUIDs and exposes the current endpoints in Swagger', async () => {
+    await request(app.getHttpServer()).get('/groups/not-a-uuid').expect(400);
+    await request(app.getHttpServer())
+      .get('/groups/ffffffff-ffff-4fff-8fff-ffffffffffff')
+      .expect(404);
+    await request(app.getHttpServer()).get('/groups/not-a-uuid/invite-link').expect(400);
+    await request(app.getHttpServer()).post('/invite-links/not-a-uuid/join').expect(400);
+
+    const swagger = await request(app.getHttpServer()).get('/docs-json').expect(200);
+
+    expect(swagger.body.paths['/groups'].get).toBeDefined();
+    expect(swagger.body.paths['/groups'].post).toBeDefined();
+    expect(swagger.body.paths['/groups/{groupId}'].get).toBeDefined();
+    expect(swagger.body.paths['/groups/{groupId}/invite-link'].get).toBeDefined();
+    expect(swagger.body.paths['/invite-links/{token}/join'].post).toBeDefined();
+    expect(
+      Object.keys(swagger.body.components.schemas.JoinGroupByInviteResponseDto.properties)
+    ).toEqual(['token']);
+
+    const createGroupMultipartProperties =
+      swagger.body.paths['/groups'].post.requestBody.content['multipart/form-data'].schema
+        .properties;
+
+    expect(createGroupMultipartProperties).toHaveProperty('profile_pic');
+    expect(createGroupMultipartProperties).not.toHaveProperty('image');
+
+    expect(Object.keys(swagger.body.paths['/groups'].get.responses).sort()).toEqual(['200', '500']);
+    expect(Object.keys(swagger.body.paths['/groups'].post.responses).sort()).toEqual([
+      '201',
+      '400',
+      '500',
+    ]);
+    expect(Object.keys(swagger.body.paths['/groups/{groupId}'].get.responses).sort()).toEqual([
+      '200',
+      '400',
+      '500',
+    ]);
+    expect(
+      Object.keys(swagger.body.paths['/groups/{groupId}/invite-link'].get.responses).sort()
+    ).toEqual(['200', '400', '401', '403', '404', '500']);
+    expect(
+      Object.keys(swagger.body.paths['/invite-links/{token}/join'].post.responses).sort()
+    ).toEqual(['201', '400', '401', '404', '410', '500']);
+  });
+});

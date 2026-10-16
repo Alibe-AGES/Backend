@@ -8,9 +8,15 @@ import {
 
 import { MetricsService } from './metrics.service';
 import { HttpMetricsInterceptor } from './http-metrics.interceptor';
+import { PublicMetricsController } from './public-metrics.controller';
 
 @Module({
-  imports: [PrometheusModule.register({ defaultMetrics: { enabled: true } })],
+  imports: [
+    PrometheusModule.register({
+      controller: PublicMetricsController,
+      defaultMetrics: { enabled: true },
+    }),
+  ],
 
   providers: [
     MetricsService,

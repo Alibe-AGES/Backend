@@ -1,11 +1,20 @@
 export interface ExampleProps {
-  message: string;
+  id: string;
+  description: string;
+  imageKey: string;
+  createdAt: Date;
 }
 
 export class Example {
-  readonly message: string;
+  readonly id: string;
+  readonly description: string;
+  readonly imageKey: string;
+  readonly createdAt: Date;
 
   constructor(props: ExampleProps) {
-    this.message = props.message;
+    this.id = props.id;
+    this.description = props.description;
+    this.imageKey = props.imageKey;
+    this.createdAt = props.createdAt;
   }
 }

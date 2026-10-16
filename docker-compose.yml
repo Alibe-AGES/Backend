@@ -8,24 +8,32 @@ services:
       target: build
 
     depends_on:
-      - alibe-db
+      alibe-db:
+        condition: service_healthy
+      ministack:
+        condition: service_started
+      aws-bootstrap:
+        condition: service_completed_successfully
 
     env_file:
       - .env
 
     environment:
+      HOME: /tmp
       PORT: ${APP_PORT}
+      DATABASE_URL: postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@alibe-db:5432/${DATABASE_NAME}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
 
     volumes:
       - .:/app
       - /app/node_modules
-      - /app/generated
 
     ports:
       - '${APP_PORT}:${APP_PORT}'
       - '5555:5555'
 
-    command: npm run start:dev
+    # TEMPORÁRIO: permite executar a seed local quando SEED_ON_STARTUP=true.
+    command: sh -c "npm run prisma:generate && npx prisma migrate deploy && if [ "$${SEED_ON_STARTUP}" = "true" ]; then npm run prisma:seed; fi && exec npm run start:dev"
 
   alibe-db:
     container_name: alibe-db
@@ -37,6 +45,13 @@ services:
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
       PGDATA: /var/lib/postgresql/data/pgdata
+
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
     ports:
       - '5432:5432'
@@ -68,6 +83,7 @@ services:
   grafana:
     image: grafana/grafana:13.2.0
     container_name: alibe-grafana
+    attach: false
     environment:
       GF_PLUGINS_PREINSTALL_DISABLED: 'true'
     ports:
@@ -80,7 +96,63 @@ services:
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
 
+  ministack:
+    image: ministackorg/ministack:1.5.3
+    container_name: alibe-ministack
+
+    ports:
+      - '4566:4566'
+
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_REGION}
+      PERSIST_STATE: '1'
+      S3_PERSIST: '1'
+      STATE_DIR: /var/lib/ministack/state
+      S3_DATA_DIR: /var/lib/ministack/s3
+      LOG_LEVEL: INFO
+
+    volumes:
+      - ministack-data:/var/lib/ministack
+      - ./infra/cloudformation:/infra/cloudformation:ro
+
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  aws-bootstrap:
+    image: amazon/aws-cli:2.36.34
+    container_name: alibe-aws-bootstrap
+
+    depends_on:
+      ministack:
+        condition: service_healthy
+
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+
+    volumes:
+      - ./infra:/infra:ro
+
+    entrypoint: ['/bin/sh', '/infra/local/bootstrap.sh']
+
 volumes:
   db-data:
   prometheus-data:
   grafana-data:
+  ministack-data:
+
+networks:
+  default:
+    name: alibe-network
