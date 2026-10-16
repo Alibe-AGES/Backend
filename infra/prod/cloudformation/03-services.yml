@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECR da API e fila SQS de notificacoes de producao do projeto Alibe
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: alibe
+    Description: Nome usado para identificar os recursos do projeto.
+
+Resources:
+  BackendRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Delete # Imagens de deploy podem ser reconstruidas a partir do codigo-fonte.
+    UpdateReplacePolicy: Delete
+    Properties:
+      RepositoryName: !Sub '${ProjectName}/backend'
+      ImageTagMutability: IMMUTABLE # Evita substituir silenciosamente uma imagem ja implantada.
+      ImageScanningConfiguration:
+        ScanOnPush: true # Usa a configuracao de scanning do registro sem criar outro servico.
+      EncryptionConfiguration:
+        EncryptionType: AES256 # Criptografia gerenciada pelo ECR, sem chave KMS adicional.
+      EmptyOnDelete: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove imagens sem tag depois de um dia",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 1
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Mantem somente as cinco imagens mais recentes",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+        - Key: Workload
+          Value: backend
+
+  NotificationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${ProjectName}-prod-notifications'
+      SqsManagedSseEnabled: true # Criptografia gerenciada pelo SQS, sem custo de uma chave KMS.
+      MessageRetentionPeriod: 345600 # Quatro dias para recuperar falhas sem guardar mensagens indefinidamente.
+      VisibilityTimeout: 60 # Seis vezes o timeout da Lambda, conforme recomendado para o consumidor.
+      ReceiveMessageWaitTimeSeconds: 20 # Long polling reduz requisicoes vazias e ajuda a controlar custo.
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  # O repositorio da imagem Go, a Lambda, sua role IAM e o consumidor da fila serao
+  # adicionados quando o servico de notificacoes existir e estiver pronto para publicacao.
+
+Outputs:
+  BackendRepositoryName:
+    Description: Repositorio das imagens ARM64 da API executada na EC2 t4g.
+    Value: !Ref BackendRepository
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendRepositoryName'
+
+  BackendRepositoryArn:
+    Value: !GetAtt BackendRepository.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendRepositoryArn'
+
+  BackendRepositoryUri:
+    Value: !GetAtt BackendRepository.RepositoryUri
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendRepositoryUri'
+
+  NotificationQueueUrl:
+    Description: URL que a API usara para publicar notificacoes.
+    Value: !Ref NotificationQueue
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationQueueUrl'
+
+  NotificationQueueArn:
+    Value: !GetAtt NotificationQueue.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationQueueArn'

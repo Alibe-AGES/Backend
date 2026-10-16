@@ -1,0 +1,221 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Uma EC2 ARM64 para a producao do projeto Alibe
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: alibe
+    Description: Nome usado para identificar os recursos do projeto.
+
+  NetworkStackName:
+    Type: String
+    Default: alibe-network
+    Description: Nome da stack criada pelo arquivo 01-network.yml.
+
+  DataStackName:
+    Type: String
+    Default: alibe-data2
+    Description: Nome da stack criada pelo arquivo 02-data.yml.
+
+  ServicesStackName:
+    Type: String
+    Default: alibe-prod-services
+    Description: Nome da stack criada pelo arquivo 03-services.yml.
+
+  AllowedClientCidr:
+    Type: String
+    Description: IPv4 publico autorizado a acessar temporariamente a API, no formato 203.0.113.10/32.
+    AllowedPattern: '^(?:[0-9]{1,3}\.){3}[0-9]{1,3}/(?:[0-9]|[12][0-9]|3[0-2])$'
+    ConstraintDescription: Informe um IPv4 em formato CIDR, preferencialmente o seu IP publico com /32.
+
+  Ec2InstanceConnectPrefixListId:
+    Type: String
+    Description: ID da prefix list gerenciada com.amazonaws.us-east-2.ec2-instance-connect, usada pelo terminal web da AWS.
+    AllowedPattern: '^pl-[0-9a-f]+$'
+    ConstraintDescription: Informe um ID de prefix list valido, iniciado por pl-.
+
+  LatestArm64AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
+    Description: AMI oficial mais recente do Amazon Linux 2023 para processadores ARM64.
+
+Resources:
+  ComputeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Entrada web publica e saidas minimas da EC2 do Alibe
+      VpcId:
+        Fn::ImportValue: !Sub '${NetworkStackName}-VpcId'
+      SecurityGroupIngress:
+        # A API fica restrita ao IP informado durante esta fase manual, ainda sem TLS.
+        - Description: HTTP temporario da API e do Swagger, restrito ao administrador
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref AllowedClientCidr
+        # O terminal do navegador usa SSH internamente, mas somente a faixa oficial
+        # do EC2 Instance Connect em Ohio consegue alcançar esta porta.
+        - Description: Terminal web pelo EC2 Instance Connect de Ohio
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourcePrefixListId: !Ref Ec2InstanceConnectPrefixListId
+      SecurityGroupEgress:
+        - Description: HTTPS para ECR, S3, SQS, repositorios e APIs externas
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - Description: PostgreSQL privado no Security Group do RDS
+          IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          DestinationSecurityGroupId:
+            Fn::ImportValue: !Sub '${DataStackName}-DatabaseSecurityGroupId'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-prod-compute'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  DatabaseIngressFromCompute:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: PostgreSQL acessivel apenas pela EC2 da aplicacao
+      GroupId:
+        Fn::ImportValue: !Sub '${DataStackName}-DatabaseSecurityGroupId'
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !GetAtt ComputeSecurityGroup.GroupId
+
+  ComputeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AccessAlibeMediaObjects
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  Fn::Sub:
+                    - '${BucketArn}/*'
+                    - BucketArn:
+                        Fn::ImportValue: !Sub '${DataStackName}-MediaBucketArn'
+        - PolicyName: PublishNotifications
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource:
+                  Fn::ImportValue: !Sub '${ServicesStackName}-NotificationQueueArn'
+        - PolicyName: PullBackendImages
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                Resource:
+                  Fn::ImportValue: !Sub '${ServicesStackName}-BackendRepositoryArn'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  ComputeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ComputeRole
+
+  ComputeInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestArm64AmiId
+      InstanceType: t4g.medium # Uma unica instancia, exatamente como previsto no PDF de custos.
+      IamInstanceProfile: !Ref ComputeInstanceProfile
+      SubnetId:
+        Fn::ImportValue: !Sub '${NetworkStackName}-PublicSubnetId'
+      SecurityGroupIds:
+        - !GetAtt ComputeSecurityGroup.GroupId
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: 12 # Suficiente para o host e o cluster pequeno, com retencao limitada do Prometheus.
+            Encrypted: true
+            DeleteOnTermination: true
+      CreditSpecification:
+        CPUCredits: standard # Impede cobranca de creditos Unlimited em carga sustentada.
+      Monitoring: false # Nao ativa o Detailed Monitoring cobrado do EC2.
+      InstanceInitiatedShutdownBehavior: stop # Um shutdown dentro do Linux pausa a EC2 em vez de encerra-la.
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required # IMDSv2 obrigatorio para proteger as credenciais temporarias da role.
+        HttpPutResponseHopLimit: 2 # Permite que o container da API use a role sem chaves AWS estaticas.
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-prod-compute'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ComputePublicIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc # Um unico IPv4 fixo, previsto no PDF e mantido mesmo com a EC2 parada.
+      InstanceId: !Ref ComputeInstance # Associa o IP sem criar uma interface de rede separada.
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-prod-api'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+Outputs:
+  InstanceId:
+    Description: ID da unica EC2 que executara a API e, futuramente, o K3s.
+    Value: !Ref ComputeInstance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+
+  PublicIp:
+    Description: IPv4 fixo da API; o SSH aceita somente o EC2 Instance Connect.
+    Value: !Ref ComputePublicIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicIp'
+
+  ApiHttpUrl:
+    Description: URL HTTP temporaria para validar a API antes da configuracao de TLS.
+    Value: !Sub 'http://${ComputePublicIp}'
+
+  SwaggerUrl:
+    Description: URL temporaria do Swagger, acessivel apenas pelo CIDR autorizado.
+    Value: !Sub 'http://${ComputePublicIp}/docs'
+

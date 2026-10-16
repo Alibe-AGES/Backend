@@ -223,9 +223,9 @@ No Adminer, use `alibe-db` como servidor. Dentro da rede do Compose, containers 
 
 ## Infraestrutura AWS com MiniStack e CloudFormation
 
-O projeto utiliza o MiniStack para simular serviços da AWS no ambiente local. Ele fica disponível em <http://localhost:4566>, enquanto a infraestrutura é descrita de forma versionável pelo template [`infra/cloudformation/alibe.yml`](infra/cloudformation/alibe.yml).
+O projeto utiliza o MiniStack para simular serviços da AWS no ambiente local. Ele fica disponível em <http://localhost:4566>. O ambiente local utiliza [`infra/local/cloudformation/storage.yml`](infra/local/cloudformation/storage.yml), enquanto os templates da AWS ficam em [`infra/prod/cloudformation/`](infra/prod/cloudformation/).
 
-Atualmente, o template cria um bucket S3 privado para mídias, com versionamento, criptografia AES-256, bloqueio de acesso público, tags de projeto e ambiente e outputs com o nome e o ARN do bucket.
+O template local cria um bucket S3 privado para mídias, com versionamento, criptografia AES-256, ownership controlado pelo bucket, bloqueio de acesso público, retenção contra remoção acidental, tags e outputs.
 
 ### Pré-requisitos
 
@@ -249,13 +249,14 @@ AWS_ACCESS_KEY_ID=test \
 AWS_SECRET_ACCESS_KEY=test \
 AWS_DEFAULT_REGION=us-east-2 \
 aws --endpoint-url=http://localhost:4566 cloudformation deploy \
-    --template-file infra/cloudformation/alibe.yml \
+    --template-file infra/local/cloudformation/storage.yml \
     --stack-name alibe-local \
-    --parameter-overrides MediaBucketName=alibe-local-media \
+    --parameter-overrides \
+        MediaBucketName=alibe-local-media \
     --region us-east-2
 ```
 
-As credenciais `test` são fictícias e servem somente para o emulador local. O parâmetro `Environment` não aparece nesse comando porque seu valor padrão no template é `local`.
+As credenciais `test` são fictícias e servem somente para o emulador local.
 
 Para confirmar que a stack foi criada e consultar seus outputs:
 
@@ -492,40 +493,13 @@ No React Native, a utilização segue a mesma ideia da imagem de grupo:
 O banco armazena somente uma key como `users/{userId}/profile-picture.png`; os bytes permanecem
 no S3.
 
-### Placeholder para uma AWS remota
+### Produção na AWS
 
-Antes do deploy real, autentique a AWS CLI por um perfil, SSO ou role e confirme a conta selecionada:
+Os templates de produção ficam separados em [`infra/prod/cloudformation/`](infra/prod/cloudformation/) e são implantados em stacks numeradas. Eles não utilizam o endpoint, as credenciais fictícias nem os recursos do MiniStack.
 
-```bash
-aws sts get-caller-identity \
-    --profile YOUR_AWS_PROFILE \
-    --region YOUR_AWS_REGION
-```
+Antes do K3s, o deploy manual da API na EC2 usa exclusivamente [`infra/prod/compose.ec2.yml`](infra/prod/compose.ec2.yml). Esse Compose executa somente as migrations e a API; PostgreSQL, S3 e demais recursos são os serviços reais da AWS.
 
-Depois, substitua todos os valores iniciados por `YOUR_` antes de executar:
-
-```bash
-AWS_PROFILE=YOUR_AWS_PROFILE \
-AWS_DEFAULT_REGION=YOUR_AWS_REGION \
-aws cloudformation deploy \
-    --template-file infra/cloudformation/alibe.yml \
-    --stack-name YOUR_REMOTE_STACK_NAME \
-    --parameter-overrides \
-        Environment=production \
-        MediaBucketName=YOUR_GLOBALLY_UNIQUE_BUCKET_NAME \
-    --region YOUR_AWS_REGION
-```
-
-Exemplo de significado dos placeholders:
-
-| Placeholder                        | O que informar                                       |
-| ---------------------------------- | ---------------------------------------------------- |
-| `YOUR_AWS_PROFILE`                 | Perfil local autenticado na conta correta.           |
-| `YOUR_AWS_REGION`                  | Região real escolhida, por exemplo `us-east-2`.      |
-| `YOUR_REMOTE_STACK_NAME`           | Nome da stack, por exemplo `alibe-production`.       |
-| `YOUR_GLOBALLY_UNIQUE_BUCKET_NAME` | Nome globalmente único para o bucket S3 de produção. |
-
-No ambiente remoto, não utilize `--endpoint-url`, pois esse argumento direciona os comandos ao emulador local. Também não coloque `AWS_ACCESS_KEY_ID` ou `AWS_SECRET_ACCESS_KEY` reais no README, no Git ou em comandos compartilhados. Em CI, prefira autenticação por OIDC ou secrets protegidos da plataforma.
+Não coloque `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, senhas do RDS ou outros segredos reais no README, no Git ou nos arquivos de parâmetros versionados.
 
 > **Atenção:** o comando remoto é apenas um modelo e não deve ser executado sem substituir os placeholders, confirmar conta e região e revisar o template. Um deploy remoto cria recursos reais e pode gerar custos.
 

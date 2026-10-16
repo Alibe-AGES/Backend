@@ -1,23 +1,18 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: Infraestrutura AWS do projeto Alibe
+Description: Armazenamento local de midias do Alibe no MiniStack
 
 Parameters:
-  Environment:
-    Type: String
-    Description: Ambiente da aplicação
-    AllowedValues:
-      - local
-      - production
-    Default: local
-
   MediaBucketName:
     Type: String
-    Description: Nome do bucket S3 utilizado para armazenar arquivos do Alibe
+    Description: Nome do bucket local de midias do Alibe
+    MinLength: 3
 
 Resources:
   AlibeMediaBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
 
     Properties:
       BucketName: !Ref MediaBucketName
@@ -30,6 +25,10 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
@@ -39,15 +38,20 @@ Resources:
       Tags:
         - Key: Project
           Value: Alibe
-
         - Key: Environment
-          Value: !Ref Environment
+          Value: local
+        - Key: ManagedBy
+          Value: CloudFormation
 
 Outputs:
   MediaBucketName:
-    Description: Nome do bucket S3 do Alibe
+    Description: Nome do bucket local de midias do Alibe
     Value: !Ref AlibeMediaBucket
 
   MediaBucketArn:
-    Description: ARN do bucket S3 do Alibe
+    Description: ARN do bucket local de midias do Alibe
     Value: !GetAtt AlibeMediaBucket.Arn
+
+  MediaBucketRegionalDomainName:
+    Description: Dominio regional do bucket local
+    Value: !GetAtt AlibeMediaBucket.RegionalDomainName
