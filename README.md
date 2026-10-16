@@ -83,21 +83,22 @@ O `.env` não deve ser enviado ao Git. O arquivo `.env.template` contém somente
 
 Variáveis atuais:
 
-| Variável                      | Responsabilidade                                                   |
-| ----------------------------- | ------------------------------------------------------------------ |
-| `DATABASE_USER`               | Usuário criado no PostgreSQL pelo Docker Compose.                  |
-| `DATABASE_PASSWORD`           | Senha do usuário do PostgreSQL.                                    |
-| `DATABASE_NAME`               | Nome do banco da aplicação.                                        |
-| `APP_PORT`                    | Porta exposta pela API quando executada pelo Docker Compose.       |
-| `DATABASE_URL`                | URL de conexão utilizada pelo Prisma.                              |
-| `BETTER_AUTH_SECRET`          | Segredo de alta entropia usado para assinar dados de autenticação. |
-| `BETTER_AUTH_URL`             | URL pública da API utilizada pelo Better Auth.                     |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | Origens web e schemes Expo aceitos, separados por vírgula.         |
-| `AWS_REGION`                  | Região usada pelo MiniStack e pelos comandos da AWS CLI.           |
-| `AWS_S3_BUCKET`               | Nome do bucket utilizado pela aplicação.                           |
-| `AWS_ENDPOINT_URL`            | Endpoint global dos serviços AWS; presente apenas no MiniStack.    |
-| `AWS_ACCESS_KEY_ID`           | Credencial fictícia local; em produção, prefira role ou OIDC.      |
-| `AWS_SECRET_ACCESS_KEY`       | Segredo fictício local; nunca versionar um valor real.             |
+| Variável                      | Responsabilidade                                                     |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `DATABASE_USER`               | Usuário criado no PostgreSQL pelo Docker Compose.                    |
+| `DATABASE_PASSWORD`           | Senha do usuário do PostgreSQL.                                      |
+| `DATABASE_NAME`               | Nome do banco da aplicação.                                          |
+| `APP_PORT`                    | Porta exposta pela API quando executada pelo Docker Compose.         |
+| `DATABASE_URL`                | URL de conexão utilizada pelo Prisma.                                |
+| `BETTER_AUTH_SECRET`          | Segredo de alta entropia usado para assinar dados de autenticação.   |
+| `BETTER_AUTH_URL`             | URL pública da API utilizada pelo Better Auth.                       |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | Origens web e schemes Expo aceitos, separados por vírgula.           |
+| `AWS_REGION`                  | Região usada pelo MiniStack e pelos comandos da AWS CLI.             |
+| `AWS_S3_BUCKET`               | Nome do bucket utilizado pela aplicação.                             |
+| `AWS_ENDPOINT_URL`            | Endpoint global dos serviços AWS; presente apenas no MiniStack.      |
+| `AWS_ACCESS_KEY_ID`           | Credencial fictícia local; em produção, prefira role ou OIDC.        |
+| `AWS_SECRET_ACCESS_KEY`       | Segredo fictício local; nunca versionar um valor real.               |
+| `GOOGLE_PLACES_API_KEY`       | Chave da Places API (New); sem ela `GET /api/locations` retorna 503. |
 
 Nunca coloque tokens, senhas reais ou credenciais de produção no `.env.template`.
 
@@ -322,6 +323,21 @@ O código é único para todos os ambientes. Não existe verificação de `NODE_
 Quando `AWS_ENDPOINT_URL` está configurada, o client S3 ativa path-style internamente porque esse formato é exigido pelo MiniStack. O desenvolvedor não precisa configurar uma segunda variável para esse detalhe do adapter.
 
 Na AWS real, configure `AWS_REGION` e `AWS_S3_BUCKET`, remova `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` do ambiente quando a autenticação vier de role ou OIDC. O SDK passa automaticamente a usar o endpoint e a cadeia de credenciais padrão da AWS, sem mudança no código-fonte.
+
+### Integração com Google Places
+
+O cliente da [Places API (New)](https://developers.google.com/maps/documentation/places/web-service/nearby-search) está em `src/infrastructure/api/google-places/` e implementa o contrato `PlacesProvider` (`src/shared/places/`). Os módulos importam `GooglePlacesModule` e dependem apenas de `PlacesProvider`.
+
+```text
+api/google-places/
+├── google-places.config.ts    # Lê GOOGLE_PLACES_API_KEY
+├── google-places.service.ts   # Chama places:searchNearby e normaliza a resposta
+└── google-places.module.ts    # Exporta o PlacesProvider
+```
+
+A chave é lida de `GOOGLE_PLACES_API_KEY`. A API inicializa sem ela, mas as buscas respondem `503`. Para gerar a chave, ative a **Places API (New)** no Google Cloud e restrinja a chave a essa API. O field mask solicita campos de atmosfera (`outdoorSeating`, `goodForGroups`, `priceRange`), que entram no SKU Enterprise + Atmosphere.
+
+`GET /api/locations?latitude=&longitude=` usa esse cliente para montar o feed: busca até 20 locais no raio informado (`maxDistanceKm`, padrão de 50 km), aplica os filtros (`budgetMin`, `budgetMax`, `period`, `environment`, `groupSize`, `type`), pagina o resultado e registra os locais da página na tabela `location` com `manually_created = false`.
 
 Um módulo que precise armazenar arquivos importa `StorageModule` e seu caso de uso depende do contrato geral `ObjectStorage`, nunca do SDK ou do `S3StorageService` concreto:
 
@@ -1002,6 +1018,8 @@ Backend/
 │   └── migrations/                 # Criada quando existirem migrations
 ├── src/
 │   ├── infrastructure/
+│   │   ├── api/
+│   │   │   └── google-places/      # Cliente da Places API (New)
 │   │   ├── prisma/
 │   │   │   ├── prisma.module.ts
 │   │   │   └── prisma.service.ts
