@@ -5,6 +5,9 @@ import { UpdateProposalResponseUseCase } from './application/update-proposal-res
 import { ProposalResponseRepository } from './domain/proposal-response.repository';
 import { ProposalResponseController } from './http/proposal-response.controller';
 import { PrismaProposalResponseRepository } from './persistence/prisma-proposal-response.repository';
+import { GetProposalByGroupUseCase } from './application/get-proposals-by-group';
+import { ProposalRepository } from './domain/proposal.entity.repository';
+import { PrismaProposalRepository } from './persistence/prisma-proposal.repository';
 
 @Module({
   imports: [PrismaModule],
@@ -16,6 +19,12 @@ import { PrismaProposalResponseRepository } from './persistence/prisma-proposal-
       provide: ProposalResponseRepository,
       useClass: PrismaProposalResponseRepository,
     },
+    GetProposalByGroupUseCase,
+    {
+      provide: ProposalRepository,
+      useClass: PrismaProposalRepository,
+    },
   ],
+  exports: [GetProposalByGroupUseCase],
 })
 export class ProposalsModule {}

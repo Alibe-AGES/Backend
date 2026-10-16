@@ -55,6 +55,8 @@ import {
   GroupNotFoundError as AvailabilityGroupNotFoundError,
   InvalidAvailabilityDateError,
 } from '../application/get-availability-intervals.use-case';
+import { ProposalDto } from '../../../../src/modules/proposals/http/dto/proposal-dto';
+import { GetProposalByGroupUseCase } from '../../../../src/modules/proposals/application/get-proposals-by-group';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -66,7 +68,8 @@ export class GroupsController {
     private readonly getGroupUseCase: GetGroupUseCase,
     private readonly getGroupProfilePictureUseCase: GetGroupProfilePictureUseCase,
     private readonly listGroupsUseCase: ListGroupsUseCase,
-    private readonly getAvailabilityIntervalsUseCase: GetAvailabilityIntervalsUseCase
+    private readonly getAvailabilityIntervalsUseCase: GetAvailabilityIntervalsUseCase,
+    private readonly getProposalByGroupUseCase: GetProposalByGroupUseCase
   ) {}
   /**
    * GET /groups
@@ -272,5 +275,25 @@ export class GroupsController {
 
       throw error;
     }
+  }
+
+  @Get(':groupId/proposals')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Obtém as propostas ativas para o grupo' })
+  @ApiParam({ name: 'groupId', format: 'uuid' })
+  @ApiOkResponse({
+    description: 'Propostas encontradas.',
+    type: ProposalDto,
+    isArray: true,
+  })
+  @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
+  async getProposals(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<ProposalDto[]> {
+    const userId = request.user.id;
+
+    return this.getProposalByGroupUseCase.execute(groupId, userId);
   }
 }
