@@ -49,7 +49,6 @@ describe('Group proposals endpoints (e2e)', () => {
     process.env.MOCK_AUTH_USER_ID = USER_ID;
     proposalsRepo.clear();
 
-    // Popula com o formato exato esperado pela API
     proposalsRepo.setGroupData(
       GROUP_ID,
       [USER_ID],
@@ -131,27 +130,33 @@ describe('Group proposals endpoints (e2e)', () => {
   it('returns empty array when the group has no active proposals', async () => {
     proposalsRepo.setGroupData(GROUP_ID, [USER_ID], []);
 
-    const response = await request(app.getHttpServer()).get(PROPOSALS_PATH).expect(200);
+    const response = await request(app.getHttpServer()).get(PROPOSALS_PATH);
 
+    expect(response.status).toBe(200);
     expect(response.body).toEqual([]);
   });
 
   it('rejects an invalid group id (not a uuid)', async () => {
-    await request(app.getHttpServer()).get('/groups/not-a-uuid/proposals').expect(400);
+    const response = await request(app.getHttpServer()).get('/groups/not-a-uuid/proposals');
+
+    expect(response.status).toBe(400);
   });
 
   it('returns empty array when user outside the group tries to access', async () => {
     process.env.MOCK_AUTH_USER_ID = OUTSIDER_ID;
 
-    const response = await request(app.getHttpServer()).get(PROPOSALS_PATH).expect(200);
+    const response = await request(app.getHttpServer()).get(PROPOSALS_PATH);
 
+    expect(response.status).toBe(200);
     expect(response.body).toEqual([]);
   });
 
   it('rejects requests without an authenticated user', async () => {
     process.env.MOCK_AUTH_ENABLED = 'false';
 
-    await request(app.getHttpServer()).get(PROPOSALS_PATH).expect(401);
+    const response = await request(app.getHttpServer()).get(PROPOSALS_PATH);
+
+    expect(response.status).toBe(401);
   });
 });
 
