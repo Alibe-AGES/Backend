@@ -6,8 +6,8 @@ export interface CatalogLocationData {
 
 export abstract class LocationRepository {
   /**
-   * Garante que cada local externo exista no catálogo (manually_created = false)
-   * e retorna o id interno indexado pelo externalId.
+   * Ensures each external place exists in the catalog (manually_created = false)
+   * and returns the internal id keyed by externalId.
    */
   abstract ensureCatalogLocations(locations: CatalogLocationData[]): Promise<Map<string, string>>;
 }

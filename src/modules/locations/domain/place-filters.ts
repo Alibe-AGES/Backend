@@ -20,7 +20,7 @@ const MINUTES_IN_DAY = 24 * 60;
 const MINUTES_IN_WEEK = 7 * MINUTES_IN_DAY;
 const EARTH_RADIUS_IN_METERS = 6_371_000;
 
-/** Janelas [início, fim) em minutos do dia. */
+/** [start, end) windows in minutes of the day. */
 const DAY_PERIOD_WINDOWS: Record<DayPeriod, [number, number]> = {
   morning: [6 * 60, 12 * 60],
   afternoon: [12 * 60, 18 * 60],
@@ -44,8 +44,8 @@ const OUTDOOR_PLACE_TYPES = new Set([
 ]);
 
 /**
- * Orçamento e horário só excluem um local quando o Google informa dados que contradizem o filtro,
- * pois faixa de preço e horários frequentemente estão ausentes.
+ * Budget and period only exclude a place when Google returns data that contradicts the filter,
+ * since price ranges and opening hours are often missing.
  */
 export function matchesPlaceFilters(place: Place, filters: PlaceFilters): boolean {
   return (

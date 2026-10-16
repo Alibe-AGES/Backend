@@ -3,7 +3,7 @@ import { type GeoPoint, type Place, PlacesProvider } from '../../../shared/place
 import { LocationRepository } from '../domain/location.repository';
 import { distanceInMeters, matchesPlaceFilters, type PlaceFilters } from '../domain/place-filters';
 
-/** Sem filtro de distância, a busca usa o maior raio aceito pelo Google Places. */
+/** Without a distance filter, the search uses the largest radius accepted by Google Places. */
 export const ANY_DISTANCE_IN_KM = 50;
 
 export interface ListCatalogLocationsInput extends PlaceFilters {

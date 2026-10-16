@@ -18,7 +18,7 @@ export const GOOGLE_PLACES_MAX_RESULT_COUNT = 20;
 
 const REQUEST_TIMEOUT_IN_MS = 10_000;
 
-/** Campos solicitados ao Google; cada campo influencia o SKU cobrado pela busca. */
+/** Fields requested from Google; each field affects the SKU billed for the search. */
 const FIELD_MASK = [
   'places.id',
   'places.displayName',

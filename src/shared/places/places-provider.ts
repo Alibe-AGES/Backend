@@ -13,14 +13,14 @@ export interface PlacePriceRange {
   end: Money | null;
 }
 
-/** day: 0 = domingo ... 6 = sábado, no horário local do estabelecimento. */
+/** day: 0 = Sunday ... 6 = Saturday, in the place's local time. */
 export interface PlaceTimePoint {
   day: number;
   hour: number;
   minute: number;
 }
 
-/** Um período sem `close` indica funcionamento 24 horas. */
+/** A period without `close` means the place is open 24 hours. */
 export interface PlaceOpeningPeriod {
   open: PlaceTimePoint;
   close: PlaceTimePoint | null;

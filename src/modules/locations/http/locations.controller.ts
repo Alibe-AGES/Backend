@@ -38,8 +38,8 @@ export class LocationsController {
 
   /**
    * GET /api/locations?latitude=-30.03&longitude=-51.22&page=1&limit=20
-   * Busca locais próximos ao usuário no Google Places, aplica os filtros do feed e registra
-   * a página retornada no catálogo (location com manually_created = false).
+   * Searches Google Places near the user, applies the feed filters and registers the
+   * returned page in the catalog (location with manually_created = false).
    */
   @Get()
   @ApiOperation({ summary: 'Lista locais do catálogo próximos ao usuário para o feed' })
