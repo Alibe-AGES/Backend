@@ -63,6 +63,9 @@ describe('AvailabilityModule integration', () => {
   };
 
   beforeAll(async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-10-14T12:00:00.000Z'));
+
     moduleFixture = await Test.createTestingModule({
       imports: [AvailabilityModule],
     })
@@ -73,6 +76,7 @@ describe('AvailabilityModule integration', () => {
 
   afterAll(async () => {
     await moduleFixture.close();
+    jest.useRealTimers();
   });
 
   beforeEach(() => {
