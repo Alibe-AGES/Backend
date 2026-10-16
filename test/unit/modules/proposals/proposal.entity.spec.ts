@@ -2,7 +2,7 @@ import { Proposal, ProposalProps } from '../../../../src/modules/proposals/domai
 
 describe('Proposal Entity', () => {
   it('should successfully instantiate a proposal entity with correct properties', () => {
-    const proposalData:ProposalProps = {
+    const proposalData: ProposalProps = {
       id: '55555555-5555-4555-8555-555555555555',
       createdAt: new Date('2026-10-14T18:55:48.552Z'),
       eventId: '22222222-2222-4222-8222-222222222222',
