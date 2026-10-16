@@ -30,6 +30,12 @@ import { ProposalQueryController } from './http/proposal-query.controller';
       provide: ProposalResponseRepository,
       useClass: PrismaProposalResponseRepository,
     },
+    GetProposalByGroupUseCase,
+    {
+      provide: ProposalRepository,
+      useClass: PrismaProposalRepository,
+    },
   ],
+  exports: [GetProposalByGroupUseCase],
 })
 export class ProposalsModule {}

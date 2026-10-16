@@ -34,7 +34,7 @@ describe('ProposalsModule integration', () => {
   };
 
   beforeAll(async () => {
-    moduleFixture = await Test.createTestingModule({ imports: [ProposalsModule] })
+    moduleFixture = await Test.createTestingModule({ imports: [ProposalsModule, GroupsModule] })
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(S3_CLIENT)
