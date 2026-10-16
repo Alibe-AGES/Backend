@@ -32,6 +32,7 @@ model User {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   profilePic    String?   @map("profile_pic")
   birthDate     DateTime? @map("birth_date") @db.Date
+  expoPushToken String?   @unique @map("expo_push_token") @db.VarChar(255)
 
   groups            UserGroup[]
   moods             Mood[]
