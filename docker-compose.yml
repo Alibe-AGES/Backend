@@ -113,7 +113,6 @@ services:
 
     volumes:
       - ministack-data:/var/lib/ministack
-      - ./infra/cloudformation:/infra/cloudformation:ro
 
     healthcheck:
       test:

@@ -1,0 +1,4 @@
+# A configuracao do Prometheus sera adicionada na etapa do K3s.
+# Para limitar o uso do EBS de 12 GB, o container devera receber:
+#   --storage.tsdb.retention.time=3d
+#   --storage.tsdb.retention.size=1GB

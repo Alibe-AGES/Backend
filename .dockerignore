@@ -3,5 +3,8 @@ dist
 generated
 coverage
 .git
-.env
+.env*
+**/.env*
+!.env.template
+!**/.env*.example
 npm-debug.log*
