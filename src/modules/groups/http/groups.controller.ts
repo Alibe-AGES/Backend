@@ -287,6 +287,8 @@ export class GroupsController {
     isArray: true,
   })
   @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
+  @ApiNotFoundResponse({ description: 'Grupo inexistente para o id informado.' })
+  @ApiForbiddenResponse({ description: 'Usuário não pertence ao respectivo grupo. '})
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   async getProposals(
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
