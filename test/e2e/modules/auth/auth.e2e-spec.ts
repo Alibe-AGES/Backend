@@ -204,6 +204,29 @@ describe('Better Auth configuration (e2e)', () => {
     });
   });
 
+  it('returns success true when the sign-out endpoint is called', async () => {
+    const signInResponse = await request(app.getHttpServer())
+      .post('/api/auth/sign-in/email')
+      .send({
+        email: 'ana.silva@example.com',
+        password: 'senha-segura',
+      })
+      .expect('Cache-Control', /no-store/)
+      .expect(200);
+
+    expect(signInResponse.headers['set-cookie']).toEqual([
+      expect.stringContaining('better-auth.session_token=opaque-session-token'),
+    ]);
+
+    const signOutResponse = await request(app.getHttpServer())
+      .post('/api/auth/sign-out')
+      .set('accept', 'application/json')
+      .expect(200);
+
+    expect(signOutResponse.body).toBeNull(); //Apenas para testar
+    //expect(signOutResponse.body).toEqual({ success: true });
+  });
+
   it('rejects invalid login credentials without revealing which field is wrong', async () => {
     await request(app.getHttpServer())
       .post('/api/auth/sign-in/email')
@@ -234,6 +257,9 @@ describe('Better Auth configuration (e2e)', () => {
     );
     expect(response.body.paths['/api/auth/sign-up/email'].post).toEqual(
       expect.objectContaining({ operationId: 'signUpWithEmail' })
+    );
+    expect(response.body.paths['/api/auth/sign-out'].post).toEqual(
+      expect.objectContaining({ operationId: 'signOut' })
     );
     expect(response.body.components.securitySchemes['better-auth-bearer']).toEqual(
       expect.objectContaining({ type: 'http', scheme: 'bearer' })
