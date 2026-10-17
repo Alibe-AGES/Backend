@@ -95,14 +95,14 @@ export class PrismaEventRepository extends EventRepository {
     return { event: this.toDomain(event), ownerResponse };
   }
 
-  async findLocationById(id: string): Promise<ExistingEventLocation | null> {
+  findLocationById(id: string): Promise<ExistingEventLocation | null> {
     return this.prisma.location.findUnique({
       where: { id },
       select: { id: true, description: true, address: true },
     });
   }
 
-  async createWithExistingLocation(data: CreateLocatedEventData): Promise<CreatedLocationProposal> {
+  createWithExistingLocation(data: CreateLocatedEventData): Promise<CreatedLocationProposal> {
     return this.prisma.$transaction(async (transaction) => {
       const location = await transaction.location.findUnique({
         where: { id: data.locationId },
