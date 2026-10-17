@@ -753,6 +753,36 @@ expõem `/api/events/:eventId/image`. Essa rota entrega os bytes apenas para usu
 que participam do grupo do evento. Campos obrigatórios ausentes respondem `400`, grupo inexistente
 `404`, usuário fora do grupo `403` e ausência de autenticação `401`.
 
+### Criação de proposta com localização existente
+
+```http
+POST /api/groups/:groupId/proposals
+```
+
+O endpoint fica no módulo `proposals` e reutiliza o repository exportado por `EventsModule`.
+O body JSON estrito exige `locationId` (UUID), `name` (não vazio após `trim()`), `date`
+(`YYYY-MM-DD`) e `time` (`HH:mm`). `budgetStart` e `budgetEnd` são strings decimais opcionais
+e independentes, seguindo a validação da criação de eventos; não aceitam `null` explícito.
+Campos extras, incluindo `ownerId` e `userId`, respondem `400`. O autor vem somente da sessão.
+
+Uma transação cria `Event` com status `pending`, `Proposal` e `ProposalResponse` do autor com
+resposta `yes`. A `Location` selecionada é reutilizada sem criação ou alteração de seus dados.
+Data e horário são interpretados em UTC, como no fluxo manual existente.
+
+A resposta `201` contém `id` e `createdAt` da proposta, `owner` (`id`, `name`, `image`),
+`event` (`id`, `name`, `date`, `time`, `budgetStart`, `budgetEnd`, `status`, `groupId`),
+`location` (`id`, `description`, `address`) e `myAnswer: "yes"`. Orçamentos são apresentados
+com duas casas decimais, como nos detalhes de evento, ou `null` quando omitidos. A imagem
+do autor usa `/users/:id/profile-picture` ou `null`; descrição e endereço preservam valores
+nulos. `createdAt` é serializado em ISO. Grupo ou localização inexistentes respondem `404`,
+usuário fora do grupo `403` e ausência de autenticação `401`.
+
+O teste de persistência e rollback com PostgreSQL é opt-in. Use um banco local exclusivo cujo
+nome termine em `_test`, aplique as migrations existentes com `prisma migrate deploy` apontando
+`DATABASE_URL` para esse banco e execute `npm run test:integration` com `TEST_DATABASE_URL`
+apontando para ele. Sem essa variável, os testes de PostgreSQL são ignorados; os testes de
+composição do módulo continuam executando. Os dados criados pelos testes são removidos no teardown.
+
 ### Endpoints de resposta à proposta do evento
 
 O módulo `proposals` registra a resposta do usuário autenticado (`request.user`) à proposta do

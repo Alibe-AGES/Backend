@@ -12,6 +12,7 @@ import { GetEventImageUseCase } from './application/get-event-image.use-case';
 @Module({
   imports: [PrismaModule, StorageModule],
   controllers: [EventController],
+  exports: [EventRepository],
   providers: [
     GetEventUseCase,
     GetEventImageUseCase,
