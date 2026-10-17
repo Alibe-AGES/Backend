@@ -204,27 +204,26 @@ describe('Better Auth configuration (e2e)', () => {
     });
   });
 
-  it('returns success true when the sign-out endpoint is called', async () => {
-    const signInResponse = await request(app.getHttpServer())
-      .post('/api/auth/sign-in/email')
-      .send({
-        email: 'ana.silva@example.com',
-        password: 'senha-segura',
-      })
-      .expect('Cache-Control', /no-store/)
+  it('ends the session and clean the cookie', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/auth/sign-out')
+      .set('Cookie', 'better-auth.session_token=valid-session-token')
+      .set('accept', 'application/json')
+      .send({})
       .expect(200);
 
-    expect(signInResponse.headers['set-cookie']).toEqual([
-      expect.stringContaining('better-auth.session_token=opaque-session-token'),
+    expect(response.body).toEqual({ success: true });
+    expect(response.headers['set-cookie']).toEqual([
+      expect.stringMatching(/better-auth\.session_token=;|Max-Age=0/),
     ]);
+  });
 
-    const signOutResponse = await request(app.getHttpServer())
+  it('sign-out without session', async () => {
+    const response = await request(app.getHttpServer())
       .post('/api/auth/sign-out')
       .set('accept', 'application/json')
-      .expect(200);
-
-    expect(signOutResponse.body).toBeNull(); //Apenas para testar
-    //expect(signOutResponse.body).toEqual({ success: true });
+      .send({});
+    expect([200, 401]).toContain(response.status);
   });
 
   it('rejects invalid login credentials without revealing which field is wrong', async () => {
