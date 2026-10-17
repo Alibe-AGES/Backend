@@ -204,6 +204,28 @@ describe('Better Auth configuration (e2e)', () => {
     });
   });
 
+  it('ends the session and clean the cookie', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/auth/sign-out')
+      .set('Cookie', 'better-auth.session_token=valid-session-token')
+      .set('accept', 'application/json')
+      .send({})
+      .expect(200);
+
+    expect(response.body).toEqual({ success: true });
+    expect(response.headers['set-cookie']).toEqual([
+      expect.stringMatching(/better-auth\.session_token=;|Max-Age=0/),
+    ]);
+  });
+
+  it('sign-out without session', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/auth/sign-out')
+      .set('accept', 'application/json')
+      .send({});
+    expect([200, 401]).toContain(response.status);
+  });
+
   it('rejects invalid login credentials without revealing which field is wrong', async () => {
     await request(app.getHttpServer())
       .post('/api/auth/sign-in/email')
@@ -234,6 +256,9 @@ describe('Better Auth configuration (e2e)', () => {
     );
     expect(response.body.paths['/api/auth/sign-up/email'].post).toEqual(
       expect.objectContaining({ operationId: 'signUpWithEmail' })
+    );
+    expect(response.body.paths['/api/auth/sign-out'].post).toEqual(
+      expect.objectContaining({ operationId: 'signOut' })
     );
     expect(response.body.components.securitySchemes['better-auth-bearer']).toEqual(
       expect.objectContaining({ type: 'http', scheme: 'bearer' })
