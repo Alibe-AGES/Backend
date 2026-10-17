@@ -229,17 +229,17 @@ export function addBetterAuthOpenApiPaths(document: OpenAPIObject): OpenAPIObjec
       tags: ['Authentication'],
       operationId: 'signOut',
       summary: 'Encerrar sessão',
-      description:
-        'Encerra a sessão do usuário.',
+      description: 'Encerra a sessão do usuário.',
       security: [{ 'better-auth-bearer': [] }, { 'better-auth': [] }, {}],
       responses: {
         200: {
-          description: 'Sessão encerrada. Envia o cookie HttpOnly better-auth.session_token com valor vazio.',
+          description:
+            'Sessão encerrada. Envia o cookie HttpOnly better-auth.session_token com valor vazio.',
           headers: {
-            "Set-Cookie": {
+            'Set-Cookie': {
               description: 'Limpa o cookie da sessão.',
               schema: { type: 'string' },
-            }
+            },
           },
           content: {
             'application/json': {
@@ -248,17 +248,17 @@ export function addBetterAuthOpenApiPaths(document: OpenAPIObject): OpenAPIObjec
                 required: ['success'],
                 properties: {
                   success: { type: 'boolean', example: true },
-                }
-              }
-
-            }
-          }
+                },
+              },
+            },
+          },
         },
-          401: {
-          description: 'Sessão/token ausente ou já inválido (dependendo da configuração, ainda pode retornar 200).',
+        401: {
+          description:
+            'Sessão/token ausente ou já inválido (dependendo da configuração, ainda pode retornar 200).',
           content: { 'application/json': { schema: errorSchema } },
         },
-      }
+      },
     },
   };
 
