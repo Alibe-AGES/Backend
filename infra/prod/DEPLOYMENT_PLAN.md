@@ -483,28 +483,30 @@ Uma possibilidade inicial é cadastrar os valores manualmente como variáveis cr
 Lambda e manter a fonte em secrets protegidos do GitHub. A decisão precisa ser revisada antes da
 implementação, pois adicionar Secrets Manager criaria outro serviço fora da estimativa atual.
 
-### 7.7 Empacotar em ZIP e implantar a Lambda
+### 7.7 Empacotar no ECR e implantar a Lambda
 
 Quando o serviço existir:
 
-1. compilar o executável Go `bootstrap` para `linux/amd64`, pois a estimativa da Lambda usa x86;
-2. empacotar o executável em um ZIP;
-3. enviar o ZIP ao bucket de mídias já existente usando uma chave baseada no SHA, como
-   `lambda/notification-service/<SHA>.zip`;
-4. atualizar a mesma stack de serviços com `DeployNotificationLambda=true` e a chave enviada em
-   `NotificationCodeS3Key`;
+1. criar o repositório `alibe/notification-service` pelo `03-services.yml`, mantendo
+   `DeployNotificationLambda=false` na primeira atualização;
+2. construir a imagem Go para `linux/amd64`, pois a estimativa da Lambda usa x86;
+3. publicar a imagem no ECR usando o SHA do commit como tag imutável;
+4. atualizar a mesma stack de serviços com `DeployNotificationLambda=true` e o SHA enviado em
+   `NotificationImageTag`;
 5. manter por CloudFormation:
    - role mínima da Lambda;
-   - função baseada no ZIP existente no S3;
+   - função baseada na imagem do ECR;
    - event source mapping da fila SQS;
    - timeout curto;
    - 256 MB de memória;
    - 512 MB de armazenamento temporário;
    - concorrência máxima de duas invocações pelo consumidor da fila.
 
-Essa decisão reutiliza o S3 já estimado e evita criar um segundo repositório ECR. O parâmetro
-`DeployNotificationLambda` permanece `false` por padrão para que uma atualização manual da stack
-não comece a consumir mensagens antes do pacote existir.
+O segundo repositório ECR separa a imagem x86 da Lambda Go das imagens ARM64 do Backend/K3s. O ECR
+cobra pelo armazenamento total das imagens, e não por uma máquina permanentemente ligada. A policy
+de retenção mantém somente cinco imagens. O parâmetro `DeployNotificationLambda` permanece `false`
+por padrão para criar primeiro o repositório vazio, sem tentar iniciar uma Lambda antes de a imagem
+existir.
 
 A Lambda deve permanecer fora da VPC. Ela recebe mensagens pelo serviço gerenciado do SQS e precisa
 acessar FCM/APNs pela internet. Colocá-la nas subnets privadas exigiria NAT Gateway, que não está no

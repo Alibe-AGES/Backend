@@ -7,11 +7,6 @@ Parameters:
     Default: alibe
     Description: Nome usado para identificar os recursos do projeto.
 
-  DataStackName:
-    Type: String
-    Default: alibe-data2
-    Description: Nome da stack criada pelo arquivo 02-data.yml.
-
   DeployNotificationLambda:
     Type: String
     Default: 'false'
@@ -20,7 +15,20 @@ Parameters:
       - 'false'
     Description: >-
       Use true somente apos enviar a imagem Docker da Lambda Go ao ECR.
-      O valor false impede a criacao e a execucao acidental da Lambda.
+      O valor false nao cria a Lambda; se ela ja existir, uma atualizacao com
+      false removera a funcao, a role e o consumidor da fila.
+
+  NotificationImageTag:
+    Type: String
+    Default: not-deployed
+    AllowedPattern: '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$'
+    ConstraintDescription: >-
+      Use uma tag Docker valida, preferencialmente o SHA do commit.
+    Description: >-
+      Tag imutavel da imagem Go ja publicada no ECR. Use o SHA do commit e nao latest.
+
+Conditions:
+  ShouldDeployNotificationLambda: !Equals [!Ref DeployNotificationLambda, 'true']
 
 Resources:
   BackendRepository:
@@ -70,7 +78,6 @@ Resources:
         - Key: Workload
           Value: backend
 
-  # --- REPOSITÓRIO ECR PARA O NOTIFICATION SERVICE (GO) ---
   NotificationLambdaRepository:
     Type: AWS::ECR::Repository
     DeletionPolicy: Delete
@@ -83,6 +90,22 @@ Resources:
       EncryptionConfiguration:
         EncryptionType: AES256
       EmptyOnDelete: true
+      RepositoryPolicyText:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: LambdaECRImageRetrievalPolicy
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub >-
+                  arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-prod-notification
       LifecyclePolicy:
         LifecyclePolicyText: |
           {
@@ -134,6 +157,7 @@ Resources:
 
   NotificationLambdaRole:
     Type: AWS::IAM::Role
+    Condition: ShouldDeployNotificationLambda
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -161,12 +185,17 @@ Resources:
 
   NotificationLambda:
     Type: AWS::Lambda::Function
+    Condition: ShouldDeployNotificationLambda
     Properties:
       FunctionName: !Sub '${ProjectName}-prod-notification'
       Description: Consome a fila de notificacoes e encaminha cada push ao Expo via container Go.
       PackageType: Image
       Code:
-        ImageUri: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${NotificationLambdaRepository}:latest'
+        ImageUri:
+          Fn::Sub:
+            - '${RepositoryUri}:${ImageTag}'
+            - RepositoryUri: !GetAtt NotificationLambdaRepository.RepositoryUri
+              ImageTag: !Ref NotificationImageTag
       Architectures:
         - x86_64
       Role: !GetAtt NotificationLambdaRole.Arn
@@ -180,6 +209,7 @@ Resources:
 
   NotificationQueueConsumer:
     Type: AWS::Lambda::EventSourceMapping
+    Condition: ShouldDeployNotificationLambda
     Properties:
       BatchSize: 10
       Enabled: true
@@ -208,7 +238,7 @@ Outputs:
       Name: !Sub '${AWS::StackName}-BackendRepositoryUri'
 
   NotificationLambdaRepositoryUri:
-    Description: Repositorio ECR do Notification Service (Go).
+    Description: Repositorio ECR da imagem do Notification Service em Go.
     Value: !GetAtt NotificationLambdaRepository.RepositoryUri
     Export:
       Name: !Sub '${AWS::StackName}-NotificationLambdaRepositoryUri'
@@ -225,12 +255,14 @@ Outputs:
       Name: !Sub '${AWS::StackName}-NotificationQueueArn'
 
   NotificationLambdaName:
+    Condition: ShouldDeployNotificationLambda
     Description: Nome da Lambda Go consumidora da fila.
     Value: !Ref NotificationLambda
     Export:
       Name: !Sub '${AWS::StackName}-NotificationLambdaName'
 
   NotificationLambdaArn:
+    Condition: ShouldDeployNotificationLambda
     Description: ARN da Lambda Go consumidora da fila.
     Value: !GetAtt NotificationLambda.Arn
     Export:
