@@ -1,10 +1,9 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ProposalRepository } from '../domain/proposal.entity.repository';
 import { ProposalDto } from '../http/dto/proposal-dto';
-import { ListGroupsUseCase } from 'src/modules/groups/application/list-groups.use-case';
-import { is } from 'zod/locales';
-import { Group } from 'generated/prisma/browser';
-import { GetGroupUseCase } from 'src/modules/groups/application/get-group.use-case';
+import { ListGroupsUseCase } from '../../../../src/modules/groups/application/list-groups.use-case';
+import { Group } from '../../../../generated/prisma/browser';
+import { GetGroupUseCase } from '../../../../src/modules/groups/application/get-group.use-case';
 
 @Injectable()
 export class GetProposalByGroupUseCase {
