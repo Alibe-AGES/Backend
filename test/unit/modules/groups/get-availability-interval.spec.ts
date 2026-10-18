@@ -2,6 +2,7 @@ import {
   GetAvailabilityIntervalsUseCase,
   GroupNotFoundError,
   InvalidAvailabilityDateError,
+  AvailabilityAccessDeniedError,
 } from '../../../../src/modules/groups/application/get-availability-intervals.use-case';
 import {
   type GroupAvailabilitiesByDate,
@@ -47,12 +48,13 @@ describe('GetAvailabilityIntervalsUseCase', () => {
       findAvailabilitiesByDate: jest.fn(),
     };
     useCase = new GetAvailabilityIntervalsUseCase(groups);
+    groups.findMembership.mockResolvedValue(true);
   });
 
   it('returns the availability data for a valid date', async () => {
     groups.findAvailabilitiesByDate.mockResolvedValue(availabilities);
 
-    await expect(useCase.execute(GROUP_ID, DATE, USER_ID)).resolves.toBe(availabilities);
+    await expect(useCase.execute(GROUP_ID, DATE, USER_ID)).resolves.toEqual(availabilities);
     expect(groups.findAvailabilitiesByDate).toHaveBeenCalledWith(GROUP_ID, DATE, USER_ID);
   });
 
@@ -64,13 +66,46 @@ describe('GetAvailabilityIntervalsUseCase', () => {
     );
   });
 
-  it.each(['2026/09/26', '2026-99-99', '2026-02-31'])(
+  it.each(['2026/09/26', '2026-99-99', '2026-02-31', '', undefined, null, [DATE], { date: DATE }])(
     'rejects the invalid date %s before consulting the repository',
     async (date) => {
       await expect(useCase.execute(GROUP_ID, date, USER_ID)).rejects.toBeInstanceOf(
         InvalidAvailabilityDateError
       );
       expect(groups.findAvailabilitiesByDate).not.toHaveBeenCalled();
+      expect(groups.findMembership).not.toHaveBeenCalled();
     }
   );
+
+  it.each([
+    [null, GroupNotFoundError],
+    [false, AvailabilityAccessDeniedError],
+  ])('rejects membership %p without reading availabilities', async (membership, error) => {
+    groups.findMembership.mockResolvedValue(membership);
+    await expect(useCase.execute(GROUP_ID, DATE, USER_ID)).rejects.toBeInstanceOf(error);
+    expect(groups.findMembership).toHaveBeenCalledWith(GROUP_ID, USER_ID);
+    expect(groups.findAvailabilitiesByDate).not.toHaveBeenCalled();
+  });
+
+  it.each([1, 2])(
+    'moves the current user from index %s without reordering other members',
+    async (index) => {
+      const current = availabilities.users[0];
+      const others = ['other-a', 'other-b'].map((id) => ({ ...current, id }));
+      const users = [...others];
+      users.splice(index, 0, current);
+      const original = [...users];
+      groups.findAvailabilitiesByDate.mockResolvedValue({ date: DATE, users });
+      const result = await useCase.execute(GROUP_ID, DATE, USER_ID);
+      expect(result.users.map((user) => user.id)).toEqual([USER_ID, 'other-a', 'other-b']);
+      expect(users).toEqual(original);
+    }
+  );
+
+  it('accepts a past date without applying the POST restriction', async () => {
+    groups.findAvailabilitiesByDate.mockResolvedValue({ ...availabilities, date: '2000-02-29' });
+    await expect(useCase.execute(GROUP_ID, '2000-02-29', USER_ID)).resolves.toMatchObject({
+      date: '2000-02-29',
+    });
+  });
 });

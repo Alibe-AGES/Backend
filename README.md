@@ -726,6 +726,30 @@ O grupo deve existir e o usuário autenticado deve participar dele. Grupo inexis
 Os exemplos de requisição e resposta podem ser consultados pelo Swagger em
 <http://localhost:3000/docs>.
 
+### Consulta de disponibilidade de um dia
+
+O GET fica no módulo `groups` e consulta todos os participantes, inclusive aqueles sem
+disponibilidade registrada:
+
+```http
+GET /groups/:groupId/availabilities?date=2026-09-05
+```
+
+`date` é obrigatória no formato `YYYY-MM-DD` e deve existir no calendário. Datas passadas são
+aceitas; parâmetros `date` repetidos ou estruturados são rejeitados. O usuário vem da sessão
+e precisa participar do grupo.
+
+A resposta `200` mantém `{ date, users }`. Cada participante contém `id`, `name`, `image`,
+`isCurrentUser`, `availableAllDay` e `intervals`. O usuário autenticado aparece primeiro, com
+`isCurrentUser: true`; os demais têm `false` e mantêm sua ordem relativa. A imagem usa
+`/users/:id/profile-picture` ou `null`.
+
+Os intervalos são pares `["HH:mm", "HH:mm"]` em UTC, sem ordenação, união ou deduplicação.
+Um registro com início e fim nulos define `availableAllDay: true`, preservando os demais
+intervalos. Participantes sem registros retornam `availableAllDay: false` e `intervals: []`.
+UUID ou data inválidos respondem `400`, ausência de sessão `401`, usuário fora do grupo `403`
+e grupo inexistente `404`. A regra do POST que impede datas passadas permanece independente.
+
 ### Endpoint de criação de evento
 
 A criação fica no módulo `events`, no mesmo `EventController` da atualização. O grupo vem pela URL
@@ -787,6 +811,7 @@ nos decorators do Swagger de cada controller.
 | POST   | `/invite-links/:token/join`                  | `201`   | `400`, `500`                      |
 | GET    | `/groups/:groupId/calendar`                  | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/groups/:groupId/availabilities`            | `201`   | `400`, `401`, `403`, `404`, `500` |
+| GET    | `/groups/:groupId/availabilities`            | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/groups/:groupId/events`                    | `201`   | `400`, `401`, `403`, `404`, `413` |
 | GET    | `/api/events/:eventId/image`                 | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/api/events/:eventId/proposal/responses`    | `201`   | `400`, `401`, `403`, `404`, `409` |
