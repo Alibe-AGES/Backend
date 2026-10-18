@@ -7,22 +7,23 @@ import { GetGroupUseCase } from '../../../../src/modules/groups/application/get-
 
 @Injectable()
 export class GetProposalByGroupUseCase {
-  constructor(private readonly proposalRepository: ProposalRepository,
-              private readonly listGroupsUseCase: ListGroupsUseCase,
-              private readonly getGroupUseCase: GetGroupUseCase
-            ) {}
+  constructor(
+    private readonly proposalRepository: ProposalRepository,
+    private readonly listGroupsUseCase: ListGroupsUseCase,
+    private readonly getGroupUseCase: GetGroupUseCase
+  ) {}
 
   async execute(groupId: string, userId: string): Promise<ProposalDto[]> {
     const group = await this.getGroupUseCase.execute(groupId);
 
-    if(!group){
-      throw new NotFoundException('Grupo inexistente.')
+    if (!group) {
+      throw new NotFoundException('Grupo inexistente.');
     }
 
     const groups = await this.listGroupsUseCase.execute(userId);
-    
+
     const isInGroup = groups.some((g: Group) => g.id === groupId);
-    
+
     if (!isInGroup) {
       throw new ForbiddenException('Usuário não pertence ao respectivo grupo.');
     }

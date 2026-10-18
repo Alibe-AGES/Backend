@@ -58,7 +58,7 @@ const mockGroup = {
   profilePic: null,
   createdAt: new Date(),
   participants: [],
-  nextEvent: null
+  nextEvent: null,
 };
 
 describe('GetProposalByGroupUseCase', () => {
@@ -121,9 +121,7 @@ describe('GetProposalByGroupUseCase', () => {
     const nonExistentGroupId = 'non-existent-group-id';
     getGroupUseCase.execute.mockResolvedValue(null as any);
 
-    await expect(useCase.execute(nonExistentGroupId, USER_ID)).rejects.toThrow(
-      NotFoundException
-    );
+    await expect(useCase.execute(nonExistentGroupId, USER_ID)).rejects.toThrow(NotFoundException);
 
     expect(getGroupUseCase.execute).toHaveBeenCalledWith(nonExistentGroupId);
     expect(proposalRepository.findProposalsByGroup).not.toHaveBeenCalled();

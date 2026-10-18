@@ -27,14 +27,16 @@ describe('Group proposals endpoints (e2e)', () => {
   const previousMockAuthUserId = process.env.MOCK_AUTH_USER_ID;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule, ProposalsModule, GroupsModule] })
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule, ProposalsModule, GroupsModule],
+    })
       .overrideProvider(S3_CLIENT)
       .useValue({ send: jest.fn() })
       .overrideProvider(S3_BUCKET)
       .useValue('alibe-local-media')
       .overrideProvider(PrismaService)
       .useValue({})
-      .overrideProvider(GetGroupUseCase) 
+      .overrideProvider(GetGroupUseCase)
       .useValue({
         execute: jest.fn().mockResolvedValue({
           id: GROUP_ID,
@@ -181,9 +183,9 @@ describe('Group proposals endpoints (e2e)', () => {
 
     expect(response.status).toBe(403);
     expect(response.body).toEqual({
-      "error": "Forbidden", 
-      "message": "Usuário não pertence ao respectivo grupo.", 
-      "statusCode": 403
+      error: 'Forbidden',
+      message: 'Usuário não pertence ao respectivo grupo.',
+      statusCode: 403,
     });
   });
 
