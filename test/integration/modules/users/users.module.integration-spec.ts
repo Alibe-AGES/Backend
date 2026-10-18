@@ -5,6 +5,7 @@ import { UsersController } from '../../../../src/modules/users/http/users.contro
 import { UsersModule } from '../../../../src/modules/users/users.module';
 import { PushTokensController } from '../../../../src/modules/users/http/push-tokens.controller';
 import { RegisterPushTokenUseCase } from '../../../../src/modules/users/application/register-push-token.use-case';
+import { SendTestPushNotificationUseCase } from '../../../../src/modules/users/application/send-test-push-notification.use-case';
 
 describe('UsersModule integration', () => {
   let module: TestingModule;
@@ -30,5 +31,8 @@ describe('UsersModule integration', () => {
     expect(module.get(UsersController)).toBeInstanceOf(UsersController);
     expect(module.get(PushTokensController)).toBeInstanceOf(PushTokensController);
     expect(module.get(RegisterPushTokenUseCase)).toBeInstanceOf(RegisterPushTokenUseCase);
+    expect(module.get(SendTestPushNotificationUseCase)).toBeInstanceOf(
+      SendTestPushNotificationUseCase
+    );
   });
 });

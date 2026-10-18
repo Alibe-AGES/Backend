@@ -65,6 +65,11 @@ describe('EventController (e2e)', () => {
       status: 'pending',
       ownerAnswer: 'yes',
       createdAt: new Date('2026-09-22T18:30:00.000Z'),
+      notification: {
+        type: 'createdEvent',
+        message: 'O evento "Jantar de aniversário" foi criado para o dia 15/10/2026.',
+        createdAt: new Date('2026-09-22T18:30:00.000Z'),
+      },
     };
 
     await eventRepository.create(eventData);

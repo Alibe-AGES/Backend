@@ -176,6 +176,17 @@ export class PrismaEventRepository extends EventRepository {
       select: { id: true, userId: true, answer: true },
     });
 
+    await transaction.groupNotification.create({
+      data: {
+        type: data.notification.type,
+        message: data.notification.message,
+        createdAt: data.notification.createdAt,
+        groupId: data.groupId,
+        eventId: data.id,
+      },
+      select: { id: true },
+    });
+
     const event = await transaction.event.findUniqueOrThrow({
       where: { id: data.id },
       include: eventInclude,

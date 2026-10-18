@@ -47,14 +47,11 @@ Resources:
       VpcId:
         Fn::ImportValue: !Sub '${NetworkStackName}-VpcId'
       SecurityGroupIngress:
-        # A API fica restrita ao IP informado durante esta fase manual, ainda sem TLS.
         - Description: HTTP temporario da API e do Swagger, restrito ao administrador
           IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           CidrIp: !Ref AllowedClientCidr
-        # O terminal do navegador usa SSH internamente, mas somente a faixa oficial
-        # do EC2 Instance Connect em Ohio consegue alcançar esta porta.
         - Description: Terminal web pelo EC2 Instance Connect de Ohio
           IpProtocol: tcp
           FromPort: 22
@@ -154,7 +151,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref LatestArm64AmiId
-      InstanceType: t4g.medium # Uma unica instancia, exatamente como previsto no PDF de custos.
+      InstanceType: t4g.medium
       IamInstanceProfile: !Ref ComputeInstanceProfile
       SubnetId:
         Fn::ImportValue: !Sub '${NetworkStackName}-PublicSubnetId'
@@ -164,17 +161,17 @@ Resources:
         - DeviceName: /dev/xvda
           Ebs:
             VolumeType: gp3
-            VolumeSize: 12 # Suficiente para o host e o cluster pequeno, com retencao limitada do Prometheus.
+            VolumeSize: 12
             Encrypted: true
             DeleteOnTermination: true
       CreditSpecification:
-        CPUCredits: standard # Impede cobranca de creditos Unlimited em carga sustentada.
-      Monitoring: false # Nao ativa o Detailed Monitoring cobrado do EC2.
-      InstanceInitiatedShutdownBehavior: stop # Um shutdown dentro do Linux pausa a EC2 em vez de encerra-la.
+        CPUCredits: standard
+      Monitoring: false
+      InstanceInitiatedShutdownBehavior: stop
       MetadataOptions:
         HttpEndpoint: enabled
-        HttpTokens: required # IMDSv2 obrigatorio para proteger as credenciais temporarias da role.
-        HttpPutResponseHopLimit: 2 # Permite que o container da API use a role sem chaves AWS estaticas.
+        HttpTokens: required
+        HttpPutResponseHopLimit: 2
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-prod-compute'
@@ -188,8 +185,8 @@ Resources:
   ComputePublicIp:
     Type: AWS::EC2::EIP
     Properties:
-      Domain: vpc # Um unico IPv4 fixo, previsto no PDF e mantido mesmo com a EC2 parada.
-      InstanceId: !Ref ComputeInstance # Associa o IP sem criar uma interface de rede separada.
+      Domain: vpc
+      InstanceId: !Ref ComputeInstance
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-prod-api'
@@ -200,22 +197,21 @@ Resources:
 
 Outputs:
   InstanceId:
-    Description: ID da unica EC2 que executara a API e, futuramente, o K3s.
+    Description: ID da unica EC2 que executara a API e o K3s.
     Value: !Ref ComputeInstance
     Export:
       Name: !Sub '${AWS::StackName}-InstanceId'
 
   PublicIp:
-    Description: IPv4 fixo da API; o SSH aceita somente o EC2 Instance Connect.
+    Description: IPv4 fixo da API.
     Value: !Ref ComputePublicIp
     Export:
       Name: !Sub '${AWS::StackName}-PublicIp'
 
   ApiHttpUrl:
-    Description: URL HTTP temporaria para validar a API antes da configuracao de TLS.
+    Description: URL HTTP temporaria para validar a API.
     Value: !Sub 'http://${ComputePublicIp}'
 
   SwaggerUrl:
-    Description: URL temporaria do Swagger, acessivel apenas pelo CIDR autorizado.
+    Description: URL temporaria do Swagger.
     Value: !Sub 'http://${ComputePublicIp}/docs'
-

@@ -30,15 +30,15 @@ S3, SQS, Lambda, RDS, EC2, EBS e um IPv4 público em `us-east-2`.
 
 ### Infraestrutura já descrita
 
-| Arquivo | Responsabilidade |
-| --- | --- |
-| `cloudformation/00-safety.yml` | Budget mensal e alerta de custo |
-| `cloudformation/01-network.yml` | VPC, subnet pública, subnets privadas, rotas e Internet Gateway |
-| `cloudformation/02-data.yml` | S3 privado e RDS PostgreSQL privado |
-| `cloudformation/03-services.yml` | ECR da API e fila SQS |
-| `cloudformation/04-compute.yml` | EC2, EBS, Elastic IP, IAM e Security Groups |
-| `compose.ec2.yml` | Deploy inicial da API diretamente na EC2 |
-| `.env.production.example` | Modelo das variáveis necessárias na EC2 |
+| Arquivo                          | Responsabilidade                                                |
+| -------------------------------- | --------------------------------------------------------------- |
+| `cloudformation/00-safety.yml`   | Budget mensal e alerta de custo                                 |
+| `cloudformation/01-network.yml`  | VPC, subnet pública, subnets privadas, rotas e Internet Gateway |
+| `cloudformation/02-data.yml`     | S3 privado e RDS PostgreSQL privado                             |
+| `cloudformation/03-services.yml` | ECR da API, fila SQS e Lambda Go opcional                       |
+| `cloudformation/04-compute.yml`  | EC2, EBS, Elastic IP, IAM e Security Groups                     |
+| `compose.ec2.yml`                | Deploy inicial da API diretamente na EC2                        |
+| `.env.production.example`        | Modelo das variáveis necessárias na EC2                         |
 
 ### Ordem obrigatória
 
@@ -483,22 +483,28 @@ Uma possibilidade inicial é cadastrar os valores manualmente como variáveis cr
 Lambda e manter a fonte em secrets protegidos do GitHub. A decisão precisa ser revisada antes da
 implementação, pois adicionar Secrets Manager criaria outro serviço fora da estimativa atual.
 
-### 7.7 Empacotar no ECR e implantar a Lambda
+### 7.7 Empacotar em ZIP e implantar a Lambda
 
 Quando o serviço existir:
 
-1. adicionar um segundo repositório ECR para notificações em `03-services.yml`;
-2. manter o armazenamento total dos repositórios dentro dos 5 GB estimados;
-3. construir a imagem Go para `linux/amd64`, pois a estimativa da Lambda usa x86;
-4. publicar com tag baseada no SHA;
-5. adicionar por CloudFormation:
+1. compilar o executável Go `bootstrap` para `linux/amd64`, pois a estimativa da Lambda usa x86;
+2. empacotar o executável em um ZIP;
+3. enviar o ZIP ao bucket de mídias já existente usando uma chave baseada no SHA, como
+   `lambda/notification-service/<SHA>.zip`;
+4. atualizar a mesma stack de serviços com `DeployNotificationLambda=true` e a chave enviada em
+   `NotificationCodeS3Key`;
+5. manter por CloudFormation:
    - role mínima da Lambda;
-   - função baseada na imagem do ECR;
+   - função baseada no ZIP existente no S3;
    - event source mapping da fila SQS;
    - timeout curto;
    - 256 MB de memória;
    - 512 MB de armazenamento temporário;
-   - concorrência limitada após teste de carga.
+   - concorrência máxima de duas invocações pelo consumidor da fila.
+
+Essa decisão reutiliza o S3 já estimado e evita criar um segundo repositório ECR. O parâmetro
+`DeployNotificationLambda` permanece `false` por padrão para que uma atualização manual da stack
+não comece a consumir mensagens antes do pacote existir.
 
 A Lambda deve permanecer fora da VPC. Ela recebe mensagens pelo serviço gerenciado do SQS e precisa
 acessar FCM/APNs pela internet. Colocá-la nas subnets privadas exigiria NAT Gateway, que não está no

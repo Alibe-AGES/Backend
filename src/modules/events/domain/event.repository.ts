@@ -72,6 +72,11 @@ export interface CreateEventData {
   status: EventStatus;
   ownerAnswer: ProposalAnswer;
   createdAt: Date;
+  notification: {
+    type: 'createdEvent';
+    message: string;
+    createdAt: Date;
+  };
 }
 
 export interface CreatedEvent {

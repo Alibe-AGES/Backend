@@ -42,6 +42,7 @@ model User {
   folders           Folder[]
   sessions          Session[]
   accounts          Account[]
+  notificationReads GroupNotificationRead[]
 
   @@map("user")
 }
@@ -102,12 +103,13 @@ model Group {
   profilePic String?  @map("profile_pic")
   createdAt  DateTime @map("created_at")
 
-  users        UserGroup[]
-  events       Event[]
-  moods        Mood[]
+  users          UserGroup[]
+  events         Event[]
+  moods          Mood[]
   availabilities Availability[]
-  inviteLinks  InviteLink[]
-  folders      Folder[]
+  inviteLinks    InviteLink[]
+  folders        Folder[]
+  notifications  GroupNotification[]
 
   @@map("group")
 }
@@ -136,18 +138,48 @@ model Event {
   groupId     String     @map("group_id") @db.Uuid
   locationId  String     @map("location_id") @db.Uuid
 
-  group    Group     @relation(fields: [groupId], references: [id])
-  location Location  @relation(fields: [locationId], references: [id])
-  memories Memory[]
-  proposals Proposal[]
+  group         Group               @relation(fields: [groupId], references: [id])
+  location      Location            @relation(fields: [locationId], references: [id])
+  memories      Memory[]
+  proposals     Proposal[]
+  notifications GroupNotification[]
 
   @@map("event")
 }
 
+model GroupNotification {
+  id        String                @id @default(uuid()) @db.Uuid
+  type      GroupNotificationType
+  message   String                @db.VarChar(255)
+  createdAt DateTime              @default(now()) @map("created_at")
+  groupId   String                @map("group_id") @db.Uuid
+  eventId   String?               @map("event_id") @db.Uuid
+
+  group Group                   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  event Event?                  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  reads GroupNotificationRead[]
+
+  @@index([groupId, createdAt(sort: Desc), id(sort: Desc)])
+  @@map("group_notification")
+}
+
+model GroupNotificationRead {
+  notificationId String   @map("notification_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  readAt         DateTime @default(now()) @map("read_at")
+
+  notification GroupNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([notificationId, userId])
+  @@index([userId])
+  @@map("group_notification_read")
+}
+
 model Memory {
-  id      String @id @default(uuid()) @db.Uuid
+  id      String  @id @default(uuid()) @db.Uuid
   picture String?
-  eventId String @map("event_id") @db.Uuid
+  eventId String  @map("event_id") @db.Uuid
 
   event Event @relation(fields: [eventId], references: [id])
 
@@ -155,11 +187,11 @@ model Memory {
 }
 
 model Mood {
-  id         String   @id @default(uuid()) @db.Uuid
-  humorScale Int?     @map("humor_scale")
+  id         String    @id @default(uuid()) @db.Uuid
+  humorScale Int?      @map("humor_scale")
   date       DateTime? @db.Date
-  userId     String   @map("user_id") @db.Uuid
-  groupId    String   @map("group_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  groupId    String    @map("group_id") @db.Uuid
 
   user  User  @relation(fields: [userId], references: [id])
   group Group @relation(fields: [groupId], references: [id])
@@ -271,4 +303,11 @@ enum AnswerEnum {
   no
 
   @@map("answer_enum")
+}
+
+enum GroupNotificationType {
+  match
+  createdEvent
+
+  @@map("group_notification_type")
 }

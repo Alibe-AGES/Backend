@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: ECR da API e fila SQS de notificacoes de producao do projeto Alibe
+Description: ECR da API, fila SQS e Lambda Go de notificacoes do projeto Alibe
 
 Parameters:
   ProjectName:
@@ -7,18 +7,33 @@ Parameters:
     Default: alibe
     Description: Nome usado para identificar os recursos do projeto.
 
+  DataStackName:
+    Type: String
+    Default: alibe-data2
+    Description: Nome da stack criada pelo arquivo 02-data.yml.
+
+  DeployNotificationLambda:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: >-
+      Use true somente apos enviar a imagem Docker da Lambda Go ao ECR.
+      O valor false impede a criacao e a execucao acidental da Lambda.
+
 Resources:
   BackendRepository:
     Type: AWS::ECR::Repository
-    DeletionPolicy: Delete # Imagens de deploy podem ser reconstruidas a partir do codigo-fonte.
+    DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
       RepositoryName: !Sub '${ProjectName}/backend'
-      ImageTagMutability: IMMUTABLE # Evita substituir silenciosamente uma imagem ja implantada.
+      ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration:
-        ScanOnPush: true # Usa a configuracao de scanning do registro sem criar outro servico.
+        ScanOnPush: true
       EncryptionConfiguration:
-        EncryptionType: AES256 # Criptografia gerenciada pelo ECR, sem chave KMS adicional.
+        EncryptionType: AES256
       EmptyOnDelete: true
       LifecyclePolicy:
         LifecyclePolicyText: |
@@ -55,26 +70,129 @@ Resources:
         - Key: Workload
           Value: backend
 
+  # --- REPOSITÓRIO ECR PARA O NOTIFICATION SERVICE (GO) ---
+  NotificationLambdaRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RepositoryName: !Sub '${ProjectName}/notification-service'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      EmptyOnDelete: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove imagens sem tag depois de um dia",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 1
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Mantem somente as cinco imagens mais recentes",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+        - Key: Workload
+          Value: notification-service
+
   NotificationQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub '${ProjectName}-prod-notifications'
-      SqsManagedSseEnabled: true # Criptografia gerenciada pelo SQS, sem custo de uma chave KMS.
-      MessageRetentionPeriod: 345600 # Quatro dias para recuperar falhas sem guardar mensagens indefinidamente.
-      VisibilityTimeout: 60 # Seis vezes o timeout da Lambda, conforme recomendado para o consumidor.
-      ReceiveMessageWaitTimeSeconds: 20 # Long polling reduz requisicoes vazias e ajuda a controlar custo.
+      SqsManagedSseEnabled: true
+      MessageRetentionPeriod: 345600
+      VisibilityTimeout: 60
+      ReceiveMessageWaitTimeSeconds: 20
       Tags:
         - Key: Project
           Value: !Ref ProjectName
         - Key: Environment
           Value: production
 
-  # O repositorio da imagem Go, a Lambda, sua role IAM e o consumidor da fila serao
-  # adicionados quando o servico de notificacoes existir e estiver pronto para publicacao.
+  NotificationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ConsumeNotificationQueue
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt NotificationQueue.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  NotificationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-prod-notification'
+      Description: Consome a fila de notificacoes e encaminha cada push ao Expo via container Go.
+      PackageType: Image
+      Code:
+        ImageUri: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${NotificationLambdaRepository}:latest'
+      Architectures:
+        - x86_64
+      Role: !GetAtt NotificationLambdaRole.Arn
+      MemorySize: 256
+      Timeout: 10
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  NotificationQueueConsumer:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt NotificationQueue.Arn
+      FunctionName: !Ref NotificationLambda
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      ScalingConfig:
+        MaximumConcurrency: 2
 
 Outputs:
   BackendRepositoryName:
-    Description: Repositorio das imagens ARM64 da API executada na EC2 t4g.
+    Description: Repositorio das imagens da API executada na EC2.
     Value: !Ref BackendRepository
     Export:
       Name: !Sub '${AWS::StackName}-BackendRepositoryName'
@@ -89,6 +207,12 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-BackendRepositoryUri'
 
+  NotificationLambdaRepositoryUri:
+    Description: Repositorio ECR do Notification Service (Go).
+    Value: !GetAtt NotificationLambdaRepository.RepositoryUri
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationLambdaRepositoryUri'
+
   NotificationQueueUrl:
     Description: URL que a API usara para publicar notificacoes.
     Value: !Ref NotificationQueue
@@ -99,3 +223,15 @@ Outputs:
     Value: !GetAtt NotificationQueue.Arn
     Export:
       Name: !Sub '${AWS::StackName}-NotificationQueueArn'
+
+  NotificationLambdaName:
+    Description: Nome da Lambda Go consumidora da fila.
+    Value: !Ref NotificationLambda
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationLambdaName'
+
+  NotificationLambdaArn:
+    Description: ARN da Lambda Go consumidora da fila.
+    Value: !GetAtt NotificationLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationLambdaArn'

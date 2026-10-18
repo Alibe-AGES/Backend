@@ -8,6 +8,9 @@ import { GetEventUseCase } from '../../../../src/modules/events/application/get-
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import type { CreateEventDto } from '../../../../src/modules/events/http/dto/create-event.dto';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
+import { AttendanceReminderScheduler } from '../../../../src/modules/events/scheduling/attendance-reminder.scheduler';
+import { SendAttendanceRemindersUseCase } from '../../../../src/modules/events/application/send-attendance-reminders.use-case';
+import { DistributedTaskLock } from '../../../../src/shared/scheduling/distributed-task-lock';
 
 const groupId = '33333333-3333-4333-8333-333333333333';
 const userId = '11111111-1111-4111-8111-111111111111';
@@ -26,11 +29,13 @@ describe('EventsModule integration', () => {
     event: { create: jest.fn(), findUniqueOrThrow: jest.fn() },
     proposal: { create: jest.fn() },
     proposalResponse: { create: jest.fn() },
+    groupNotification: { create: jest.fn() },
   };
 
   const prisma = {
     group: { findUnique: jest.fn() },
     event: { findUnique },
+    userGroup: { findMany: jest.fn() },
     $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) => callback(transaction)),
   } as unknown as PrismaService;
 
@@ -54,12 +59,16 @@ describe('EventsModule integration', () => {
   beforeEach(() => {
     findUnique.mockReset();
     jest.clearAllMocks();
+    (prisma.userGroup.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   it('registers the events controller and connects use cases to repository', () => {
     expect(moduleFixture.get(EventController)).toBeInstanceOf(EventController);
     expect(moduleFixture.get(GetEventUseCase)).toBeDefined();
     expect(moduleFixture.get(EventRepository)).toBeDefined();
+    expect(moduleFixture.get(SendAttendanceRemindersUseCase)).toBeDefined();
+    expect(moduleFixture.get(AttendanceReminderScheduler)).toBeDefined();
+    expect(moduleFixture.get(DistributedTaskLock)).toBeDefined();
   });
 
   it('connects controller, use case and Prisma repository to create an event', async () => {
@@ -75,6 +84,7 @@ describe('EventsModule integration', () => {
       userId,
       answer: 'yes',
     });
+    transaction.groupNotification.create.mockResolvedValue({ id: 'notification-id' });
     transaction.event.findUniqueOrThrow.mockImplementation(({ where }: { where: { id: string } }) =>
       Promise.resolve({
         id: where.id,
@@ -104,6 +114,17 @@ describe('EventsModule integration', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(transaction.location.create).toHaveBeenCalledWith({
       data: { description: 'Casa', manuallyCreated: true },
+      select: { id: true },
+    });
+    expect(transaction.groupNotification.create).toHaveBeenCalledWith({
+      data: {
+        type: 'createdEvent',
+        message:
+          '${user:11111111-1111-4111-8111-111111111111} criou o evento "Jantar" para o dia 15/10/2026 às 20:00.',
+        createdAt: expect.any(Date),
+        groupId,
+        eventId: expect.any(String),
+      },
       select: { id: true },
     });
     expect(result).toMatchObject({

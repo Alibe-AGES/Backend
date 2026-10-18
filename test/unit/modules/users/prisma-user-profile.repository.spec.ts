@@ -85,4 +85,25 @@ describe('PrismaUserProfileRepository', () => {
     });
     expect(transaction).toHaveBeenCalledWith([clearPreviousOwner, updateCurrentUser]);
   });
+
+  it('finds the Expo push token without selecting other user fields', async () => {
+    const findUnique = jest.fn().mockResolvedValue({ expoPushToken: 'ExpoPushToken[test-token]' });
+    const repository = new PrismaUserProfileRepository({
+      user: { findUnique },
+    } as unknown as PrismaService);
+
+    await expect(repository.findExpoPushToken(userId)).resolves.toBe('ExpoPushToken[test-token]');
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: userId },
+      select: { expoPushToken: true },
+    });
+  });
+
+  it('returns null when the user has no Expo push token', async () => {
+    const repository = new PrismaUserProfileRepository({
+      user: { findUnique: jest.fn().mockResolvedValue({ expoPushToken: null }) },
+    } as unknown as PrismaService);
+
+    await expect(repository.findExpoPushToken(userId)).resolves.toBeNull();
+  });
 });

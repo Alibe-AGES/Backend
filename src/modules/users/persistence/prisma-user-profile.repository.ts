@@ -66,4 +66,13 @@ export class PrismaUserProfileRepository extends UserProfileRepository {
       }),
     ]);
   }
+
+  async findExpoPushToken(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { expoPushToken: true },
+    });
+
+    return user?.expoPushToken ?? null;
+  }
 }

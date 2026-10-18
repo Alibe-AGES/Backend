@@ -384,6 +384,7 @@ describe('PrismaEventRepository', () => {
         },
         proposal: { create: jest.fn().mockResolvedValue({ id: baseRecord.proposals[0].id }) },
         proposalResponse: { create: jest.fn().mockResolvedValue(ownerResponse) },
+        groupNotification: { create: jest.fn().mockResolvedValue({ id: 'notification-id' }) },
       };
       const $transaction = jest.fn((callback: (tx: typeof transaction) => unknown) =>
         callback(transaction)
@@ -403,6 +404,11 @@ describe('PrismaEventRepository', () => {
         status: 'pending',
         ownerAnswer: 'yes',
         createdAt,
+        notification: {
+          type: 'createdEvent',
+          message: 'O evento "Event" foi criado para o dia 15/10/2026.',
+          createdAt,
+        },
       });
 
       expect($transaction).toHaveBeenCalledTimes(1);
@@ -431,6 +437,16 @@ describe('PrismaEventRepository', () => {
           createdAt,
         },
         select: { id: true, userId: true, answer: true },
+      });
+      expect(transaction.groupNotification.create).toHaveBeenCalledWith({
+        data: {
+          type: 'createdEvent',
+          message: 'O evento "Event" foi criado para o dia 15/10/2026.',
+          createdAt,
+          groupId: baseRecord.groupId,
+          eventId,
+        },
+        select: { id: true },
       });
       expect(result.event).toMatchObject({ id: eventId, budgetStart: '50.00' });
       expect(result.ownerResponse).toEqual(ownerResponse);

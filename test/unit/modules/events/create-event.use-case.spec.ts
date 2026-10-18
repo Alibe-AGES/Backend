@@ -7,6 +7,7 @@ import {
 } from '../../../../src/modules/events/application/create-event.use-case';
 import { InMemoryEventRepository } from '../../../helpers/in-memory-event.repository';
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
+import { GroupPushNotificationService } from '../../../../src/modules/events/application/group-push-notification.service';
 
 const GROUP_ID = '33333333-3333-4333-8333-333333333333';
 const OWNER_ID = '11111111-1111-4111-8111-111111111111';
@@ -28,12 +29,17 @@ describe('CreateEventUseCase', () => {
   let events: InMemoryEventRepository;
   let storage: InMemoryObjectStorage;
   let useCase: CreateEventUseCase;
+  let groupNotifications: jest.Mocked<GroupPushNotificationService>;
 
   beforeEach(() => {
     events = new InMemoryEventRepository();
     storage = new InMemoryObjectStorage();
     events.setGroupMembers(GROUP_ID, [OWNER_ID]);
-    useCase = new CreateEventUseCase(events, storage);
+    groupNotifications = {
+      sendToGroup: jest.fn().mockResolvedValue({ attempted: 1, sent: 1, failed: 0 }),
+      sendToRecipients: jest.fn(),
+    } as unknown as jest.Mocked<GroupPushNotificationService>;
+    useCase = new CreateEventUseCase(events, storage, groupNotifications);
   });
 
   it('creates a pending event with a manual location and the owner answering yes', async () => {
@@ -54,11 +60,26 @@ describe('CreateEventUseCase', () => {
         status: 'pending',
         ownerAnswer: 'yes',
         createdAt: expect.any(Date),
+        notification: {
+          type: 'createdEvent',
+          message:
+            '${user:11111111-1111-4111-8111-111111111111} criou o evento "Jantar de aniversário" para o dia 15/10/2026 às 20:00.',
+          createdAt: expect.any(Date),
+        },
       })
     );
     expect(event.status).toBe('pending');
     expect(event.location.manuallyCreated).toBe(true);
     expect(ownerResponse).toMatchObject({ userId: OWNER_ID, answer: 'yes' });
+    expect(groupNotifications.sendToGroup).toHaveBeenCalledWith(
+      GROUP_ID,
+      {
+        title: 'Novo encontro no grupo',
+        body: 'O evento "Jantar de aniversário" foi criado para o dia 15/10/2026 às 20:00.',
+        data: { type: 'new_event', eventId: event.id, groupId: GROUP_ID },
+      },
+      OWNER_ID
+    );
   });
 
   it('defaults optional budgets to null', async () => {
@@ -137,5 +158,12 @@ describe('CreateEventUseCase', () => {
 
     const imageKey = deleteSpy.mock.calls[0][0];
     await expect(storage.findByKey(imageKey)).resolves.toBeNull();
+    expect(groupNotifications.sendToGroup).not.toHaveBeenCalled();
+  });
+
+  it('keeps a persisted event when notification recipient lookup fails', async () => {
+    groupNotifications.sendToGroup.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(useCase.execute(validInput)).resolves.toHaveProperty('event.id');
   });
 });

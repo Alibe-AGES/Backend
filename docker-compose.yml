@@ -23,6 +23,8 @@ services:
       PORT: ${APP_PORT}
       DATABASE_URL: postgres://${DATABASE_USER}:${DATABASE_PASSWORD}@alibe-db:5432/${DATABASE_NAME}
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
+      AWS_SQS_NOTIFICATION_QUEUE_URL: ${AWS_SQS_NOTIFICATION_QUEUE_URL:-http://ministack:4566/000000000000/alibe-local-notifications}
+      ENABLE_NOTIFICATION_TEST_ENDPOINT: ${ENABLE_NOTIFICATION_TEST_ENDPOINT:-true}
 
     volumes:
       - .:/app
@@ -127,6 +129,18 @@ services:
       retries: 5
       start_period: 5s
 
+  notification-package:
+    build:
+      context: ../Notification-Service
+      dockerfile: Dockerfile
+      target: package
+      args:
+        TARGETOS: linux
+        TARGETARCH: amd64
+
+    volumes:
+      - notification-artifacts:/artifacts
+
   aws-bootstrap:
     image: amazon/aws-cli:2.36.34
     container_name: alibe-aws-bootstrap
@@ -134,6 +148,8 @@ services:
     depends_on:
       ministack:
         condition: service_healthy
+      notification-package:
+        condition: service_completed_successfully
 
     environment:
       AWS_ACCESS_KEY_ID: test
@@ -143,6 +159,7 @@ services:
 
     volumes:
       - ./infra:/infra:ro
+      - notification-artifacts:/artifacts:ro
 
     entrypoint: ['/bin/sh', '/infra/local/bootstrap.sh']
 
@@ -151,6 +168,7 @@ volumes:
   prometheus-data:
   grafana-data:
   ministack-data:
+  notification-artifacts:
 
 networks:
   default:
