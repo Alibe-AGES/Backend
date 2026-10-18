@@ -131,7 +131,7 @@ services:
 
   notification-package:
     build:
-      context: ../Notification-Service
+      context: ./services/notification-service
       dockerfile: Dockerfile
       target: package
       args:
