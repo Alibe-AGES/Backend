@@ -8,6 +8,12 @@ import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.serv
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { ProposalRepository } from '../../../../src/modules/proposals/domain/proposal.entity.repository';
 import { InMemoryProposalRepository } from '../../../helpers/in-memory-proposal.repository';
+import { GroupsModule } from '../../../../src/modules/groups/groups.module';
+import { ProposalsModule } from '../../../../src/modules/proposals/proposals.module';
+import { GetGroupUseCase } from '../../../../src/modules/groups/application/get-group.use-case';
+import { GroupRepository } from '../../../../src/modules/groups/domain/group.repository';
+import { InMemoryGroupRepository } from '../../../../test/helpers/in-memory-group.repository';
+import { ListGroupsUseCase } from '../../../../src/modules/groups/application/list-groups.use-case';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const GROUP_ID = 'd719525b-3514-4d3b-aa36-d51299bac4ab';
@@ -21,15 +27,41 @@ describe('Group proposals endpoints (e2e)', () => {
   const previousMockAuthUserId = process.env.MOCK_AUTH_USER_ID;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] })
+    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule, ProposalsModule, GroupsModule] })
       .overrideProvider(S3_CLIENT)
       .useValue({ send: jest.fn() })
       .overrideProvider(S3_BUCKET)
       .useValue('alibe-local-media')
       .overrideProvider(PrismaService)
       .useValue({})
+      .overrideProvider(GetGroupUseCase) 
+      .useValue({
+        execute: jest.fn().mockResolvedValue({
+          id: GROUP_ID,
+          name: 'Grupo Teste',
+          createdAt: new Date(),
+        }),
+      })
+      .overrideProvider(ListGroupsUseCase)
+      .useValue({
+        execute: jest.fn().mockImplementation((userId: string) => {
+          if (userId === '99999999-9999-4999-8999-999999999999') {
+            return Promise.resolve([]);
+          }
+          return Promise.resolve([
+            {
+              id: GROUP_ID,
+              name: 'Grupo Teste',
+              profilePic: null,
+              createdAt: new Date(),
+            },
+          ]);
+        }),
+      })
       .overrideProvider(ProposalRepository)
       .useClass(InMemoryProposalRepository)
+      .overrideProvider(GroupRepository)
+      .useClass(InMemoryGroupRepository)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -142,13 +174,17 @@ describe('Group proposals endpoints (e2e)', () => {
     expect(response.status).toBe(400);
   });
 
-  it('returns empty array when user outside the group tries to access', async () => {
+  it('returns empty array and ForbiddenError when user outside the group tries to access', async () => {
     process.env.MOCK_AUTH_USER_ID = OUTSIDER_ID;
 
     const response = await request(app.getHttpServer()).get(PROPOSALS_PATH);
 
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual([]);
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({
+      "error": "Forbidden", 
+      "message": "Usuário não pertence ao respectivo grupo.", 
+      "statusCode": 403
+    });
   });
 
   it('rejects requests without an authenticated user', async () => {

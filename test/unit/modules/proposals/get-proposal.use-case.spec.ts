@@ -1,6 +1,9 @@
 import { ProposalDto } from 'src/modules/proposals/http/dto/proposal-dto';
 import { GetProposalByGroupUseCase } from '../../../../src/modules/proposals/application/get-proposals-by-group';
 import { ProposalRepository } from '../../../../src/modules/proposals/domain/proposal.entity.repository';
+import { ListGroupsUseCase } from 'src/modules/groups/application/list-groups.use-case';
+import { GetGroupUseCase } from 'src/modules/groups/application/get-group.use-case';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
 const EVENT_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -49,54 +52,80 @@ const mockProposal: ProposalDto = {
   myAnswer: 'pending',
 };
 
+const mockGroup = {
+  id: GROUP_ID,
+  name: 'Grupo de Teste',
+  profilePic: null,
+  createdAt: new Date(),
+  participants: [],
+  nextEvent: null
+};
+
 describe('GetProposalByGroupUseCase', () => {
   let useCase: GetProposalByGroupUseCase;
   let proposalRepository: jest.Mocked<ProposalRepository>;
+  let listGroupsUseCase: jest.Mocked<ListGroupsUseCase>;
+  let getGroupUseCase: jest.Mocked<GetGroupUseCase>;
 
   beforeEach(() => {
     proposalRepository = {
       findProposalsByGroup: jest.fn(),
     } as unknown as jest.Mocked<ProposalRepository>;
 
-    useCase = new GetProposalByGroupUseCase(proposalRepository);
+    listGroupsUseCase = {
+      execute: jest.fn(),
+    } as unknown as jest.Mocked<ListGroupsUseCase>;
+
+    getGroupUseCase = {
+      execute: jest.fn(),
+    } as unknown as jest.Mocked<GetGroupUseCase>;
+
+    useCase = new GetProposalByGroupUseCase(proposalRepository, listGroupsUseCase, getGroupUseCase);
     jest.resetAllMocks();
   });
 
   it('return proposal details when the user belongs to the group', async () => {
+    getGroupUseCase.execute.mockResolvedValue(mockGroup);
+    listGroupsUseCase.execute.mockResolvedValue([mockGroup]);
     proposalRepository.findProposalsByGroup.mockResolvedValue([mockProposal]);
 
     const result = await useCase.execute(GROUP_ID, USER_ID);
 
+    expect(getGroupUseCase.execute).toHaveBeenCalledWith(GROUP_ID);
+    expect(listGroupsUseCase.execute).toHaveBeenCalledWith(USER_ID);
     expect(proposalRepository.findProposalsByGroup).toHaveBeenCalledWith(GROUP_ID, USER_ID);
     expect(result).toEqual([mockProposal]);
   });
 
   it('denies access when the user does not belong to the group', async () => {
-    proposalRepository.findProposalsByGroup.mockResolvedValue([]);
+    getGroupUseCase.execute.mockResolvedValue(mockGroup);
+    listGroupsUseCase.execute.mockResolvedValue([]);
 
-    const result = await useCase.execute(GROUP_ID, 'unauthorized-user-id');
-
-    expect(proposalRepository.findProposalsByGroup).toHaveBeenCalledWith(
-      GROUP_ID,
-      'unauthorized-user-id'
+    await expect(useCase.execute(GROUP_ID, 'unauthorized-user-id')).rejects.toThrow(
+      ForbiddenException
     );
-    expect(result).toEqual([]);
+
+    expect(getGroupUseCase.execute).toHaveBeenCalledWith(GROUP_ID);
+    expect(listGroupsUseCase.execute).toHaveBeenCalledWith('unauthorized-user-id');
+    expect(proposalRepository.findProposalsByGroup).not.toHaveBeenCalled();
   });
 
-  it('returns 401 Unauthorized for a unauthenticated user', async () => {
-    proposalRepository.findProposalsByGroup.mockResolvedValue([]);
+  it('returns 401/Forbidden for an unauthenticated user or empty id', async () => {
+    getGroupUseCase.execute.mockResolvedValue(mockGroup);
+    listGroupsUseCase.execute.mockResolvedValue([]);
 
-    const result = await useCase.execute(GROUP_ID, '');
-
-    expect(proposalRepository.findProposalsByGroup).toHaveBeenCalledWith(GROUP_ID, '');
-    expect(result).toEqual([]);
+    await expect(useCase.execute(GROUP_ID, '')).rejects.toThrow(ForbiddenException);
   });
 
   it('return NotFoundException for an unexistent group', async () => {
     const nonExistentGroupId = 'non-existent-group-id';
-    proposalRepository.findProposalsByGroup.mockResolvedValue([]);
+    getGroupUseCase.execute.mockResolvedValue(null as any);
 
-    const result = await useCase.execute(nonExistentGroupId, USER_ID);
-    expect(result).toEqual([]);
+    await expect(useCase.execute(nonExistentGroupId, USER_ID)).rejects.toThrow(
+      NotFoundException
+    );
+
+    expect(getGroupUseCase.execute).toHaveBeenCalledWith(nonExistentGroupId);
+    expect(proposalRepository.findProposalsByGroup).not.toHaveBeenCalled();
   });
 });
