@@ -1,11 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { type CatalogLocationData, LocationRepository } from '../domain/location.repository';
+import {
+  type CatalogLocationData,
+  type LocationDetails,
+  LocationRepository,
+} from '../domain/location.repository';
 
 @Injectable()
 export class PrismaLocationRepository extends LocationRepository {
   constructor(private readonly prisma: PrismaService) {
     super();
+  }
+
+  findById(id: string): Promise<LocationDetails | null> {
+    return this.prisma.location.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        externalId: true,
+        description: true,
+        address: true,
+        manuallyCreated: true,
+      },
+    });
   }
 
   async ensureCatalogLocations(locations: CatalogLocationData[]): Promise<Map<string, string>> {

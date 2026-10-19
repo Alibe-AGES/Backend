@@ -21,6 +21,7 @@ describe('Locations endpoint (e2e)', () => {
   const getPhotoUrl = jest.fn();
   const isEnabled = jest.fn();
   const ensureCatalogLocations = jest.fn();
+  const findById = jest.fn();
   const previousMockAuthEnabled = process.env.MOCK_AUTH_ENABLED;
 
   beforeAll(async () => {
@@ -38,7 +39,7 @@ describe('Locations endpoint (e2e)', () => {
       .overrideProvider(FeatureFlags)
       .useValue({ isEnabled })
       .overrideProvider(LocationRepository)
-      .useValue({ ensureCatalogLocations })
+      .useValue({ ensureCatalogLocations, findById })
       .compile();
 
     app = moduleFixture.createNestApplication({ bodyParser: false });
@@ -62,6 +63,7 @@ describe('Locations endpoint (e2e)', () => {
     getPhotoUrl.mockReset().mockResolvedValue('https://lh3.googleusercontent.com/photo-1');
     isEnabled.mockReset().mockResolvedValue(true);
     ensureCatalogLocations.mockReset();
+    findById.mockReset();
     ensureCatalogLocations.mockResolvedValue(new Map([['place-1', LOCATION_ID]]));
   });
 
@@ -183,6 +185,32 @@ describe('Locations endpoint (e2e)', () => {
       .expect(503);
   });
 
+  it('returns the details of a location by id', async () => {
+    const location = {
+      id: LOCATION_ID,
+      externalId: 'place-001',
+      description: 'Café com ambiente tranquilo e mesas externas',
+      address: 'Rua Padre Chagas, 320 - Moinhos de Vento, Porto Alegre - RS',
+      manuallyCreated: false,
+    };
+    findById.mockResolvedValue(location);
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/locations/${LOCATION_ID}`)
+      .expect(200);
+
+    expect(response.body).toEqual(location);
+    expect(findById).toHaveBeenCalledWith(LOCATION_ID);
+  });
+
+  it('validates the location id and returns 404 for unknown locations', async () => {
+    await request(app.getHttpServer()).get('/api/locations/not-a-uuid').expect(400);
+    expect(findById).not.toHaveBeenCalled();
+
+    findById.mockResolvedValue(null);
+    await request(app.getHttpServer()).get(`/api/locations/${LOCATION_ID}`).expect(404);
+  });
+
   it('requires an authenticated session', async () => {
     process.env.MOCK_AUTH_ENABLED = 'false';
 
@@ -190,5 +218,6 @@ describe('Locations endpoint (e2e)', () => {
       .get('/api/locations')
       .query({ latitude: -30, longitude: -51 })
       .expect(401);
+    await request(app.getHttpServer()).get(`/api/locations/${LOCATION_ID}`).expect(401);
   });
 });

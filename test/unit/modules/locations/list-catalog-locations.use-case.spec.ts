@@ -23,6 +23,7 @@ describe('ListCatalogLocationsUseCase', () => {
       getPhotoUrl: jest.fn(),
     };
     locations = {
+      findById: jest.fn(),
       ensureCatalogLocations: jest.fn(
         async (items) => new Map(items.map((item) => [item.externalId, `id-${item.externalId}`]))
       ),

@@ -341,6 +341,8 @@ A chave é lida de `GOOGLE_PLACES_API_KEY`. A API inicializa sem ela, mas as bus
 
 Cada item traz `imageUrl` no formato `/api/locations/photos?name=places/{placeId}/photos/{photoId}`, sem chamada extra ao Google durante a busca do feed. Quando o app carrega a imagem (com a mesma sessão das demais rotas), o Backend consulta a rota de mídia do [Place Photos (New)](https://developers.google.com/maps/documentation/places/web-service/place-photos) com `skipHttpRedirect=true` e responde `302` para a URL pública do Google (`googleusercontent.com`), que não contém a API key. Assim, cada foto custa uma chamada somente quando é exibida. O parâmetro opcional `maxWidthPx` (padrão 800) define a largura, e a resposta usa `Cache-Control: private, max-age=3600`; fotos que não puderem ser resolvidas retornam `404`.
 
+`GET /api/locations/:locationId` retorna um local da tabela `location` (`id`, `externalId`, `description`, `address`, `manuallyCreated`) para a tela de detalhe, ou `404` quando não existe. A imagem do detalhe continua vindo do `imageUrl` do feed.
+
 ### Feature flags
 
 As feature flags ficam na tabela `feature_flag` (`key`, `enabled`, `description`) e são lidas pelo contrato `FeatureFlags` (`src/shared/feature-flags/`), implementado em `src/infrastructure/feature-flags/`. Uma flag ausente no banco é tratada como desativada.
