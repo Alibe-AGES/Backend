@@ -2,13 +2,19 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Header,
+  HttpStatus,
+  NotFoundException,
   Query,
+  Redirect,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCookieAuth,
+  ApiFoundResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
@@ -18,11 +24,16 @@ import {
 } from '@nestjs/swagger';
 import { PlacesProviderUnavailableError } from '../../../shared/places/places-provider';
 import {
+  GetLocationPhotoUseCase,
+  LocationPhotoNotFoundError,
+} from '../application/get-location-photo.use-case';
+import {
   type CatalogLocation,
   InvalidLocationSearchError,
   ListCatalogLocationsUseCase,
 } from '../application/list-catalog-locations.use-case';
 import { DAY_PERIODS, GROUP_SIZES, PLACE_ENVIRONMENTS } from '../domain/place-filters';
+import { GetLocationPhotoQueryDto } from './dto/get-location-photo-query.dto';
 import { ListLocationsQueryDto } from './dto/list-locations-query.dto';
 import {
   LocationListItemResponseDto,
@@ -34,7 +45,10 @@ import {
 @ApiBearerAuth('better-auth-bearer')
 @Controller('api/locations')
 export class LocationsController {
-  constructor(private readonly listCatalogLocations: ListCatalogLocationsUseCase) {}
+  constructor(
+    private readonly listCatalogLocations: ListCatalogLocationsUseCase,
+    private readonly getLocationPhoto: GetLocationPhotoUseCase
+  ) {}
 
   /**
    * GET /api/locations?latitude=-30.03&longitude=-51.22&page=1&limit=20
@@ -93,6 +107,41 @@ export class LocationsController {
     }
   }
 
+  /**
+   * GET /api/locations/photos?name=places/{placeId}/photos/{photoId}
+   * Resolves the photo on Google Places and redirects to its public URL, keeping the API key
+   * on the server. Used as the imageUrl of the feed items.
+   */
+  @Get('photos')
+  @Redirect()
+  @Header('Cache-Control', 'private, max-age=3600')
+  @ApiOperation({ summary: 'Redireciona para a foto de um local do Google Places' })
+  @ApiQuery({
+    name: 'name',
+    type: String,
+    example: 'places/ChIJN1t_tDeuEmsRUsoyG83frY4/photos/AUc7tXV...',
+    description: 'Nome da foto retornado no imageUrl do feed.',
+  })
+  @ApiQuery({ name: 'maxWidthPx', type: Number, required: false, maximum: 4800, example: 800 })
+  @ApiFoundResponse({ description: 'Redireciona para a URL pública da imagem.' })
+  @ApiBadRequestResponse({ description: 'Nome da foto ou largura inválidos.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiNotFoundResponse({ description: 'Foto não encontrada.' })
+  async photo(
+    @Query() query: GetLocationPhotoQueryDto
+  ): Promise<{ url: string; statusCode: number }> {
+    try {
+      const url = await this.getLocationPhoto.execute(query.name, query.maxWidthPx);
+      return { url, statusCode: HttpStatus.FOUND };
+    } catch (error) {
+      if (error instanceof LocationPhotoNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
   private toItemResponse({
     id,
     place,
@@ -105,6 +154,9 @@ export class LocationsController {
       id,
       externalId: place.externalId,
       name: place.name,
+      imageUrl: place.photoName
+        ? `/api/locations/photos?${new URLSearchParams({ name: place.photoName })}`
+        : null,
       description: place.summary,
       address: place.address,
       latitude: place.location?.latitude ?? null,

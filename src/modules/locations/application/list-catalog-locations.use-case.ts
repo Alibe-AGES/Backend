@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { FEATURE_FLAGS, FeatureFlags } from '../../../shared/feature-flags/feature-flags';
 import { type GeoPoint, type Place, PlacesProvider } from '../../../shared/places/places-provider';
 import { LocationRepository } from '../domain/location.repository';
 import { distanceInMeters, matchesPlaceFilters, type PlaceFilters } from '../domain/place-filters';
+import { mockPriceRange } from './mock-price-range';
 
 /** Without a distance filter, the search uses the largest radius accepted by Google Places. */
 export const ANY_DISTANCE_IN_KM = 50;
@@ -34,7 +36,8 @@ export class InvalidLocationSearchError extends Error {}
 export class ListCatalogLocationsUseCase {
   constructor(
     private readonly places: PlacesProvider,
-    private readonly locations: LocationRepository
+    private readonly locations: LocationRepository,
+    private readonly featureFlags: FeatureFlags
   ) {}
 
   async execute(input: ListCatalogLocationsInput): Promise<CatalogLocationsPage> {
@@ -46,12 +49,17 @@ export class ListCatalogLocationsUseCase {
       throw new InvalidLocationSearchError('O orçamento mínimo não pode ser maior que o máximo');
     }
 
+    const budgetFromProvider = await this.featureFlags.isEnabled(FEATURE_FLAGS.googlePlacesBudget);
     const center: GeoPoint = { latitude: input.latitude, longitude: input.longitude };
-    const places = await this.places.searchNearby({
+    const found = await this.places.searchNearby({
       center,
       radiusMeters: (input.maxDistanceKm ?? ANY_DISTANCE_IN_KM) * 1000,
       includedTypes: input.type ? [input.type] : undefined,
+      includePriceRange: budgetFromProvider,
     });
+    const places = budgetFromProvider
+      ? found
+      : found.map((place) => ({ ...place, priceRange: mockPriceRange(place.externalId) }));
 
     const filtered = places.filter((place) => matchesPlaceFilters(place, input));
     const pageItems = filtered.slice((input.page - 1) * input.limit, input.page * input.limit);

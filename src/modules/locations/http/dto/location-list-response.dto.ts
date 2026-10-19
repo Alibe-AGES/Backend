@@ -24,6 +24,15 @@ export class LocationListItemResponseDto {
   @ApiProperty({
     type: String,
     nullable: true,
+    example: '/api/locations/photos?name=places%2FChIJN1t_tDeuEmsRUsoyG83frY4%2Fphotos%2FAUc7tXV',
+    description:
+      'Rota autenticada que redireciona para a foto principal do local; aceita maxWidthPx.',
+  })
+  imageUrl!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
     example: 'Café com ambiente tranquilo e mesas externas',
   })
   description!: string | null;
@@ -53,7 +62,12 @@ export class LocationListItemResponseDto {
   @ApiProperty({ type: String, nullable: true, example: 'PRICE_LEVEL_MODERATE' })
   priceLevel!: string | null;
 
-  @ApiProperty({ type: PriceRangeResponseDto, nullable: true })
+  @ApiProperty({
+    type: PriceRangeResponseDto,
+    nullable: true,
+    description:
+      'Faixa de preço do Google quando a flag google_places_budget está ativa; caso contrário, valor mockado.',
+  })
   priceRange!: PriceRangeResponseDto | null;
 
   @ApiProperty({ type: String, nullable: true, example: '(51) 3333-3333' })

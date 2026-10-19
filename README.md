@@ -335,9 +335,27 @@ api/google-places/
 └── google-places.module.ts    # Exporta o PlacesProvider
 ```
 
-A chave é lida de `GOOGLE_PLACES_API_KEY`. A API inicializa sem ela, mas as buscas respondem `503`. Para gerar a chave, ative a **Places API (New)** no Google Cloud e restrinja a chave a essa API. O field mask solicita campos de atmosfera (`outdoorSeating`, `goodForGroups`, `priceRange`), que entram no SKU Enterprise + Atmosphere.
+A chave é lida de `GOOGLE_PLACES_API_KEY`. A API inicializa sem ela, mas as buscas respondem `503`. Para gerar a chave, ative a **Places API (New)** no Google Cloud e restrinja a chave a essa API. O field mask solicita campos de atmosfera (`outdoorSeating`, `goodForGroups`), que entram no SKU Enterprise + Atmosphere.
 
 `GET /api/locations?latitude=&longitude=` usa esse cliente para montar o feed: busca até 20 locais no raio informado (`maxDistanceKm`, padrão de 50 km), aplica os filtros (`budgetMin`, `budgetMax`, `period`, `environment`, `groupSize`, `type`), pagina o resultado e registra os locais da página na tabela `location` com `manually_created = false`.
+
+Cada item traz `imageUrl` no formato `/api/locations/photos?name=places/{placeId}/photos/{photoId}`, sem chamada extra ao Google durante a busca do feed. Quando o app carrega a imagem (com a mesma sessão das demais rotas), o Backend consulta a rota de mídia do [Place Photos (New)](https://developers.google.com/maps/documentation/places/web-service/place-photos) com `skipHttpRedirect=true` e responde `302` para a URL pública do Google (`googleusercontent.com`), que não contém a API key. Assim, cada foto custa uma chamada somente quando é exibida. O parâmetro opcional `maxWidthPx` (padrão 800) define a largura, e a resposta usa `Cache-Control: private, max-age=3600`; fotos que não puderem ser resolvidas retornam `404`.
+
+### Feature flags
+
+As feature flags ficam na tabela `feature_flag` (`key`, `enabled`, `description`) e são lidas pelo contrato `FeatureFlags` (`src/shared/feature-flags/`), implementado em `src/infrastructure/feature-flags/`. Uma flag ausente no banco é tratada como desativada.
+
+| Flag                   | Padrão  | Efeito                                                                                                                                     |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `google_places_budget` | `false` | `true`: solicita `priceRange` ao Google Places. `false`: não solicita o campo e usa uma faixa de preço mockada, estável por local, em BRL. |
+
+A migration `add_feature_flag` e a seed criam a flag desativada, evitando chamadas extras ao Google durante o desenvolvimento. Para ativar em um ambiente:
+
+```sql
+UPDATE feature_flag SET enabled = true, updated_at = now() WHERE key = 'google_places_budget';
+```
+
+A flag é consultada a cada requisição, então a mudança vale sem reiniciar a API.
 
 Um módulo que precise armazenar arquivos importa `StorageModule` e seu caso de uso depende do contrato geral `ObjectStorage`, nunca do SDK ou do `S3StorageService` concreto:
 

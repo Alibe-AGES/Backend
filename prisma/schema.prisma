@@ -256,6 +256,15 @@ model FolderLocation {
   @@map("folder_location")
 }
 
+model FeatureFlag {
+  key         String   @id
+  enabled     Boolean  @default(false)
+  description String?
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("feature_flag")
+}
+
 enum StatusEnum {
   pending
   confirmed

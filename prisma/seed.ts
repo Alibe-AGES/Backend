@@ -801,6 +801,26 @@ async function main() {
   }
 
   // ============================================================
+  // FEATURE FLAGS
+  // ============================================================
+  //
+  // Disabled by default so the team does not flood Google Places with budget requests.
+  //
+
+  console.log('Configurando feature flags...');
+
+  await prisma.featureFlag.upsert({
+    where: { key: 'google_places_budget' },
+    update: { enabled: false },
+    create: {
+      key: 'google_places_budget',
+      enabled: false,
+      description:
+        'Fetch the budget (price range) of places from Google Places; when disabled, mocked random values are used.',
+    },
+  });
+
+  // ============================================================
   // FINALIZAÇÃO
   // ============================================================
 

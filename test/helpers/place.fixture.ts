@@ -19,6 +19,7 @@ export function buildPlace(overrides: Partial<Place> = {}): Place {
     openingHours: null,
     outdoorSeating: null,
     goodForGroups: null,
+    photoName: null,
     ...overrides,
   };
 }

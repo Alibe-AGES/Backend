@@ -4,6 +4,7 @@ import {
   type Place,
   type PlaceOpeningPeriod,
   type PlaceTimePoint,
+  PLACE_PHOTO_NAME_PATTERN,
   PlacesProvider,
   PlacesProviderUnavailableError,
   type SearchNearbyPlacesInput,
@@ -13,13 +14,15 @@ import { GOOGLE_PLACES_API_KEY } from './google-places.config';
 export const GOOGLE_PLACES_SEARCH_NEARBY_URL =
   'https://places.googleapis.com/v1/places:searchNearby';
 
+export const GOOGLE_PLACES_API_BASE_URL = 'https://places.googleapis.com/v1';
+
 export const GOOGLE_PLACES_MAX_RADIUS_METERS = 50_000;
 export const GOOGLE_PLACES_MAX_RESULT_COUNT = 20;
 
 const REQUEST_TIMEOUT_IN_MS = 10_000;
 
 /** Fields requested from Google; each field affects the SKU billed for the search. */
-const FIELD_MASK = [
+const BASE_FIELDS = [
   'places.id',
   'places.displayName',
   'places.formattedAddress',
@@ -27,7 +30,6 @@ const FIELD_MASK = [
   'places.rating',
   'places.userRatingCount',
   'places.priceLevel',
-  'places.priceRange',
   'places.nationalPhoneNumber',
   'places.websiteUri',
   'places.googleMapsUri',
@@ -37,7 +39,10 @@ const FIELD_MASK = [
   'places.editorialSummary',
   'places.outdoorSeating',
   'places.goodForGroups',
-].join(',');
+  'places.photos',
+];
+
+const PRICE_RANGE_FIELD = 'places.priceRange';
 
 interface GoogleMoney {
   currencyCode?: string;
@@ -72,10 +77,15 @@ interface GooglePlace {
   editorialSummary?: { text?: string };
   outdoorSeating?: boolean;
   goodForGroups?: boolean;
+  photos?: Array<{ name?: string }>;
 }
 
 interface GoogleSearchNearbyResponse {
   places?: GooglePlace[];
+}
+
+interface GooglePhotoMediaResponse {
+  photoUri?: string;
 }
 
 @Injectable()
@@ -115,7 +125,10 @@ export class GooglePlacesService extends PlacesProvider {
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': this.apiKey,
-          'X-Goog-FieldMask': FIELD_MASK,
+          'X-Goog-FieldMask': [
+            ...BASE_FIELDS,
+            ...(input.includePriceRange ? [PRICE_RANGE_FIELD] : []),
+          ].join(','),
         },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_IN_MS),
@@ -134,6 +147,38 @@ export class GooglePlacesService extends PlacesProvider {
 
     const payload = (await response.json()) as GoogleSearchNearbyResponse;
     return (payload.places ?? []).map((place) => this.toPlace(place));
+  }
+
+  /**
+   * Resolves the photo through the Place Photos (New) media route with skipHttpRedirect, so the
+   * returned googleusercontent URL can be sent to the app without exposing the API key.
+   */
+  async getPhotoUrl(photoName: string, maxWidthPx: number): Promise<string | null> {
+    if (!this.apiKey || !PLACE_PHOTO_NAME_PATTERN.test(photoName)) {
+      return null;
+    }
+
+    const url = new URL(`${GOOGLE_PLACES_API_BASE_URL}/${photoName}/media`);
+    url.searchParams.set('maxWidthPx', String(maxWidthPx));
+    url.searchParams.set('skipHttpRedirect', 'true');
+
+    try {
+      const response = await fetch(url, {
+        headers: { 'X-Goog-Api-Key': this.apiKey },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_IN_MS),
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`Google Place Photos respondeu ${response.status} para ${photoName}`);
+        return null;
+      }
+
+      const payload = (await response.json()) as GooglePhotoMediaResponse;
+      return payload.photoUri ?? null;
+    } catch (error) {
+      this.logger.warn(`Falha ao consultar a foto ${photoName}: ${(error as Error).message}`);
+      return null;
+    }
   }
 
   private toPlace(place: GooglePlace): Place {
@@ -172,6 +217,7 @@ export class GooglePlacesService extends PlacesProvider {
         : null,
       outdoorSeating: place.outdoorSeating ?? null,
       goodForGroups: place.goodForGroups ?? null,
+      photoName: place.photos?.find((photo) => photo.name)?.name ?? null,
     };
   }
 
