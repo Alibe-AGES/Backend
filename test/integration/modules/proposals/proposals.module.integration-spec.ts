@@ -1,8 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import { ProposalResponseController } from '../../../../src/modules/proposals/http/proposal-response.controller';
 import { ProposalsModule } from '../../../../src/modules/proposals/proposals.module';
+import { ProposalsController } from '../../../../src/modules/proposals/http/proposals.controller';
+import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
+import { PrismaEventRepository } from '../../../../src/modules/events/persistence/prisma-event.repository';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const PROPOSAL_ID = '55555555-5555-4555-8555-555555555555';
@@ -20,6 +24,10 @@ describe('ProposalsModule integration', () => {
     moduleFixture = await Test.createTestingModule({ imports: [ProposalsModule] })
       .overrideProvider(PrismaService)
       .useValue(prisma)
+      .overrideProvider(S3_CLIENT)
+      .useValue({ send: jest.fn() })
+      .overrideProvider(S3_BUCKET)
+      .useValue('alibe-test-media')
       .compile();
   });
 
@@ -50,5 +58,56 @@ describe('ProposalsModule integration', () => {
       userId: USER_ID,
       answer: 'yes',
     });
+  });
+
+  it('injects the exported event repository into the proposal creation flow', async () => {
+    const repository = moduleFixture.get(EventRepository);
+    expect(repository).toBeInstanceOf(PrismaEventRepository);
+    const location = {
+      id: '44444444-4444-4444-8444-444444444444',
+      description: null,
+      address: null,
+    };
+    const membership = jest.spyOn(repository, 'findGroupMembership').mockResolvedValue(true);
+    const findLocation = jest.spyOn(repository, 'findLocationById').mockResolvedValue(location);
+    const create = jest.spyOn(repository, 'createWithExistingLocation').mockResolvedValue({
+      id: PROPOSAL_ID,
+      createdAt: new Date('2026-10-09T17:00:00.000Z'),
+      owner: { id: USER_ID, name: 'Ana', image: null },
+      event: {
+        id: EVENT_ID,
+        name: 'Café',
+        timeslot: new Date('2026-10-17T15:00:00.000Z'),
+        budgetStart: null,
+        budgetEnd: null,
+        status: 'pending',
+        groupId: '33333333-3333-4333-8333-333333333333',
+      },
+      location,
+      myAnswer: 'yes',
+    });
+    try {
+      const result = await moduleFixture
+        .get(ProposalsController)
+        .create(
+          '33333333-3333-4333-8333-333333333333',
+          { locationId: location.id, name: 'Café', date: '2026-10-17', time: '15:00' },
+          { user: { id: USER_ID } } as AuthenticatedRequest
+        );
+      expect(result).toMatchObject({
+        id: PROPOSAL_ID,
+        owner: { id: USER_ID, image: null },
+        event: { date: '2026-10-17', time: '15:00' },
+        location,
+        myAnswer: 'yes',
+      });
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerId: USER_ID, locationId: location.id })
+      );
+    } finally {
+      membership.mockRestore();
+      findLocation.mockRestore();
+      create.mockRestore();
+    }
   });
 });
