@@ -31,7 +31,7 @@ export class InMemoryEventRepository extends EventRepository {
   async createWithExistingLocation(data: CreateLocatedEventData): Promise<CreatedLocationProposal> {
     const location = await this.findLocationById(data.locationId);
     if (!location) throw new EventLocationNotFoundError('Localização não encontrada');
-    const { event, ownerResponse } = await this.create({
+    const { event, ownerResponse } = this.persist({
       ...data,
       location: { description: location.description, manuallyCreated: false },
     });
@@ -84,6 +84,10 @@ export class InMemoryEventRepository extends EventRepository {
   }
 
   create(data: CreateEventData): Promise<CreatedEvent> {
+    return Promise.resolve(this.persist(data));
+  }
+
+  private persist(data: Omit<CreateEventData, 'notification'>): CreatedEvent {
     const event = new Event({
       id: data.id,
       name: data.name,
@@ -122,14 +126,14 @@ export class InMemoryEventRepository extends EventRepository {
     });
     this.events.set(event.id, event);
 
-    return Promise.resolve({
+    return {
       event,
       ownerResponse: {
         id: '66666666-6666-4666-8666-666666666666',
         userId: data.ownerId,
         answer: data.ownerAnswer,
       },
-    });
+    };
   }
 
   update(id: string, data: UpdateEventData): Promise<Event> {

@@ -72,6 +72,11 @@ export interface CreateEventData {
   status: EventStatus;
   ownerAnswer: ProposalAnswer;
   createdAt: Date;
+  notification: {
+    type: 'createdEvent';
+    message: string;
+    createdAt: Date;
+  };
 }
 
 export interface CreatedEvent {
@@ -85,7 +90,9 @@ export interface ExistingEventLocation {
   address: string | null;
 }
 
-export type CreateLocatedEventData = Omit<CreateEventData, 'location'> & { locationId: string };
+export type CreateLocatedEventData = Omit<CreateEventData, 'location' | 'notification'> & {
+  locationId: string;
+};
 
 export interface CreatedLocationProposal {
   id: string;

@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Rede de producao do projeto Alibe
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: alibe
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC # serviço de VPC, Apesar de ter EC2 no tipo, isso não cria um EC2
+    Properties:
+      CidrBlock: 10.0.0.0/24 # Faixa da VPC; nao usa 10.42.0.0/16 porque essa rede e reservada por padrao aos pods do K3s
+      EnableDnsSupport: true # A gente habilita DNS pra fazer a conexões entre as redes privadas dentro da VPC
+      EnableDnsHostnames: true
+      Tags: #lista de etiquetas do recurso, uma etiqueta é um par de chave valor usado apra identificar ou organizar recursos na AWS
+        - Key: Name #O nome da chave é Name
+          Value: !Sub '${ProjectName}-prod-vpc' #o valor é o o parametro projectName-prod-vpc, o !sub é uma função que substitui variáveis dentro de um texto
+
+  PublicSubnet: #Agora a gente vai criar uma subnet publica para o acesso a API
+    Type: AWS::EC2::Subnet #Tipo de recurso que o cloudformation cria
+    Properties:
+      VpcId: !Ref Vpc #isso vai opter o id da vpc criada ali em cima e coloca a subnet nela, basicamente um link
+      CidrBlock: 10.0.0.0/26 # IPs de 10.0.0.0 a 10.0.0.63
+      AvailabilityZone: us-east-2a # Zona A da regiao Ohio
+      MapPublicIpOnLaunch: false # diz se a subnet tem um ip publico
+      Tags: # Etiquetas desta subnet
+        - Key: Name # Nome amigavel mostrado no console
+          Value: !Sub '${ProjectName}-prod-public' # Resultado: alibe-prod-public
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.0.64/26 # IPs de 10.0.0.64 a 10.0.0.127
+      AvailabilityZone: us-east-2a
+      MapPublicIpOnLaunch: false
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  InternetGatewayAttachment: # isso aqui conecta a public subnet na internet
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable: #informa ao cloud formation quq quremos criar uma tabea de rotas
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc #linka a tabela na vpc
+
+  PublicDefaultRoute: # Rota padrao da tabela publica
+    Type: AWS::EC2::Route # Adiciona uma rota
+    DependsOn: InternetGatewayAttachment # Aguarda o gateway estar conectado a VPC
+    Properties:
+      RouteTableId: !Ref PublicRouteTable # Tabela que recebera a rota
+      DestinationCidrBlock: 0.0.0.0/0 # Destinos IPv4 sem uma rota mais especifica
+      GatewayId: !Ref InternetGateway # Encaminha esses destinos ao gateway de internet
+
+  PublicSubnetRouteTableAssociation: # Faz a subnet publica usar a tabela publica
+    Type: AWS::EC2::SubnetRouteTableAssociation # Associa uma subnet a uma tabela de rotas
+    Properties:
+      SubnetId: !Ref PublicSubnet # Subnet que usara a tabela
+      RouteTableId: !Ref PublicRouteTable # Tabela com a rota para o gateway de internet
+
+  PrivateSubnetB: # Segunda subnet para o grupo do RDS, em outra zona
+    Type: AWS::EC2::Subnet # Nao cria outro banco
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.0.128/26 # Faixa de 10.0.0.128 a 10.0.0.191
+      AvailabilityZone: us-east-2b # Zona B de Ohio
+      MapPublicIpOnLaunch: false
+
+  PrivateRouteTable: # Tabela sem rota para a internet
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc # Mantem a rota local criada automaticamente pela AWS
+
+  PrivateSubnetARouteTableAssociation: # Associa a primeira privada a tabela privada
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteTableAssociation: # Associa a segunda privada a tabela privada
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+Outputs: # Saidas para os outros arquivos; fica fora de Resources
+  VpcId: # Disponibiliza o ID da VPC
+    Value: !Ref Vpc # ID real gerado pela AWS
+    Export: # Permite consultar este valor em outra stack com !ImportValue
+      Name: !Sub '${AWS::StackName}-VpcId' # Usa o nome desta stack para identificar a exportacao
+
+  PublicSubnetId: # Subnet que sera usada pela EC2
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicSubnetId'
+
+  PrivateSubnetAId: # Primeira subnet para o grupo de subnets do RDS
+    Value: !Ref PrivateSubnetA
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateSubnetAId'
+
+  PrivateSubnetBId: # Segunda subnet para o grupo de subnets do RDS
+    Value: !Ref PrivateSubnetB
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateSubnetBId'
+
+  ComputeAvailabilityZone: # Zona que usaremos para a EC2 e o RDS Single-AZ
+    Value: !GetAtt PublicSubnet.AvailabilityZone # GetAtt consulta a zona configurada na subnet publica
+    Export:
+      Name: !Sub '${AWS::StackName}-ComputeAvailabilityZone'
