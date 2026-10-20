@@ -215,6 +215,18 @@ jest.mock('better-auth/node', () => ({
       return;
     }
 
+    if (request.method === 'POST' && path?.endsWith('/sign-out')) {
+      response.statusCode = 200;
+      response.setHeader('Cache-Control', 'no-store');
+      response.setHeader('Content-type', 'application/json');
+      response.setHeader(
+        'Set-Cookie',
+        'better-auth.session_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+      );
+      response.end(JSON.stringify({ success: true }));
+      return;
+    }
+
     response.statusCode = 200;
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('Content-Type', 'application/json');
