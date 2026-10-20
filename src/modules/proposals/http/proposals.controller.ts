@@ -33,7 +33,7 @@ import {
   EventGroupAccessDeniedError,
   EventGroupNotFoundError,
 } from '../../events/application/create-event.use-case';
-import { EventLocationNotFoundError } from '../../events/domain/event.repository';
+import { ProposalLocationNotFoundError } from '../domain/proposal.repository';
 import {
   CreateProposalUseCase,
   InvalidProposalCreationError,
@@ -51,7 +51,11 @@ export class ProposalsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Sugere um local do catálogo do Google Places como encontro do grupo' })
+  @ApiOperation({
+    summary: 'Sugere um local do catálogo do Google Places como encontro do grupo',
+    description:
+      'Cria somente a sugestão (proposta do tipo `suggestion`) com o aceite do autor. Nenhum evento é criado; dia, horário e orçamento são opcionais.',
+  })
   @ApiParam({ name: 'groupId', format: 'uuid' })
   @ApiBody({ type: CreateProposalDto })
   @ApiCreatedResponse({ type: CreatedProposalResponseDto })
@@ -76,7 +80,10 @@ export class ProposalsController {
       if (error instanceof InvalidProposalCreationError) {
         throw new BadRequestException(error.message);
       }
-      if (error instanceof EventGroupNotFoundError || error instanceof EventLocationNotFoundError) {
+      if (
+        error instanceof EventGroupNotFoundError ||
+        error instanceof ProposalLocationNotFoundError
+      ) {
         throw new NotFoundException(error.message);
       }
       if (error instanceof EventGroupAccessDeniedError) {

@@ -14,12 +14,16 @@ const createProposalSchema = z
   .object({
     locationId: z.string().regex(PLACE_ID_PATTERN),
     name: z.string().trim().min(1),
-    date: z.iso.date(),
-    time: z.iso.time({ precision: -1 }),
+    date: z.iso.date().optional(),
+    time: z.iso.time({ precision: -1 }).optional(),
     budgetStart: proposalBudgetSchema.optional(),
     budgetEnd: proposalBudgetSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine((input) => (input.date === undefined) === (input.time === undefined), {
+    message: 'Dia e horário devem ser informados juntos',
+    path: ['time'],
+  });
 
 export class CreateProposalDto extends createZodDto(createProposalSchema) {
   @ApiProperty({
@@ -31,11 +35,18 @@ export class CreateProposalDto extends createZodDto(createProposalSchema) {
   @ApiProperty({ minLength: 1, example: 'Café de sábado' })
   name!: string;
 
-  @ApiProperty({ format: 'date', example: '2026-10-17' })
-  date!: string;
+  @ApiPropertyOptional({
+    format: 'date',
+    example: '2026-10-17',
+    description: 'Opcional; quando enviado, `time` também é obrigatório.',
+  })
+  date?: string;
 
-  @ApiProperty({ example: '15:00', description: 'Horário HH:mm interpretado em UTC.' })
-  time!: string;
+  @ApiPropertyOptional({
+    example: '15:00',
+    description: 'Horário HH:mm interpretado em UTC. Opcional; exige `date`.',
+  })
+  time?: string;
 
   @ApiPropertyOptional({ example: '30.00' })
   budgetStart?: string;

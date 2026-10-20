@@ -533,6 +533,7 @@ async function main() {
     const proposal = await prisma.proposal.create({
       data: {
         eventId: events[proposalData.eventIndex].id,
+        groupId: events[proposalData.eventIndex].groupId,
         ownerId: users[proposalData.ownerIndex].id,
         createdAt: new Date('2026-08-25'),
       },

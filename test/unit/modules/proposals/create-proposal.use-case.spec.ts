@@ -7,9 +7,9 @@ import {
   EventGroupNotFoundError,
 } from '../../../../src/modules/events/application/create-event.use-case';
 import {
-  EventLocationNotFoundError,
-  EventRepository,
-} from '../../../../src/modules/events/domain/event.repository';
+  ProposalLocationNotFoundError,
+  ProposalRepository,
+} from '../../../../src/modules/proposals/domain/proposal.repository';
 import {
   PlacesProvider,
   PlacesProviderUnavailableError,
@@ -28,60 +28,75 @@ const input = {
 };
 
 describe('CreateProposalUseCase', () => {
-  const events = {
+  const proposals = {
     findGroupMembership: jest.fn(),
     findCatalogLocation: jest.fn(),
-    createWithCatalogLocation: jest.fn(),
+    createSuggestion: jest.fn(),
   };
   const places = { getPlaceById: jest.fn() };
   const useCase = new CreateProposalUseCase(
-    events as unknown as EventRepository,
+    proposals as unknown as ProposalRepository,
     places as unknown as PlacesProvider
   );
 
   beforeEach(() => {
     jest.resetAllMocks();
-    events.findGroupMembership.mockResolvedValue(true);
-    events.findCatalogLocation.mockResolvedValue(null);
+    proposals.findGroupMembership.mockResolvedValue(true);
+    proposals.findCatalogLocation.mockResolvedValue(null);
     places.getPlaceById.mockResolvedValue(
       buildPlace({ externalId: PLACE_ID, summary: 'Café tranquilo', address: 'Rua A' })
     );
-    events.createWithCatalogLocation.mockResolvedValue({ id: 'proposal-id' });
+    proposals.createSuggestion.mockResolvedValue({ id: 'proposal-id' });
   });
 
-  it('trims the name, uses UTC, and creates a pending event with the authenticated owner answering yes', async () => {
+  it('trims the name, uses UTC, and creates only the suggestion for the authenticated owner', async () => {
     await expect(useCase.execute(input)).resolves.toEqual({ id: 'proposal-id' });
-    expect(events.findGroupMembership).toHaveBeenCalledWith(input.groupId, input.userId);
-    expect(events.createWithCatalogLocation).toHaveBeenCalledWith({
+    expect(proposals.findGroupMembership).toHaveBeenCalledWith(input.groupId, input.userId);
+    expect(proposals.createSuggestion).toHaveBeenCalledWith({
       id: expect.any(String),
       groupId: input.groupId,
       ownerId: input.userId,
       location: { externalId: PLACE_ID, description: 'Café tranquilo', address: 'Rua A' },
       name: 'Café de sábado',
       timeslot: new Date('2026-10-17T15:00:00.000Z'),
-      image: null,
       budgetStart: null,
       budgetEnd: null,
-      status: 'pending',
-      ownerAnswer: 'yes',
       createdAt: expect.any(Date),
     });
   });
+
+  it('creates a suggestion without day, time or budget', async () => {
+    await useCase.execute({ ...input, date: undefined, time: undefined });
+
+    expect(proposals.createSuggestion).toHaveBeenCalledWith(
+      expect.objectContaining({ timeslot: null, budgetStart: null, budgetEnd: null })
+    );
+  });
+
+  it.each([{ date: undefined }, { time: undefined }])(
+    'rejects a day or time sent alone: %p',
+    async (missing) => {
+      await expect(useCase.execute({ ...input, ...missing })).rejects.toBeInstanceOf(
+        InvalidProposalCreationError
+      );
+      expect(proposals.findGroupMembership).not.toHaveBeenCalled();
+    }
+  );
 
   it('looks a new place up on Google, using the name when there is no summary', async () => {
     places.getPlaceById.mockResolvedValue(buildPlace({ externalId: PLACE_ID, summary: null }));
 
     await useCase.execute(input);
 
-    expect(events.findCatalogLocation).toHaveBeenCalledWith(PLACE_ID);
+    expect(proposals.findCatalogLocation).toHaveBeenCalledWith(PLACE_ID);
     expect(places.getPlaceById).toHaveBeenCalledWith(PLACE_ID);
-    expect(events.createWithCatalogLocation).toHaveBeenCalledWith(
+    expect(proposals.createSuggestion).toHaveBeenCalledWith(
       expect.objectContaining({ location: expect.objectContaining({ description: 'Bloom Café' }) })
     );
   });
 
   it('reuses a place already stored by a previous proposal without calling Google', async () => {
-    events.findCatalogLocation.mockResolvedValue({
+    proposals.findCatalogLocation.mockResolvedValue({
       id: 'location-id',
       description: 'Salvo',
       address: 'Rua B',
@@ -90,7 +105,7 @@ describe('CreateProposalUseCase', () => {
     await useCase.execute(input);
 
     expect(places.getPlaceById).not.toHaveBeenCalled();
-    expect(events.createWithCatalogLocation).toHaveBeenCalledWith(
+    expect(proposals.createSuggestion).toHaveBeenCalledWith(
       expect.objectContaining({
         location: { externalId: PLACE_ID, description: 'Salvo', address: 'Rua B' },
       })
@@ -99,7 +114,7 @@ describe('CreateProposalUseCase', () => {
 
   it('preserves an independently supplied budget bound', async () => {
     await useCase.execute({ ...input, budgetEnd: '60.123' });
-    expect(events.createWithCatalogLocation).toHaveBeenCalledWith(
+    expect(proposals.createSuggestion).toHaveBeenCalledWith(
       expect.objectContaining({ budgetStart: null, budgetEnd: '60.123' })
     );
   });
@@ -110,40 +125,40 @@ describe('CreateProposalUseCase', () => {
       await expect(useCase.execute({ ...input, name })).rejects.toBeInstanceOf(
         InvalidProposalCreationError
       );
-      expect(events.findGroupMembership).not.toHaveBeenCalled();
-      expect(events.createWithCatalogLocation).not.toHaveBeenCalled();
+      expect(proposals.findGroupMembership).not.toHaveBeenCalled();
+      expect(proposals.createSuggestion).not.toHaveBeenCalled();
     }
   );
 
-  it.each(['date', 'time', 'locationId'] as const)('rejects missing %s', async (field) => {
-    await expect(useCase.execute({ ...input, [field]: undefined })).rejects.toBeInstanceOf(
+  it('rejects a missing locationId', async () => {
+    await expect(useCase.execute({ ...input, locationId: undefined })).rejects.toBeInstanceOf(
       InvalidProposalCreationError
     );
-    expect(events.createWithCatalogLocation).not.toHaveBeenCalled();
+    expect(proposals.createSuggestion).not.toHaveBeenCalled();
   });
 
   it.each([
     [null, EventGroupNotFoundError],
     [false, EventGroupAccessDeniedError],
   ])('rejects membership %p before looking up the location', async (membership, error) => {
-    events.findGroupMembership.mockResolvedValue(membership);
+    proposals.findGroupMembership.mockResolvedValue(membership);
     await expect(useCase.execute(input)).rejects.toBeInstanceOf(error);
-    expect(events.findCatalogLocation).not.toHaveBeenCalled();
+    expect(proposals.findCatalogLocation).not.toHaveBeenCalled();
     expect(places.getPlaceById).not.toHaveBeenCalled();
-    expect(events.createWithCatalogLocation).not.toHaveBeenCalled();
+    expect(proposals.createSuggestion).not.toHaveBeenCalled();
   });
 
   it('rejects a place unknown to Google without creating records', async () => {
     places.getPlaceById.mockResolvedValue(null);
-    await expect(useCase.execute(input)).rejects.toBeInstanceOf(EventLocationNotFoundError);
-    expect(events.createWithCatalogLocation).not.toHaveBeenCalled();
+    await expect(useCase.execute(input)).rejects.toBeInstanceOf(ProposalLocationNotFoundError);
+    expect(proposals.createSuggestion).not.toHaveBeenCalled();
   });
 
   it('propagates Google and persistence failures', async () => {
     places.getPlaceById.mockRejectedValueOnce(new PlacesProviderUnavailableError('down'));
     await expect(useCase.execute(input)).rejects.toBeInstanceOf(PlacesProviderUnavailableError);
 
-    events.createWithCatalogLocation.mockRejectedValue(new Error('database unavailable'));
+    proposals.createSuggestion.mockRejectedValue(new Error('database unavailable'));
     await expect(useCase.execute(input)).rejects.toThrow('database unavailable');
   });
 });

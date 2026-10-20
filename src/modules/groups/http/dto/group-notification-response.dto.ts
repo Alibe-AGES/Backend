@@ -16,6 +16,13 @@ export class GroupNotificationResponseDto {
 
   @ApiProperty({ format: 'uuid', nullable: true })
   eventId!: string | null;
+
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    description: 'Sugestão que deu match; preenchido nas notificações do tipo `match`.',
+  })
+  proposalId!: string | null;
 }
 
 export class GroupNotificationPaginationDto {

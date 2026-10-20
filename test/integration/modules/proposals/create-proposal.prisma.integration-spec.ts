@@ -1,39 +1,41 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
-import { PrismaEventRepository } from '../../../../src/modules/events/persistence/prisma-event.repository';
-import { type CreateCatalogEventData } from '../../../../src/modules/events/domain/event.repository';
+import type { CreateSuggestionData } from '../../../../src/modules/proposals/domain/proposal.repository';
+import { PrismaProposalRepository } from '../../../../src/modules/proposals/persistence/prisma-proposal.repository';
+import { PrismaProposalResponseRepository } from '../../../../src/modules/proposals/persistence/prisma-proposal-response.repository';
 
 // Opt-in: migrations must already be applied to this dedicated test database.
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const describeDatabase = testDatabaseUrl ? describe : describe.skip;
 
-describeDatabase('Proposal creation with PostgreSQL', () => {
+describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
   let prisma: PrismaService;
-  let events: PrismaEventRepository;
-  const userId = randomUUID();
+  let proposals: PrismaProposalRepository;
+  let responses: PrismaProposalResponseRepository;
+  const ownerId = randomUUID();
+  const firstMemberId = randomUUID();
+  const secondMemberId = randomUUID();
+  const userIds = [ownerId, firstMemberId, secondMemberId];
   const groupId = randomUUID();
+  const soloGroupId = randomUUID();
+  const groupIds = [groupId, soloGroupId];
   const locationId = randomUUID();
   const externalId = `place-${randomUUID()}`;
   const newExternalIds: string[] = [];
-  const eventIds: string[] = [];
-  const data = (placeId = externalId): CreateCatalogEventData => {
-    const id = randomUUID();
-    eventIds.push(id);
-    return {
-      id,
-      groupId,
-      ownerId: userId,
-      location: { externalId: placeId, description: 'Do Google', address: 'Rua do Google' },
-      name: 'Café',
-      timeslot: new Date('2026-10-17T15:00:00.000Z'),
-      image: null,
-      budgetStart: '30',
-      budgetEnd: '60.126',
-      status: 'pending',
-      ownerAnswer: 'yes',
-      createdAt: new Date(),
-    };
-  };
+  const data = (overrides: Partial<CreateSuggestionData> = {}): CreateSuggestionData => ({
+    id: randomUUID(),
+    groupId,
+    ownerId,
+    location: { externalId, description: 'Do Google', address: 'Rua do Google' },
+    name: 'Café',
+    timeslot: new Date('2026-10-17T15:00:00.000Z'),
+    budgetStart: '30',
+    budgetEnd: '60.126',
+    createdAt: new Date(),
+    ...overrides,
+  });
+  const accept = (proposalId: string, userId: string) =>
+    responses.create({ proposalId, userId, answer: 'yes', createdAt: new Date() });
 
   beforeAll(async () => {
     const url = new URL(testDatabaseUrl);
@@ -49,16 +51,25 @@ describeDatabase('Proposal creation with PostgreSQL', () => {
       else process.env.DATABASE_URL = previousUrl;
     }
     await prisma.$connect();
-    events = new PrismaEventRepository(prisma);
-    await prisma.user.create({
-      data: { id: userId, name: 'Ana', email: `${userId}@example.test`, profilePic: null },
+    proposals = new PrismaProposalRepository(prisma);
+    responses = new PrismaProposalResponseRepository(prisma);
+    await prisma.user.createMany({
+      data: userIds.map((id) => ({ id, name: 'Ana', email: `${id}@example.test` })),
     });
     await prisma.group.create({
       data: {
         id: groupId,
         name: 'Grupo teste',
         createdAt: new Date(),
-        users: { create: { userId } },
+        users: { create: userIds.map((userId) => ({ userId })) },
+      },
+    });
+    await prisma.group.create({
+      data: {
+        id: soloGroupId,
+        name: 'Grupo solo',
+        createdAt: new Date(),
+        users: { create: { userId: ownerId } },
       },
     });
     await prisma.location.create({
@@ -75,119 +86,161 @@ describeDatabase('Proposal creation with PostgreSQL', () => {
   afterAll(async () => {
     if (!prisma) return;
     try {
+      await prisma.groupNotification.deleteMany({ where: { groupId: { in: groupIds } } });
       await prisma.proposalResponse.deleteMany({
-        where: { proposal: { eventId: { in: eventIds } } },
+        where: { proposal: { groupId: { in: groupIds } } },
       });
-      await prisma.proposal.deleteMany({ where: { eventId: { in: eventIds } } });
-      await prisma.event.deleteMany({ where: { id: { in: eventIds } } });
+      await prisma.proposal.deleteMany({ where: { groupId: { in: groupIds } } });
       await prisma.location.deleteMany({
         where: { OR: [{ id: locationId }, { externalId: { in: newExternalIds } }] },
       });
-      await prisma.userGroup.deleteMany({ where: { groupId } });
-      await prisma.group.deleteMany({ where: { id: groupId } });
-      await prisma.user.deleteMany({ where: { id: userId } });
+      await prisma.userGroup.deleteMany({ where: { groupId: { in: groupIds } } });
+      await prisma.group.deleteMany({ where: { id: { in: groupIds } } });
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     } finally {
       await prisma.$disconnect();
     }
   });
 
-  it('persists all associations and reuses the complete location without mutation or duplication', async () => {
+  it('persists the suggestion with the owner acceptance and no event', async () => {
     const original = await prisma.location.findUniqueOrThrow({ where: { id: locationId } });
-    const count = await prisma.location.count();
-    expect(await events.findGroupMembership(groupId, userId)).toBe(true);
-    expect(await events.findCatalogLocation(externalId)).toEqual({
+    const eventCount = await prisma.event.count();
+    expect(await proposals.findGroupMembership(groupId, ownerId)).toBe(true);
+    expect(await proposals.findCatalogLocation(externalId)).toEqual({
       id: locationId,
       description: original.description,
       address: original.address,
     });
+
     const input = data();
-    const result = await events.createWithCatalogLocation(input);
+    const result = await proposals.createSuggestion(input);
+
     expect(result).toMatchObject({
-      owner: { id: userId, name: 'Ana', image: null },
-      event: {
-        id: input.id,
-        groupId,
-        status: 'pending',
-        timeslot: input.timeslot,
-        budgetStart: '30.00',
-        budgetEnd: '60.13',
-      },
-      location: { id: locationId, description: original.description, address: original.address },
+      id: input.id,
+      type: 'suggestion',
+      groupId,
+      timeslot: input.timeslot,
+      budgetStart: '30.00',
+      budgetEnd: '60.13',
+      owner: { id: ownerId, name: 'Ana', image: null },
+      location: { id: locationId },
       myAnswer: 'yes',
+      matched: false,
     });
-    const event = await prisma.event.findUniqueOrThrow({ where: { id: input.id } });
-    expect(event.locationId).toBe(locationId);
-    expect(event.budgetEnd.toString()).toBe('60.126');
     const proposal = await prisma.proposal.findUniqueOrThrow({
-      where: { id: result.id },
+      where: { id: input.id },
       include: { responses: true },
     });
     expect(proposal).toMatchObject({
-      eventId: input.id,
-      ownerId: userId,
-      createdAt: input.createdAt,
+      type: 'suggestion',
+      eventId: null,
+      groupId,
+      locationId,
+      matchedAt: null,
     });
-    expect(proposal.responses).toHaveLength(1);
-    expect(proposal.responses[0]).toMatchObject({ proposalId: proposal.id, userId, answer: 'yes' });
-    expect(await prisma.location.count()).toBe(count);
+    expect(proposal.responses).toEqual([
+      expect.objectContaining({ userId: ownerId, answer: 'yes' }),
+    ]);
+    expect(await prisma.event.count()).toBe(eventCount);
     expect(await prisma.location.findUniqueOrThrow({ where: { id: locationId } })).toEqual(
       original
     );
   });
 
-  it('returns null for omitted budgets', async () => {
-    const input = { ...data(), budgetStart: null, budgetEnd: null };
-    const result = await events.createWithCatalogLocation(input);
-    expect(result.event).toMatchObject({ budgetStart: null, budgetEnd: null });
-  });
+  it('stores a suggestion without day, time or budget', async () => {
+    const input = data({ timeslot: null, budgetStart: null, budgetEnd: null });
 
-  it('rolls back the event when proposal creation fails', async () => {
-    const input = { ...data(), ownerId: randomUUID() };
-    await expect(events.createWithCatalogLocation(input)).rejects.toThrow();
-    expect(await prisma.event.findUnique({ where: { id: input.id } })).toBeNull();
-    expect(await prisma.proposal.count({ where: { eventId: input.id } })).toBe(0);
-  });
-
-  it('rolls back both event and proposal when response creation fails', async () => {
-    const responseCount = await prisma.proposalResponse.count({ where: { userId } });
-    const input = data();
-    // Invalid enum fails at the third write, after real event and proposal INSERTs.
-    input.ownerAnswer = 'invalid' as CreateCatalogEventData['ownerAnswer'];
-    await expect(events.createWithCatalogLocation(input)).rejects.toThrow();
-    expect(await prisma.event.findUnique({ where: { id: input.id } })).toBeNull();
-    expect(await prisma.proposal.count({ where: { eventId: input.id } })).toBe(0);
-    expect(await prisma.proposalResponse.count({ where: { userId } })).toBe(responseCount);
-  });
-
-  it('stores a place on its first proposal and reuses it on the next one', async () => {
-    const placeId = `place-${randomUUID()}`;
-    newExternalIds.push(placeId);
-    expect(await events.findCatalogLocation(placeId)).toBeNull();
-
-    const first = await events.createWithCatalogLocation(data(placeId));
-    const second = await events.createWithCatalogLocation(data(placeId));
-
-    expect(first.location).toEqual({
-      id: expect.any(String),
-      description: 'Do Google',
-      address: 'Rua do Google',
+    await expect(proposals.createSuggestion(input)).resolves.toMatchObject({
+      timeslot: null,
+      budgetStart: null,
+      budgetEnd: null,
     });
-    expect(second.location).toEqual(first.location);
-    expect(
-      await prisma.location.findMany({ where: { externalId: placeId }, select: { id: true } })
-    ).toEqual([{ id: first.location.id }]);
-    expect(
-      await prisma.location.findUniqueOrThrow({ where: { id: first.location.id } })
-    ).toMatchObject({ manuallyCreated: false, externalId: placeId });
   });
 
-  it('rolls back a new place when the proposal fails', async () => {
+  it('stores a place on its first suggestion and reuses it on the next one', async () => {
     const placeId = `place-${randomUUID()}`;
     newExternalIds.push(placeId);
-    const input = { ...data(placeId), ownerId: randomUUID() };
+    const location = { externalId: placeId, description: 'Do Google', address: 'Rua do Google' };
 
-    await expect(events.createWithCatalogLocation(input)).rejects.toThrow();
+    const first = await proposals.createSuggestion(data({ location }));
+    const second = await proposals.createSuggestion(data({ location }));
+
+    expect(second.location).toEqual(first.location);
+    expect(await prisma.location.count({ where: { externalId: placeId } })).toBe(1);
+  });
+
+  it('rolls back a new place when the suggestion fails', async () => {
+    const placeId = `place-${randomUUID()}`;
+    newExternalIds.push(placeId);
+    const location = { externalId: placeId, description: null, address: null };
+
+    await expect(
+      proposals.createSuggestion(data({ location, ownerId: randomUUID() }))
+    ).rejects.toThrow();
 
     expect(await prisma.location.count({ where: { externalId: placeId } })).toBe(0);
+  });
+
+  it('matches only when the last member accepts and records one match notification', async () => {
+    const { id } = await proposals.createSuggestion(data({ name: 'Bar de sexta' }));
+
+    await expect(accept(id, firstMemberId)).resolves.toMatchObject({ matched: false });
+    const last = await accept(id, secondMemberId);
+
+    expect(last.matched).toBe(true);
+    expect(await prisma.proposal.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      matchedAt: last.response.createdAt,
+      eventId: null,
+    });
+    expect(
+      await prisma.groupNotification.findMany({
+        where: { proposalId: id },
+        select: { type: true, groupId: true, message: true, eventId: true },
+      })
+    ).toEqual([
+      {
+        type: 'match',
+        groupId,
+        message: 'Deu match! Todo o grupo aceitou a sugestão "Bar de sexta".',
+        eventId: null,
+      },
+    ]);
+  });
+
+  it('matches when a refusal is changed to an acceptance, but only once', async () => {
+    const { id } = await proposals.createSuggestion(data());
+    await accept(id, firstMemberId);
+    await responses.create({
+      proposalId: id,
+      userId: secondMemberId,
+      answer: 'no',
+      createdAt: new Date(),
+    });
+
+    await expect(
+      responses.updateAnswer(id, secondMemberId, 'yes', new Date())
+    ).resolves.toMatchObject({ matched: true });
+    await responses.updateAnswer(id, secondMemberId, 'no', new Date());
+    await expect(
+      responses.updateAnswer(id, secondMemberId, 'yes', new Date())
+    ).resolves.toMatchObject({ matched: false });
+
+    expect(await prisma.groupNotification.count({ where: { proposalId: id } })).toBe(1);
+  });
+
+  it('registers a single match when the last two members accept at the same time', async () => {
+    const { id } = await proposals.createSuggestion(data());
+
+    const results = await Promise.all([accept(id, firstMemberId), accept(id, secondMemberId)]);
+
+    expect(results.filter(({ matched }) => matched)).toHaveLength(1);
+    expect(await prisma.groupNotification.count({ where: { proposalId: id } })).toBe(1);
+  });
+
+  it('matches right away when the owner is the only group member', async () => {
+    const result = await proposals.createSuggestion(data({ groupId: soloGroupId }));
+
+    expect(result.matched).toBe(true);
+    expect(await prisma.groupNotification.count({ where: { proposalId: result.id } })).toBe(1);
   });
 });

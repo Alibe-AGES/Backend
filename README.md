@@ -254,12 +254,14 @@ Uma falha ao enfileirar o push é registrada no log, mas não desfaz o encontro 
 A criação do encontro também persiste, na mesma transação do PostgreSQL, uma entrada
 `createdEvent` no mural compartilhado do grupo. O mural não é uma caixa individual: todos os
 integrantes autorizados consultam os mesmos registros. O lembrete diário não é persistido no mural.
-Os tipos públicos do mural são `createdEvent` e `match`; o segundo será produzido quando o fluxo de
-match for integrado.
+Os tipos públicos do mural são `createdEvent` e `match`. O `match` é registrado quando todos os
+membros atuais do grupo aceitam uma sugestão (veja
+[Endpoints de resposta à proposta](#endpoints-de-resposta-à-proposta)); ele preenche `proposalId` e
+deixa `eventId` nulo, porque nenhum evento existe nesse momento.
 
 As mensagens persistidas usam referências no formato `${user:<uuid>}`. Ao listar o mural, a API
 resolve todas as referências da página em uma única consulta e devolve os nomes dos usuários. O
-mesmo mecanismo aceita vários usuários e já está pronto para a futura mensagem de `match`. Esse
+mesmo mecanismo aceita vários usuários por mensagem. Esse
 template pertence somente ao mural e não altera o conteúdo publicado na SQS para o push do celular.
 
 O endpoint `GET /groups/:groupId/notifications` exige autenticação e participação no grupo. Os
@@ -279,7 +281,8 @@ GET /groups/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/notifications?page=1&limit=7
       "type": "createdEvent",
       "message": "Ana Souza criou o evento \"Cinema\" para o dia 18/10/2026.",
       "createdAt": "2026-10-18T18:00:00.000Z",
-      "eventId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+      "eventId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "proposalId": null
     }
   ],
   "pagination": {
@@ -903,30 +906,34 @@ expõem `/api/events/:eventId/image`. Essa rota entrega os bytes apenas para usu
 que participam do grupo do evento. Campos obrigatórios ausentes respondem `400`, grupo inexistente
 `404`, usuário fora do grupo `403` e ausência de autenticação `401`.
 
-### Criação de proposta com local do catálogo
+### Criação de sugestão com local do catálogo
 
 ```http
 POST /api/groups/:groupId/proposals
 ```
 
-O endpoint fica no módulo `proposals` e reutiliza o repository exportado por `EventsModule`.
-O body JSON estrito exige `locationId` (Place ID do Google, o `externalId` dos itens do feed e da pesquisa), `name` (não vazio após `trim()`), `date`
-(`YYYY-MM-DD`) e `time` (`HH:mm`). `budgetStart` e `budgetEnd` são strings decimais opcionais
-e independentes, seguindo a validação da criação de eventos; não aceitam `null` explícito.
-Campos extras, incluindo `ownerId` e `userId`, respondem `400`. O autor vem somente da sessão.
+Uma sugestão é uma `Proposal` do tipo `suggestion`: a ideia de um encontro, ainda sem evento.
+O evento só é criado depois, pelos endpoints de evento. A tabela `proposal` guarda o próprio
+`group_id`, `name`, `location_id`, `timeslot` e orçamento; `event_id` fica nulo nas sugestões.
+Propostas criadas junto com um evento (`POST /groups/:groupId/events`) continuam com o tipo `event`.
 
-Uma transação cria `Event` com status `pending`, `Proposal` e `ProposalResponse` do autor com
-resposta `yes`. Na mesma transação, a `Location` com esse `external_id` e `manually_created = false`
-é reutilizada ou, no primeiro uso do local, criada com nome ou resumo e endereço do Google. O Google
-só é consultado quando o local ainda não está salvo.
-Data e horário são interpretados em UTC, como no fluxo manual existente.
+O body JSON estrito exige `locationId` (Place ID do Google, o `externalId` dos itens do feed e da
+pesquisa) e `name` (não vazio após `trim()`). `date` (`YYYY-MM-DD`) e `time` (`HH:mm`) são opcionais,
+mas devem ser enviados juntos. `budgetStart` e `budgetEnd` são strings decimais opcionais e
+independentes, seguindo a validação da criação de eventos; não aceitam `null` explícito. Campos
+extras, incluindo `ownerId` e `userId`, respondem `400`. O autor vem somente da sessão.
 
-A resposta `201` contém `id` e `createdAt` da proposta, `owner` (`id`, `name`, `image`),
-`event` (`id`, `name`, `date`, `time`, `budgetStart`, `budgetEnd`, `status`, `groupId`),
-`location` (`id`, `description`, `address`) e `myAnswer: "yes"`. Orçamentos são apresentados
-com duas casas decimais, como nos detalhes de evento, ou `null` quando omitidos. A imagem
-do autor usa `/users/:id/profile-picture` ou `null`; descrição e endereço preservam valores
-nulos. `createdAt` é serializado em ISO. Grupo inexistente ou local que o Google não encontra
+Uma transação cria a `Proposal` e a `ProposalResponse` do autor com resposta `yes`. Na mesma
+transação, a `Location` com esse `external_id` e `manually_created = false` é reutilizada ou, no
+primeiro uso do local, criada com nome ou resumo e endereço do Google. O Google só é consultado
+quando o local ainda não está salvo. Data e horário são interpretados em UTC.
+
+A resposta `201` contém `id`, `type: "suggestion"`, `groupId`, `name`, `date`, `time`,
+`budgetStart`, `budgetEnd`, `createdAt`, `owner` (`id`, `name`, `image`), `location` (`id`,
+`description`, `address`), `myAnswer: "yes"` e `matched`. `date`, `time` e orçamentos são `null`
+quando omitidos; orçamentos usam duas casas decimais. `matched` só é `true` quando o autor é o único
+membro do grupo, porque o próprio aceite completa o match. A imagem do autor usa
+`/users/:id/profile-picture` ou `null`. Grupo inexistente ou local que o Google não encontra
 respondem `404`, usuário fora do grupo `403`, ausência de autenticação `401` e Google indisponível `503`.
 
 O teste de persistência e rollback com PostgreSQL é opt-in. Use um banco local exclusivo cujo
@@ -935,23 +942,34 @@ nome termine em `_test`, aplique as migrations existentes com `prisma migrate de
 apontando para ele. Sem essa variável, os testes de PostgreSQL são ignorados; os testes de
 composição do módulo continuam executando. Os dados criados pelos testes são removidos no teardown.
 
-### Endpoints de resposta à proposta do evento
+### Endpoints de resposta à proposta
 
-O módulo `proposals` registra a resposta do usuário autenticado (`request.user`) à proposta do
+O módulo `proposals` registra a resposta do usuário autenticado (`request.user`). A proposta é
+encontrada pelo evento ao qual pertence ou diretamente pelo id, no caso das sugestões, que não têm
 evento. Quando o evento possui mais de uma proposta, é usada a mais recente.
 
 ```http
 POST  /api/events/:eventId/proposal/responses
 PATCH /api/events/:eventId/proposal/responses/me
+POST  /api/proposals/:proposalId/responses
+PATCH /api/proposals/:proposalId/responses/me
 ```
 
-Ambos recebem `{ "answer": "yes" | "no" }` e retornam `id`, `proposalId`, `userId`, `answer` e
-`createdAt`. Cada usuário possui no máximo uma `ProposalResponse` por proposta (constraint única
-`proposal_id + user_id`); um segundo `POST` responde `409` e a alteração deve ser feita pelo
-`PATCH`. O criador do evento já recebe a resposta `yes` na criação, então para ele somente o `PATCH`
+Todos recebem `{ "answer": "yes" | "no" }` e retornam `id`, `proposalId`, `userId`, `answer`,
+`createdAt` e `matched`. Cada usuário possui no máximo uma `ProposalResponse` por proposta
+(constraint única `proposal_id + user_id`); um segundo `POST` responde `409` e a alteração deve ser
+feita pelo `PATCH`. O autor já recebe a resposta `yes` na criação, então para ele somente o `PATCH`
 se aplica.
 
-Evento ou proposta inexistente respondem `404`, usuário fora do grupo do evento `403`, ausência de
+**Match.** Uma sugestão dá match quando todos os membros atuais do grupo estão com resposta `yes`.
+A resposta que completa os aceites, seja pelo `POST` ou por um `PATCH` de `no` para `yes`, retorna
+`matched: true`; na mesma transação, a proposta recebe `matched_at` e o mural do grupo ganha uma
+notificação `match` com `proposalId`. Nas demais respostas a resposta é gravada normalmente e
+`matched` é `false`. O match acontece uma única vez por sugestão: trocar a resposta depois não gera
+outro match. Propostas do tipo `event` nunca dão match. Cada resposta trava a linha da proposta
+(`SELECT ... FOR UPDATE`), então dois últimos aceites simultâneos registram exatamente um match.
+
+Evento ou proposta inexistente respondem `404`, usuário fora do grupo `403`, ausência de
 autenticação `401` e `answer` diferente de `yes`/`no` `400`. O `PATCH` também responde `404` quando
 o usuário ainda não respondeu.
 
@@ -973,6 +991,8 @@ nos decorators do Swagger de cada controller.
 | GET    | `/api/events/:eventId/image`                 | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/api/events/:eventId/proposal/responses`    | `201`   | `400`, `401`, `403`, `404`, `409` |
 | PATCH  | `/api/events/:eventId/proposal/responses/me` | `200`   | `400`, `401`, `403`, `404`        |
+| POST   | `/api/proposals/:proposalId/responses`       | `201`   | `400`, `401`, `403`, `404`, `409` |
+| PATCH  | `/api/proposals/:proposalId/responses/me`    | `200`   | `400`, `401`, `403`, `404`        |
 
 | Status                      | Significado atual                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |

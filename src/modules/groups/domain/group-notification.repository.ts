@@ -6,6 +6,8 @@ export interface GroupNotificationItem {
   message: string;
   createdAt: Date;
   eventId: string | null;
+  /** Preenchido nas notificações `match`, que se referem à sugestão aceita por todos. */
+  proposalId: string | null;
 }
 
 // Mensagens persistidas podem conter `${user:<uuid>}`. O adaptador resolve esses marcadores antes

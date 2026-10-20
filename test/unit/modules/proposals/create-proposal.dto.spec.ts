@@ -34,3 +34,18 @@ describe('CreateProposalDto budget capacity', () => {
     });
   });
 });
+
+describe('CreateProposalDto day and time', () => {
+  const suggestion = { locationId: body.locationId, name: body.name };
+
+  it('accepts a suggestion with only name and location', () => {
+    expect(CreateProposalDto.schema.safeParse(suggestion).success).toBe(true);
+  });
+
+  it.each([{ date: body.date }, { time: body.time }])(
+    'rejects a day or time sent alone: %p',
+    (partial) => {
+      expect(CreateProposalDto.schema.safeParse({ ...suggestion, ...partial }).success).toBe(false);
+    }
+  );
+});

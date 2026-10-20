@@ -426,7 +426,7 @@ describe('PrismaEventRepository', () => {
         select: { id: true },
       });
       expect(transaction.proposal.create).toHaveBeenCalledWith({
-        data: { eventId, ownerId: 'owner-id', createdAt },
+        data: { eventId, groupId: baseRecord.groupId, ownerId: 'owner-id', createdAt },
         select: { id: true },
       });
       expect(transaction.proposalResponse.create).toHaveBeenCalledWith({

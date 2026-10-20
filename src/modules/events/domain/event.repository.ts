@@ -84,45 +84,9 @@ export interface CreatedEvent {
   ownerResponse: EventProposalResponse;
 }
 
-export interface ExistingEventLocation {
-  id: string;
-  description: string | null;
-  address: string | null;
-}
-
 export type CreateLocatedEventData = Omit<CreateEventData, 'location' | 'notification'> & {
   locationId: string;
 };
-
-/** Place from the catalog (Google Places), stored only when a proposal first uses it. */
-export interface CatalogEventLocation {
-  externalId: string;
-  description: string | null;
-  address: string | null;
-}
-
-export type CreateCatalogEventData = Omit<CreateEventData, 'location' | 'notification'> & {
-  location: CatalogEventLocation;
-};
-
-export interface CreatedLocationProposal {
-  id: string;
-  createdAt: Date;
-  owner: { id: string; name: string; image: string | null };
-  event: {
-    id: string;
-    name: string;
-    timeslot: Date;
-    budgetStart: string | null;
-    budgetEnd: string | null;
-    status: EventStatus;
-    groupId: string;
-  };
-  location: ExistingEventLocation;
-  myAnswer: ProposalAnswer;
-}
-
-export class EventLocationNotFoundError extends Error {}
 
 export interface EventImageAccess {
   imageKey: string | null;
@@ -137,14 +101,6 @@ export abstract class EventRepository {
 
   /** Cria location, evento, proposta e resposta do criador de forma atômica. */
   abstract create(data: CreateEventData): Promise<CreatedEvent>;
-
-  /** Location do catálogo já salva por uma proposta anterior, buscada pelo Place ID. */
-  abstract findCatalogLocation(externalId: string): Promise<ExistingEventLocation | null>;
-
-  /** Reutiliza ou cria a location do catálogo e cria evento, proposta e resposta atomicamente. */
-  abstract createWithCatalogLocation(
-    data: CreateCatalogEventData
-  ): Promise<CreatedLocationProposal>;
 
   abstract update(id: string, data: UpdateEventData): Promise<Event>;
 

@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { ProposalResponse, type UserProposalAnswer } from '../domain/proposal-response.entity';
-import { ProposalResponseRepository } from '../domain/proposal-response.repository';
-import { resolveEventProposalId } from './resolve-event-proposal';
+import { type UserProposalAnswer } from '../domain/proposal-response.entity';
+import {
+  type ProposalAnswerResult,
+  ProposalResponseRepository,
+} from '../domain/proposal-response.repository';
+import { type ProposalTarget, resolveProposalId } from './resolve-proposal';
 
-export interface UpdateProposalResponseInput {
-  eventId: string;
+export type UpdateProposalResponseInput = ProposalTarget & {
   userId: string;
   answer: UserProposalAnswer;
-}
+};
 
 export class ProposalResponseNotFoundError extends Error {}
 
@@ -15,10 +17,15 @@ export class ProposalResponseNotFoundError extends Error {}
 export class UpdateProposalResponseUseCase {
   constructor(private readonly responses: ProposalResponseRepository) {}
 
-  async execute(input: UpdateProposalResponseInput): Promise<ProposalResponse> {
-    const proposalId = await resolveEventProposalId(this.responses, input.eventId, input.userId);
+  async execute(input: UpdateProposalResponseInput): Promise<ProposalAnswerResult> {
+    const proposalId = await resolveProposalId(this.responses, input, input.userId);
 
-    const updated = await this.responses.updateAnswer(proposalId, input.userId, input.answer);
+    const updated = await this.responses.updateAnswer(
+      proposalId,
+      input.userId,
+      input.answer,
+      new Date()
+    );
 
     if (!updated) {
       throw new ProposalResponseNotFoundError('O usuário ainda não respondeu a proposta');

@@ -15,4 +15,11 @@ export class ProposalResponseDto {
 
   @ApiProperty({ type: Date, format: 'date-time', example: '2026-09-22T18:30:00.000Z' })
   createdAt!: Date;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'true somente na resposta que completou o aceite de todos os membros do grupo em uma sugestão.',
+  })
+  matched!: boolean;
 }
