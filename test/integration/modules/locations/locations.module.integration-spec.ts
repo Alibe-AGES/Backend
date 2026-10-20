@@ -6,6 +6,7 @@ import {
 } from '../../../../src/infrastructure/api/google-places/google-places.service';
 import { PrismaFeatureFlagsService } from '../../../../src/infrastructure/feature-flags/prisma-feature-flags.service';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { GetLocationUseCase } from '../../../../src/modules/locations/application/get-location.use-case';
 import { GetLocationPhotoUseCase } from '../../../../src/modules/locations/application/get-location-photo.use-case';
 import { ListCatalogLocationsUseCase } from '../../../../src/modules/locations/application/list-catalog-locations.use-case';
 import { mockPriceRange } from '../../../../src/modules/locations/application/mock-price-range';
@@ -24,6 +25,7 @@ describe('LocationsModule integration', () => {
   const findMany = jest.fn();
   const createManyAndReturn = jest.fn();
   const findUniqueFlag = jest.fn();
+  const findUniqueLocation = jest.fn();
 
   beforeAll(async () => {
     module = await Test.createTestingModule({
@@ -33,7 +35,7 @@ describe('LocationsModule integration', () => {
       .useValue('test-key')
       .overrideProvider(PrismaService)
       .useValue({
-        location: { findMany, createManyAndReturn },
+        location: { findMany, createManyAndReturn, findUnique: findUniqueLocation },
         featureFlag: { findUnique: findUniqueFlag },
       })
       .compile();
@@ -139,5 +141,21 @@ describe('LocationsModule integration', () => {
   it('connects the photo use case to the Google Places media route', async () => {
     await expect(module.get(GetLocationPhotoUseCase).execute(PHOTO_NAME)).resolves.toBe(PHOTO_URI);
     expect(String(fetchMock.mock.calls[0][0])).toContain(`${PHOTO_NAME}/media`);
+  });
+
+  it('connects the get location use case to the Prisma repository', async () => {
+    const location = {
+      id: '0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d',
+      externalId: 'place-1',
+      description: 'Bloom Café',
+      address: 'Rua A',
+      manuallyCreated: false,
+    };
+    findUniqueLocation.mockResolvedValue(location);
+
+    await expect(module.get(GetLocationUseCase).execute(location.id)).resolves.toEqual(location);
+    expect(findUniqueLocation).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: location.id } })
+    );
   });
 });

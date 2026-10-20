@@ -58,4 +58,30 @@ describe('PrismaLocationRepository', () => {
     ]);
     expect(createManyAndReturn).not.toHaveBeenCalled();
   });
+
+  it('finds a location by id selecting only the detail fields', async () => {
+    const location = {
+      id: '0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d',
+      externalId: 'place-1',
+      description: 'Café',
+      address: 'Rua A',
+      manuallyCreated: false,
+    };
+    const findUnique = jest.fn().mockResolvedValue(location);
+    const repository = new PrismaLocationRepository({
+      location: { findUnique },
+    } as unknown as PrismaService);
+
+    await expect(repository.findById(location.id)).resolves.toEqual(location);
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: location.id },
+      select: {
+        id: true,
+        externalId: true,
+        description: true,
+        address: true,
+        manuallyCreated: true,
+      },
+    });
+  });
 });

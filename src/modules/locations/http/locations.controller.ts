@@ -5,6 +5,8 @@ import {
   Header,
   HttpStatus,
   NotFoundException,
+  Param,
+  ParseUUIDPipe,
   Query,
   Redirect,
   ServiceUnavailableException,
@@ -17,12 +19,14 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { PlacesProviderUnavailableError } from '../../../shared/places/places-provider';
+import { GetLocationUseCase, LocationNotFoundError } from '../application/get-location.use-case';
 import {
   GetLocationPhotoUseCase,
   LocationPhotoNotFoundError,
@@ -35,6 +39,7 @@ import {
 import { DAY_PERIODS, GROUP_SIZES, PLACE_ENVIRONMENTS } from '../domain/place-filters';
 import { GetLocationPhotoQueryDto } from './dto/get-location-photo-query.dto';
 import { ListLocationsQueryDto } from './dto/list-locations-query.dto';
+import { LocationDetailsResponseDto } from './dto/location-details-response.dto';
 import {
   LocationListItemResponseDto,
   LocationListResponseDto,
@@ -47,7 +52,8 @@ import {
 export class LocationsController {
   constructor(
     private readonly listCatalogLocations: ListCatalogLocationsUseCase,
-    private readonly getLocationPhoto: GetLocationPhotoUseCase
+    private readonly getLocationPhoto: GetLocationPhotoUseCase,
+    private readonly getLocation: GetLocationUseCase
   ) {}
 
   /**
@@ -135,6 +141,32 @@ export class LocationsController {
       return { url, statusCode: HttpStatus.FOUND };
     } catch (error) {
       if (error instanceof LocationPhotoNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * GET /api/locations/:locationId
+   * Returns a location from the catalog for the detail screen. Declared after the static
+   * routes so `photos` is not parsed as an id; the image comes from the photos route.
+   */
+  @Get(':locationId')
+  @ApiOperation({ summary: 'Consulta os dados de um local' })
+  @ApiParam({ name: 'locationId', format: 'uuid' })
+  @ApiOkResponse({ type: LocationDetailsResponseDto })
+  @ApiBadRequestResponse({ description: 'locationId deve ser um UUID válido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiNotFoundResponse({ description: 'Local não encontrado.' })
+  async get(
+    @Param('locationId', new ParseUUIDPipe()) locationId: string
+  ): Promise<LocationDetailsResponseDto> {
+    try {
+      return await this.getLocation.execute(locationId);
+    } catch (error) {
+      if (error instanceof LocationNotFoundError) {
         throw new NotFoundException(error.message);
       }
 
