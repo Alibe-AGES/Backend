@@ -95,12 +95,12 @@ Variáveis atuais:
 | `BETTER_AUTH_TRUSTED_ORIGINS`       | Origens web e schemes Expo aceitos, separados por vírgula.           |
 | `AWS_REGION`                        | Região usada pelo MiniStack e pelos comandos da AWS CLI.             |
 | `AWS_S3_BUCKET`                     | Nome do bucket utilizado pela aplicação.                             |
-| `AWS_SQS_NOTIFICATION_QUEUE_URL`    | URL da fila usada para publicar notificações.                      |
+| `AWS_SQS_NOTIFICATION_QUEUE_URL`    | URL da fila usada para publicar notificações.                        |
 | `AWS_ENDPOINT_URL`                  | Endpoint global dos serviços AWS; presente apenas no MiniStack.      |
-| `ENABLE_NOTIFICATION_TEST_ENDPOINT` | Habilita somente localmente o envio de push sintético.             |
+| `ENABLE_NOTIFICATION_TEST_ENDPOINT` | Habilita somente localmente o envio de push sintético.               |
 | `AWS_ACCESS_KEY_ID`                 | Credencial fictícia local; em produção, prefira role ou OIDC.        |
 | `AWS_SECRET_ACCESS_KEY`             | Segredo fictício local; nunca versionar um valor real.               |
-| `GOOGLE_PLACES_API_KEY`       | Chave da Places API (New); sem ela `GET /api/locations` retorna 503. |
+| `GOOGLE_PLACES_API_KEY`             | Chave da Places API (New); sem ela `GET /api/locations` retorna 503. |
 
 Nunca coloque tokens, senhas reais ou credenciais de produção no `.env.template`.
 
