@@ -228,7 +228,7 @@ describe('GroupsModule integration', () => {
       });
 
       await expect(
-        controller.getAvailabilities(groupId, dateParam, authenticatedRequest)
+        controller.getAvailabilities(groupId, { date: dateParam }, authenticatedRequest)
       ).resolves.toEqual({
         date: dateParam,
         users: [
@@ -266,7 +266,7 @@ describe('GroupsModule integration', () => {
       await expect(
         controller.getAvailabilities(
           '11111111-1111-4111-8111-111111111111',
-          '2026-05-06',
+          { date: '2026-05-06' },
           authenticatedRequest
         )
       ).rejects.toThrow();
@@ -277,7 +277,7 @@ describe('GroupsModule integration', () => {
       const id = randomUUID();
 
       await expect(
-        controller.getAvailabilities(id, '01/12/2026', authenticatedRequest)
+        controller.getAvailabilities(id, { date: '01/12/2026' }, authenticatedRequest)
       ).rejects.toThrow();
     });
   });

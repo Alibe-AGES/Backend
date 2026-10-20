@@ -9,11 +9,7 @@ export class InvalidAvailabilityDateError extends Error {}
 export class GetAvailabilityIntervalsUseCase {
   constructor(private readonly groups: GroupRepository) {}
 
-  async execute(
-    groupId: string,
-    date: unknown,
-    userId: string
-  ): Promise<GroupAvailabilitiesByDate> {
+  async execute(groupId: string, date: string, userId: string): Promise<GroupAvailabilitiesByDate> {
     if (!isValidDate(date)) {
       throw new InvalidAvailabilityDateError('Formato inválido de data');
     }
@@ -42,8 +38,8 @@ export class GetAvailabilityIntervalsUseCase {
   }
 }
 
-function isValidDate(value: unknown): value is string {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+function isValidDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false;
   }
 

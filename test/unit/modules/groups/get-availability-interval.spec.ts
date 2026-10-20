@@ -66,7 +66,7 @@ describe('GetAvailabilityIntervalsUseCase', () => {
     );
   });
 
-  it.each(['2026/09/26', '2026-99-99', '2026-02-31', '', undefined, null, [DATE], { date: DATE }])(
+  it.each(['2026/09/26', '2026-99-99', '2026-02-31', ''])(
     'rejects the invalid date %s before consulting the repository',
     async (date) => {
       await expect(useCase.execute(GROUP_ID, date, USER_ID)).rejects.toBeInstanceOf(

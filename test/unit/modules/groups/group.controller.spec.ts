@@ -171,13 +171,13 @@ describe('GroupsController', () => {
         new AvailabilityAccessDeniedError('Denied')
       );
       await expect(
-        controller.getAvailabilities('group-id', '2026-09-05', authenticatedRequest)
+        controller.getAvailabilities('group-id', { date: '2026-09-05' }, authenticatedRequest)
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('rejects a request missing its session user', async () => {
       await expect(
-        controller.getAvailabilities('group-id', '2026-09-05', {} as AuthenticatedRequest)
+        controller.getAvailabilities('group-id', { date: '2026-09-05' }, {} as AuthenticatedRequest)
       ).rejects.toBeInstanceOf(UnauthorizedException);
       expect(getAvailabilityIntervalsUseCase.execute).not.toHaveBeenCalled();
     });
@@ -207,7 +207,7 @@ describe('GroupsController', () => {
       });
 
       await expect(
-        controller.getAvailabilities(groupId, dateParam, authenticatedRequest)
+        controller.getAvailabilities(groupId, { date: dateParam }, authenticatedRequest)
       ).resolves.toEqual({
         date: dateParam,
         users: [
@@ -244,7 +244,7 @@ describe('GroupsController', () => {
       await expect(
         controller.getAvailabilities(
           '11111111-1111-4111-8111-111111111111',
-          '2026-06-05',
+          { date: '2026-06-05' },
           authenticatedRequest
         )
       ).rejects.toThrow(NotFoundException);
@@ -260,7 +260,7 @@ describe('GroupsController', () => {
       await expect(
         controller.getAvailabilities(
           '11111111-1111-4111-8111-111111111111',
-          invalidDateFormat,
+          { date: invalidDateFormat },
           authenticatedRequest
         )
       ).rejects.toThrow(BadRequestException);

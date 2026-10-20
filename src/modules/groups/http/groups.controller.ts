@@ -49,6 +49,7 @@ import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
 import { GroupResponsePresenter } from './presenters/group-response.presenter';
 import { ListGroupsUseCase } from '../application/list-groups.use-case';
+import { GetAvailabilitiesQueryDto } from './dto/get-availabilities-query.dto';
 import { AvailabilitiesResponseDto } from './dto/get-availabilities-response.dto';
 import {
   GetAvailabilityIntervalsUseCase,
@@ -245,7 +246,7 @@ export class GroupsController {
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   async getAvailabilities(
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
-    @Query('date') date: unknown,
+    @Query() { date }: GetAvailabilitiesQueryDto,
     @Request() request: AuthenticatedRequest
   ): Promise<AvailabilitiesResponseDto> {
     const userId = request.user?.id;
