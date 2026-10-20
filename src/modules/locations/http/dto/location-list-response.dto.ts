@@ -15,11 +15,8 @@ export class LocationListItemResponseDto {
   @ApiProperty({
     example: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
     description:
-      'Place ID do Google. Use em GET /api/locations/google-places/{placeId} e como locationId da proposta.',
+      'Google Place ID. Use it in GET /api/locations/google-places/{placeId} and as the proposal locationId.',
   })
-  id!: string;
-
-  @ApiProperty({ example: 'ChIJN1t_tDeuEmsRUsoyG83frY4', description: 'Place ID do Google.' })
   externalId!: string;
 
   @ApiProperty({ example: 'Bloom Café' })

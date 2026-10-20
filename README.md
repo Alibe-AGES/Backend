@@ -476,11 +476,13 @@ api/google-places/
 
 A chave é lida de `GOOGLE_PLACES_API_KEY`. A API inicializa sem ela, mas as buscas respondem `503`. Para gerar a chave, ative a **Places API (New)** no Google Cloud e restrinja a chave a essa API. O field mask solicita campos de atmosfera (`outdoorSeating`, `goodForGroups`), que entram no SKU Enterprise + Atmosphere.
 
-`GET /api/locations?latitude=&longitude=` usa esse cliente para montar o feed: busca até 20 locais no raio informado (`maxDistanceKm`, padrão de 50 km), aplica os filtros (`budgetMin`, `budgetMax`, `period`, `environment`, `groupSize`, `type`), e pagina o resultado. A pesquisa `GET /api/locations/search?q=` segue o mesmo fluxo com Text Search. Nenhuma das duas rotas grava no banco: o `id` de cada item é o Place ID do Google, e a linha em `location` só é criada quando uma proposta usa o local.
+`GET /api/locations?latitude=&longitude=` usa esse cliente para montar o feed: busca até 20 locais no raio informado (`maxDistanceKm`, padrão de 50 km), aplica os filtros (`budgetMin`, `budgetMax`, `period`, `environment`, `groupSize`, `type`), e pagina o resultado. A pesquisa `GET /api/locations/search?q=` segue o mesmo fluxo com Text Search. Nenhuma das duas rotas grava no banco: o `externalId` de cada item é o Place ID do Google, e a linha em `location` só é criada quando uma proposta usa o local.
 
 Cada item traz `imageUrl` no formato `/api/locations/photos?name=places/{placeId}/photos/{photoId}`, sem chamada extra ao Google durante a busca do feed. Quando o app carrega a imagem (com a mesma sessão das demais rotas), o Backend consulta a rota de mídia do [Place Photos (New)](https://developers.google.com/maps/documentation/places/web-service/place-photos) com `skipHttpRedirect=true` e responde `302` para a URL pública do Google (`googleusercontent.com`), que não contém a API key. Assim, cada foto custa uma chamada somente quando é exibida. O parâmetro opcional `maxWidthPx` (padrão 800) define a largura, e a resposta usa `Cache-Control: private, max-age=3600`; fotos que não puderem ser resolvidas retornam `404`.
 
-`GET /api/locations/google-places/:placeId` consulta o [Place Details (New)](https://developers.google.com/maps/documentation/places/web-service/place-details) pelo Place ID e devolve os mesmos campos de um item do feed, sem `distanceMeters`. Responde `400` para um Place ID malformado, `404` quando o Google não encontra o local e `503` quando o Google está indisponível. O orçamento segue a flag `google_places_budget`, como no feed.
+`GET /api/locations/google-places/:placeId` consulta o [Place Details (New)](https://developers.google.com/maps/documentation/places/web-service/place-details) pelo Place ID e devolve os mesmos campos de um item do feed, sem `distanceMeters`. Os itens não têm `id`: o identificador é o `externalId`.
+
+`GET /api/locations/:locationId` lê do banco a `location` pelo id interno (UUID), como o `location.id` devolvido em eventos e propostas, e retorna `id`, `externalId`, `description`, `address` e `manuallyCreated`. Não consulta o Google. Responde `400` para UUID inválido e `404` quando o local não existe. Responde `400` para um Place ID malformado, `404` quando o Google não encontra o local e `503` quando o Google está indisponível. O orçamento segue a flag `google_places_budget`, como no feed.
 
 ### Feature flags
 
@@ -908,7 +910,7 @@ POST /api/groups/:groupId/proposals
 ```
 
 O endpoint fica no módulo `proposals` e reutiliza o repository exportado por `EventsModule`.
-O body JSON estrito exige `locationId` (Place ID do Google, o `id` dos itens do feed e da pesquisa), `name` (não vazio após `trim()`), `date`
+O body JSON estrito exige `locationId` (Place ID do Google, o `externalId` dos itens do feed e da pesquisa), `name` (não vazio após `trim()`), `date`
 (`YYYY-MM-DD`) e `time` (`HH:mm`). `budgetStart` e `budgetEnd` são strings decimais opcionais
 e independentes, seguindo a validação da criação de eventos; não aceitam `null` explícito.
 Campos extras, incluindo `ownerId` e `userId`, respondem `400`. O autor vem somente da sessão.

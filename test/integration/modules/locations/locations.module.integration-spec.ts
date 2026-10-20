@@ -8,13 +8,16 @@ import {
 } from '../../../../src/infrastructure/api/google-places/google-places.service';
 import { PrismaFeatureFlagsService } from '../../../../src/infrastructure/feature-flags/prisma-feature-flags.service';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { FindLocationByIdUseCase } from '../../../../src/modules/locations/application/find-location-by-id.use-case';
 import { GetLocationUseCase } from '../../../../src/modules/locations/application/get-location.use-case';
 import { GetLocationPhotoUseCase } from '../../../../src/modules/locations/application/get-location-photo.use-case';
 import { ListCatalogLocationsUseCase } from '../../../../src/modules/locations/application/list-catalog-locations.use-case';
 import { SearchCatalogLocationsUseCase } from '../../../../src/modules/locations/application/search-catalog-locations.use-case';
 import { mockPriceRange } from '../../../../src/modules/locations/application/mock-price-range';
+import { LocationRepository } from '../../../../src/modules/locations/domain/location.repository';
 import { LocationsController } from '../../../../src/modules/locations/http/locations.controller';
 import { LocationsModule } from '../../../../src/modules/locations/locations.module';
+import { PrismaLocationRepository } from '../../../../src/modules/locations/persistence/prisma-location.repository';
 import { FeatureFlags } from '../../../../src/shared/feature-flags/feature-flags';
 
 const PHOTO_NAME = 'places/place-1/photos/photo-1';
@@ -24,6 +27,7 @@ describe('LocationsModule integration', () => {
   let module: TestingModule;
   let fetchMock: jest.SpyInstance;
   const findUniqueFlag = jest.fn();
+  const findUniqueLocation = jest.fn();
 
   beforeAll(async () => {
     module = await Test.createTestingModule({
@@ -32,7 +36,10 @@ describe('LocationsModule integration', () => {
       .overrideProvider(GOOGLE_PLACES_API_KEY)
       .useValue('test-key')
       .overrideProvider(PrismaService)
-      .useValue({ featureFlag: { findUnique: findUniqueFlag } })
+      .useValue({
+        featureFlag: { findUnique: findUniqueFlag },
+        location: { findUnique: findUniqueLocation },
+      })
       .compile();
   });
 
@@ -65,10 +72,11 @@ describe('LocationsModule integration', () => {
     jest.restoreAllMocks();
   });
 
-  it('registers the controller, use cases and Google Places adapter', () => {
+  it('registers the controller, use cases, Prisma adapter and Google Places adapter', () => {
     expect(module.get(LocationsController)).toBeInstanceOf(LocationsController);
     expect(module.get(ListCatalogLocationsUseCase)).toBeInstanceOf(ListCatalogLocationsUseCase);
     expect(module.get(SearchCatalogLocationsUseCase)).toBeInstanceOf(SearchCatalogLocationsUseCase);
+    expect(module.get(LocationRepository)).toBeInstanceOf(PrismaLocationRepository);
     expect(module.get(GooglePlacesService, { strict: false })).toBeInstanceOf(GooglePlacesService);
     expect(module.get(FeatureFlags, { strict: false })).toBeInstanceOf(PrismaFeatureFlagsService);
   });
@@ -146,5 +154,24 @@ describe('LocationsModule integration', () => {
     const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
     expect(String(url)).toContain(`${GOOGLE_PLACES_API_BASE_URL}/places/place-1?`);
     expect((init.headers as Record<string, string>)['X-Goog-FieldMask']).toContain('priceRange');
+  });
+
+  it('connects the find by id use case to the Prisma repository without calling Google', async () => {
+    const location = {
+      id: '0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d',
+      externalId: 'place-1',
+      description: 'Bloom Café',
+      address: 'Rua A',
+      manuallyCreated: false,
+    };
+    findUniqueLocation.mockResolvedValue(location);
+
+    await expect(module.get(FindLocationByIdUseCase).execute(location.id)).resolves.toEqual(
+      location
+    );
+    expect(findUniqueLocation).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: location.id } })
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -6,6 +6,7 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Query,
   Redirect,
   ServiceUnavailableException,
@@ -29,6 +30,7 @@ import {
   PLACE_ID_PATTERN,
   PlacesProviderUnavailableError,
 } from '../../../shared/places/places-provider';
+import { FindLocationByIdUseCase } from '../application/find-location-by-id.use-case';
 import { GetLocationUseCase, LocationNotFoundError } from '../application/get-location.use-case';
 import {
   GetLocationPhotoUseCase,
@@ -46,6 +48,7 @@ import { GetLocationPhotoQueryDto } from './dto/get-location-photo-query.dto';
 import { ListLocationsQueryDto } from './dto/list-locations-query.dto';
 import { LocationDetailsResponseDto } from './dto/location-details-response.dto';
 import { SearchLocationsQueryDto } from './dto/search-locations-query.dto';
+import { StoredLocationResponseDto } from './dto/stored-location-response.dto';
 import {
   LocationListItemResponseDto,
   LocationListResponseDto,
@@ -60,7 +63,8 @@ export class LocationsController {
     private readonly listCatalogLocations: ListCatalogLocationsUseCase,
     private readonly searchCatalogLocations: SearchCatalogLocationsUseCase,
     private readonly getLocationPhoto: GetLocationPhotoUseCase,
-    private readonly getLocation: GetLocationUseCase
+    private readonly getLocation: GetLocationUseCase,
+    private readonly findLocationById: FindLocationByIdUseCase
   ) {}
 
   /**
@@ -218,7 +222,7 @@ export class LocationsController {
   @ApiParam({
     name: 'placeId',
     example: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
-    description: 'Place ID do Google retornado no id dos itens do feed e da pesquisa.',
+    description: 'Google Place ID returned as externalId by the feed and the search.',
   })
   @ApiOkResponse({ type: LocationDetailsResponseDto })
   @ApiBadRequestResponse({ description: 'placeId deve ser um Place ID válido.' })
@@ -245,6 +249,37 @@ export class LocationsController {
     }
   }
 
+  /**
+   * GET /api/locations/:locationId
+   * Returns a location stored in the database by its internal id, such as the location of an
+   * event or proposal. Declared after the static routes so `photos` and `search` are not parsed
+   * as an id.
+   */
+  @Get(':locationId')
+  @ApiOperation({ summary: 'Consulta um local salvo no banco pelo id interno' })
+  @ApiParam({
+    name: 'locationId',
+    format: 'uuid',
+    description: 'Internal id of the location, as returned in events and proposals.',
+  })
+  @ApiOkResponse({ type: StoredLocationResponseDto })
+  @ApiBadRequestResponse({ description: 'locationId deve ser um UUID válido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiNotFoundResponse({ description: 'Local não encontrado.' })
+  async findById(
+    @Param('locationId', new ParseUUIDPipe()) locationId: string
+  ): Promise<StoredLocationResponseDto> {
+    try {
+      return await this.findLocationById.execute(locationId);
+    } catch (error) {
+      if (error instanceof LocationNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
   private toItemResponse({ place, distanceMeters }: CatalogLocation): LocationListItemResponseDto {
     return { ...this.toPlaceResponse(place), distanceMeters };
   }
@@ -254,7 +289,6 @@ export class LocationsController {
     const currencyCode = priceRange?.start?.currencyCode ?? priceRange?.end?.currencyCode;
 
     return {
-      id: place.externalId,
       externalId: place.externalId,
       name: place.name,
       imageUrl: place.photoName

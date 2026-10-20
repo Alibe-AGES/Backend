@@ -5,6 +5,7 @@ import { AppModule } from '../../../../src/app.module';
 import { setupApplication } from '../../../../src/app.setup';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
+import { LocationRepository } from '../../../../src/modules/locations/domain/location.repository';
 import { FeatureFlags } from '../../../../src/shared/feature-flags/feature-flags';
 import {
   PlacesProvider,
@@ -13,6 +14,7 @@ import {
 import { buildPlace } from '../../../helpers/place.fixture';
 
 const PLACE_ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
+const LOCATION_ID = '0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d';
 
 describe('Locations endpoint (e2e)', () => {
   let app: INestApplication;
@@ -21,6 +23,7 @@ describe('Locations endpoint (e2e)', () => {
   const getPlaceById = jest.fn();
   const getPhotoUrl = jest.fn();
   const isEnabled = jest.fn();
+  const findById = jest.fn();
   const previousMockAuthEnabled = process.env.MOCK_AUTH_ENABLED;
 
   beforeAll(async () => {
@@ -37,6 +40,8 @@ describe('Locations endpoint (e2e)', () => {
       .useValue({ searchNearby, searchText, getPlaceById, getPhotoUrl })
       .overrideProvider(FeatureFlags)
       .useValue({ isEnabled })
+      .overrideProvider(LocationRepository)
+      .useValue({ findById })
       .compile();
 
     app = moduleFixture.createNestApplication({ bodyParser: false });
@@ -61,6 +66,7 @@ describe('Locations endpoint (e2e)', () => {
     getPhotoUrl.mockReset().mockResolvedValue('https://lh3.googleusercontent.com/photo-1');
     getPlaceById.mockReset();
     isEnabled.mockReset().mockResolvedValue(true);
+    findById.mockReset();
   });
 
   it('returns the page of nearby catalog locations', async () => {
@@ -89,7 +95,6 @@ describe('Locations endpoint (e2e)', () => {
     expect(response.body).toEqual({
       items: [
         expect.objectContaining({
-          id: 'place-1',
           externalId: 'place-1',
           name: 'Bloom Café',
           imageUrl: '/api/locations/photos?name=places%2Fplace-1%2Fphotos%2Fphoto-1',
@@ -124,7 +129,7 @@ describe('Locations endpoint (e2e)', () => {
     );
     expect(searchNearby).not.toHaveBeenCalled();
     expect(response.body).toEqual({
-      items: [expect.objectContaining({ id: 'place-1', name: 'Bloom Café' })],
+      items: [expect.objectContaining({ externalId: 'place-1', name: 'Bloom Café' })],
       page: 1,
       limit: 20,
       total: 1,
@@ -241,7 +246,6 @@ describe('Locations endpoint (e2e)', () => {
     expect(getPlaceById).toHaveBeenCalledWith(PLACE_ID, { includePriceRange: true });
     expect(response.body).toEqual(
       expect.objectContaining({
-        id: PLACE_ID,
         externalId: PLACE_ID,
         name: 'Bloom Café',
         imageUrl: `/api/locations/photos?name=places%2F${PLACE_ID}%2Fphotos%2Fphoto-1`,
@@ -249,6 +253,7 @@ describe('Locations endpoint (e2e)', () => {
       })
     );
     expect(response.body).not.toHaveProperty('distanceMeters');
+    expect(response.body).not.toHaveProperty('id');
   });
 
   it('validates the Place ID and maps missing places and Google failures', async () => {
@@ -260,6 +265,33 @@ describe('Locations endpoint (e2e)', () => {
 
     getPlaceById.mockRejectedValue(new PlacesProviderUnavailableError('down'));
     await request(app.getHttpServer()).get(`/api/locations/google-places/${PLACE_ID}`).expect(503);
+  });
+
+  it('returns a stored location by its internal id', async () => {
+    const location = {
+      id: LOCATION_ID,
+      externalId: PLACE_ID,
+      description: 'Café com ambiente tranquilo',
+      address: 'Rua Padre Chagas, 320',
+      manuallyCreated: false,
+    };
+    findById.mockResolvedValue(location);
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/locations/${LOCATION_ID}`)
+      .expect(200);
+
+    expect(response.body).toEqual(location);
+    expect(findById).toHaveBeenCalledWith(LOCATION_ID);
+    expect(getPlaceById).not.toHaveBeenCalled();
+  });
+
+  it('validates the internal id and returns 404 for unknown locations', async () => {
+    await request(app.getHttpServer()).get('/api/locations/not-a-uuid').expect(400);
+    expect(findById).not.toHaveBeenCalled();
+
+    findById.mockResolvedValue(null);
+    await request(app.getHttpServer()).get(`/api/locations/${LOCATION_ID}`).expect(404);
   });
 
   it('requires an authenticated session', async () => {
@@ -274,5 +306,6 @@ describe('Locations endpoint (e2e)', () => {
       .query({ q: 'pizza', latitude: -30, longitude: -51 })
       .expect(401);
     await request(app.getHttpServer()).get(`/api/locations/google-places/${PLACE_ID}`).expect(401);
+    await request(app.getHttpServer()).get(`/api/locations/${LOCATION_ID}`).expect(401);
   });
 });

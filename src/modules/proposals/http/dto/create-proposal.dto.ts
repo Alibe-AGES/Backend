@@ -24,7 +24,7 @@ const createProposalSchema = z
 export class CreateProposalDto extends createZodDto(createProposalSchema) {
   @ApiProperty({
     example: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
-    description: 'Place ID do Google, igual ao id dos itens do feed e da pesquisa de locais.',
+    description: 'Google Place ID, the externalId returned by the locations feed and search.',
   })
   locationId!: string;
 
