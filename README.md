@@ -83,23 +83,24 @@ O `.env` não deve ser enviado ao Git. O arquivo `.env.template` contém somente
 
 Variáveis atuais:
 
-| Variável                            | Responsabilidade                                                   |
-| ----------------------------------- | ------------------------------------------------------------------ |
-| `DATABASE_USER`                     | Usuário criado no PostgreSQL pelo Docker Compose.                  |
-| `DATABASE_PASSWORD`                 | Senha do usuário do PostgreSQL.                                    |
-| `DATABASE_NAME`                     | Nome do banco da aplicação.                                        |
-| `APP_PORT`                          | Porta exposta pela API quando executada pelo Docker Compose.       |
-| `DATABASE_URL`                      | URL de conexão utilizada pelo Prisma.                              |
-| `BETTER_AUTH_SECRET`                | Segredo de alta entropia usado para assinar dados de autenticação. |
-| `BETTER_AUTH_URL`                   | URL pública da API utilizada pelo Better Auth.                     |
-| `BETTER_AUTH_TRUSTED_ORIGINS`       | Origens web e schemes Expo aceitos, separados por vírgula.         |
-| `AWS_REGION`                        | Região usada pelo MiniStack e pelos comandos da AWS CLI.           |
-| `AWS_S3_BUCKET`                     | Nome do bucket utilizado pela aplicação.                           |
-| `AWS_SQS_NOTIFICATION_QUEUE_URL`    | URL da fila usada para publicar notificações.                      |
-| `AWS_ENDPOINT_URL`                  | Endpoint global dos serviços AWS; presente apenas no MiniStack.    |
-| `ENABLE_NOTIFICATION_TEST_ENDPOINT` | Habilita somente localmente o envio de push sintético.             |
-| `AWS_ACCESS_KEY_ID`                 | Credencial fictícia local; em produção, prefira role ou OIDC.      |
-| `AWS_SECRET_ACCESS_KEY`             | Segredo fictício local; nunca versionar um valor real.             |
+| Variável                            | Responsabilidade                                                     |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| `DATABASE_USER`                     | Usuário criado no PostgreSQL pelo Docker Compose.                    |
+| `DATABASE_PASSWORD`                 | Senha do usuário do PostgreSQL.                                      |
+| `DATABASE_NAME`                     | Nome do banco da aplicação.                                          |
+| `APP_PORT`                          | Porta exposta pela API quando executada pelo Docker Compose.         |
+| `DATABASE_URL`                      | URL de conexão utilizada pelo Prisma.                                |
+| `BETTER_AUTH_SECRET`                | Segredo de alta entropia usado para assinar dados de autenticação.   |
+| `BETTER_AUTH_URL`                   | URL pública da API utilizada pelo Better Auth.                       |
+| `BETTER_AUTH_TRUSTED_ORIGINS`       | Origens web e schemes Expo aceitos, separados por vírgula.           |
+| `AWS_REGION`                        | Região usada pelo MiniStack e pelos comandos da AWS CLI.             |
+| `AWS_S3_BUCKET`                     | Nome do bucket utilizado pela aplicação.                             |
+| `AWS_SQS_NOTIFICATION_QUEUE_URL`    | URL da fila usada para publicar notificações.                        |
+| `AWS_ENDPOINT_URL`                  | Endpoint global dos serviços AWS; presente apenas no MiniStack.      |
+| `ENABLE_NOTIFICATION_TEST_ENDPOINT` | Habilita somente localmente o envio de push sintético.               |
+| `AWS_ACCESS_KEY_ID`                 | Credencial fictícia local; em produção, prefira role ou OIDC.        |
+| `AWS_SECRET_ACCESS_KEY`             | Segredo fictício local; nunca versionar um valor real.               |
+| `GOOGLE_PLACES_API_KEY`             | Chave da Places API (New); sem ela `GET /api/locations` retorna 503. |
 
 Nunca coloque tokens, senhas reais ou credenciais de produção no `.env.template`.
 
@@ -461,6 +462,43 @@ O código é único para todos os ambientes. Não existe verificação de `NODE_
 Quando `AWS_ENDPOINT_URL` está configurada, o client S3 ativa path-style internamente porque esse formato é exigido pelo MiniStack. O desenvolvedor não precisa configurar uma segunda variável para esse detalhe do adapter.
 
 Na AWS real, configure `AWS_REGION` e `AWS_S3_BUCKET`, remova `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` do ambiente quando a autenticação vier de role ou OIDC. O SDK passa automaticamente a usar o endpoint e a cadeia de credenciais padrão da AWS, sem mudança no código-fonte.
+
+### Integração com Google Places
+
+O cliente da [Places API (New)](https://developers.google.com/maps/documentation/places/web-service/nearby-search) está em `src/infrastructure/api/google-places/` e implementa o contrato `PlacesProvider` (`src/shared/places/`). Os módulos importam `GooglePlacesModule` e dependem apenas de `PlacesProvider`.
+
+```text
+api/google-places/
+├── google-places.config.ts    # Lê GOOGLE_PLACES_API_KEY
+├── google-places.service.ts   # Chama searchNearby, searchText e Place Details e normaliza a resposta
+└── google-places.module.ts    # Exporta o PlacesProvider
+```
+
+A chave é lida de `GOOGLE_PLACES_API_KEY`. A API inicializa sem ela, mas as buscas respondem `503`. Para gerar a chave, ative a **Places API (New)** no Google Cloud e restrinja a chave a essa API. O field mask solicita campos de atmosfera (`outdoorSeating`, `goodForGroups`), que entram no SKU Enterprise + Atmosphere.
+
+`GET /api/locations?latitude=&longitude=` usa esse cliente para montar o feed: busca até 20 locais no raio informado (`maxDistanceKm`, padrão de 50 km), aplica os filtros (`budgetMin`, `budgetMax`, `period`, `environment`, `groupSize`, `type`), e pagina o resultado. A pesquisa `GET /api/locations/search?q=` segue o mesmo fluxo com Text Search. Nenhuma das duas rotas grava no banco: o `externalId` de cada item é o Place ID do Google, e a linha em `location` só é criada quando uma proposta usa o local.
+
+Cada item traz `imageUrl` no formato `/api/locations/photos?name=places/{placeId}/photos/{photoId}`, sem chamada extra ao Google durante a busca do feed. Quando o app carrega a imagem (com a mesma sessão das demais rotas), o Backend consulta a rota de mídia do [Place Photos (New)](https://developers.google.com/maps/documentation/places/web-service/place-photos) com `skipHttpRedirect=true` e responde `302` para a URL pública do Google (`googleusercontent.com`), que não contém a API key. Assim, cada foto custa uma chamada somente quando é exibida. O parâmetro opcional `maxWidthPx` (padrão 800) define a largura, e a resposta usa `Cache-Control: private, max-age=3600`; fotos que não puderem ser resolvidas retornam `404`.
+
+`GET /api/locations/google-places/:placeId` consulta o [Place Details (New)](https://developers.google.com/maps/documentation/places/web-service/place-details) pelo Place ID e devolve os mesmos campos de um item do feed, sem `distanceMeters`. Os itens não têm `id`: o identificador é o `externalId`.
+
+`GET /api/locations/:locationId` lê do banco a `location` pelo id interno (UUID), como o `location.id` devolvido em eventos e propostas, e retorna `id`, `externalId`, `description`, `address` e `manuallyCreated`. Não consulta o Google. Responde `400` para UUID inválido e `404` quando o local não existe. Responde `400` para um Place ID malformado, `404` quando o Google não encontra o local e `503` quando o Google está indisponível. O orçamento segue a flag `google_places_budget`, como no feed.
+
+### Feature flags
+
+As feature flags ficam na tabela `feature_flag` (`key`, `enabled`, `description`) e são lidas pelo contrato `FeatureFlags` (`src/shared/feature-flags/`), implementado em `src/infrastructure/feature-flags/`. Uma flag ausente no banco é tratada como desativada.
+
+| Flag                   | Padrão  | Efeito                                                                                                                                     |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `google_places_budget` | `false` | `true`: solicita `priceRange` ao Google Places. `false`: não solicita o campo e usa uma faixa de preço mockada, estável por local, em BRL. |
+
+A migration `add_feature_flag` e a seed criam a flag desativada, evitando chamadas extras ao Google durante o desenvolvimento. Para ativar em um ambiente:
+
+```sql
+UPDATE feature_flag SET enabled = true, updated_at = now() WHERE key = 'google_places_budget';
+```
+
+A flag é consultada a cada requisição, então a mudança vale sem reiniciar a API.
 
 Um módulo que precise armazenar arquivos importa `StorageModule` e seu caso de uso depende do contrato geral `ObjectStorage`, nunca do SDK ou do `S3StorageService` concreto:
 
@@ -865,20 +903,22 @@ expõem `/api/events/:eventId/image`. Essa rota entrega os bytes apenas para usu
 que participam do grupo do evento. Campos obrigatórios ausentes respondem `400`, grupo inexistente
 `404`, usuário fora do grupo `403` e ausência de autenticação `401`.
 
-### Criação de proposta com localização existente
+### Criação de proposta com local do catálogo
 
 ```http
 POST /api/groups/:groupId/proposals
 ```
 
 O endpoint fica no módulo `proposals` e reutiliza o repository exportado por `EventsModule`.
-O body JSON estrito exige `locationId` (UUID), `name` (não vazio após `trim()`), `date`
+O body JSON estrito exige `locationId` (Place ID do Google, o `externalId` dos itens do feed e da pesquisa), `name` (não vazio após `trim()`), `date`
 (`YYYY-MM-DD`) e `time` (`HH:mm`). `budgetStart` e `budgetEnd` são strings decimais opcionais
 e independentes, seguindo a validação da criação de eventos; não aceitam `null` explícito.
 Campos extras, incluindo `ownerId` e `userId`, respondem `400`. O autor vem somente da sessão.
 
 Uma transação cria `Event` com status `pending`, `Proposal` e `ProposalResponse` do autor com
-resposta `yes`. A `Location` selecionada é reutilizada sem criação ou alteração de seus dados.
+resposta `yes`. Na mesma transação, a `Location` com esse `external_id` e `manually_created = false`
+é reutilizada ou, no primeiro uso do local, criada com nome ou resumo e endereço do Google. O Google
+só é consultado quando o local ainda não está salvo.
 Data e horário são interpretados em UTC, como no fluxo manual existente.
 
 A resposta `201` contém `id` e `createdAt` da proposta, `owner` (`id`, `name`, `image`),
@@ -886,8 +926,8 @@ A resposta `201` contém `id` e `createdAt` da proposta, `owner` (`id`, `name`, 
 `location` (`id`, `description`, `address`) e `myAnswer: "yes"`. Orçamentos são apresentados
 com duas casas decimais, como nos detalhes de evento, ou `null` quando omitidos. A imagem
 do autor usa `/users/:id/profile-picture` ou `null`; descrição e endereço preservam valores
-nulos. `createdAt` é serializado em ISO. Grupo ou localização inexistentes respondem `404`,
-usuário fora do grupo `403` e ausência de autenticação `401`.
+nulos. `createdAt` é serializado em ISO. Grupo inexistente ou local que o Google não encontra
+respondem `404`, usuário fora do grupo `403`, ausência de autenticação `401` e Google indisponível `503`.
 
 O teste de persistência e rollback com PostgreSQL é opt-in. Use um banco local exclusivo cujo
 nome termine em `_test`, aplique as migrations existentes com `prisma migrate deploy` apontando
@@ -1144,6 +1184,8 @@ Backend/
 │   └── migrations/                 # Criada quando existirem migrations
 ├── src/
 │   ├── infrastructure/
+│   │   ├── api/
+│   │   │   └── google-places/      # Cliente da Places API (New)
 │   │   ├── prisma/
 │   │   │   ├── prisma.module.ts
 │   │   │   └── prisma.service.ts

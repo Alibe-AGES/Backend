@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { PLACE_ID_PATTERN } from '../../../../shared/places/places-provider';
 import { decimalSchema } from '../../../events/http/dto/update-event.dto';
 
 // DECIMAL(65,30) allows at most 35 significant integer digits.
@@ -11,7 +12,7 @@ const proposalBudgetSchema = decimalSchema.refine(
 
 const createProposalSchema = z
   .object({
-    locationId: z.uuid(),
+    locationId: z.string().regex(PLACE_ID_PATTERN),
     name: z.string().trim().min(1),
     date: z.iso.date(),
     time: z.iso.time({ precision: -1 }),
@@ -21,7 +22,10 @@ const createProposalSchema = z
   .strict();
 
 export class CreateProposalDto extends createZodDto(createProposalSchema) {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({
+    example: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
+    description: 'Google Place ID, the externalId returned by the locations feed and search.',
+  })
   locationId!: string;
 
   @ApiProperty({ minLength: 1, example: 'Café de sábado' })

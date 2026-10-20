@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { EventsModule } from './modules/events/events.module';
 import { ProposalsModule } from './modules/proposals/proposals.module';
+import { LocationsModule } from './modules/locations/locations.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -24,6 +25,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     UsersModule,
     EventsModule,
     ProposalsModule,
+    LocationsModule,
   ],
   providers: [
     {

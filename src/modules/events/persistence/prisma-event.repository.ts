@@ -3,12 +3,12 @@ import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { Event } from '../domain/event.entity';
 import {
+  type CreateCatalogEventData,
   type CreatedEvent,
   type CreateEventData,
   type CreateLocatedEventData,
   type CreatedLocationProposal,
   type ExistingEventLocation,
-  EventLocationNotFoundError,
   type EventDetails,
   type EventDetailsAccess,
   type EventImageAccess,
@@ -121,24 +121,33 @@ export class PrismaEventRepository extends EventRepository {
     return { event: this.toDomain(event), ownerResponse };
   }
 
-  findLocationById(id: string): Promise<ExistingEventLocation | null> {
-    return this.prisma.location.findUnique({
-      where: { id },
+  findCatalogLocation(externalId: string): Promise<ExistingEventLocation | null> {
+    return this.prisma.location.findFirst({
+      where: { externalId, manuallyCreated: false },
       select: { id: true, description: true, address: true },
     });
   }
 
-  createWithExistingLocation(data: CreateLocatedEventData): Promise<CreatedLocationProposal> {
+  createWithCatalogLocation({
+    location: catalogLocation,
+    ...data
+  }: CreateCatalogEventData): Promise<CreatedLocationProposal> {
     return this.prisma.$transaction(async (transaction) => {
-      const location = await transaction.location.findUnique({
-        where: { id: data.locationId },
-        select: { id: true, description: true, address: true },
-      });
-      if (!location) {
-        throw new EventLocationNotFoundError('Localização não encontrada');
-      }
+      const select = { id: true, description: true, address: true };
+      const location =
+        (await transaction.location.findFirst({
+          where: { externalId: catalogLocation.externalId, manuallyCreated: false },
+          select,
+        })) ??
+        (await transaction.location.create({
+          data: { ...catalogLocation, manuallyCreated: false },
+          select,
+        }));
 
-      const { event, proposal, ownerResponse } = await this.createEventProposal(transaction, data);
+      const { event, proposal, ownerResponse } = await this.createEventProposal(transaction, {
+        ...data,
+        locationId: location.id,
+      });
       const record = await transaction.proposal.findUniqueOrThrow({
         where: { id: proposal.id },
         select: {

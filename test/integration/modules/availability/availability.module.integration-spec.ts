@@ -75,9 +75,26 @@ describe('AvailabilityModule integration', () => {
   });
 
   beforeEach(() => {
+    jest.useFakeTimers({
+      now: new Date('2026-10-10T12:00:00.000Z'),
+      doNotFake: [
+        'nextTick',
+        'setImmediate',
+        'clearImmediate',
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'queueMicrotask',
+      ],
+    });
     rows.clear();
     jest.clearAllMocks();
     prisma.group.findUnique.mockResolvedValue({ users: [{ userId }] });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('connects controller, use case and Prisma repository for creation with multiple timeslots', async () => {

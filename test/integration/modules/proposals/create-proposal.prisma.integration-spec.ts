@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { PrismaEventRepository } from '../../../../src/modules/events/persistence/prisma-event.repository';
-import {
-  type CreateLocatedEventData,
-  EventLocationNotFoundError,
-} from '../../../../src/modules/events/domain/event.repository';
+import { type CreateCatalogEventData } from '../../../../src/modules/events/domain/event.repository';
 
 // Opt-in: migrations must already be applied to this dedicated test database.
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -16,15 +13,17 @@ describeDatabase('Proposal creation with PostgreSQL', () => {
   const userId = randomUUID();
   const groupId = randomUUID();
   const locationId = randomUUID();
+  const externalId = `place-${randomUUID()}`;
+  const newExternalIds: string[] = [];
   const eventIds: string[] = [];
-  const data = (): CreateLocatedEventData => {
+  const data = (placeId = externalId): CreateCatalogEventData => {
     const id = randomUUID();
     eventIds.push(id);
     return {
       id,
       groupId,
       ownerId: userId,
-      locationId,
+      location: { externalId: placeId, description: 'Do Google', address: 'Rua do Google' },
       name: 'Café',
       timeslot: new Date('2026-10-17T15:00:00.000Z'),
       image: null,
@@ -68,7 +67,7 @@ describeDatabase('Proposal creation with PostgreSQL', () => {
         description: 'Café tranquilo',
         address: 'Rua Padre Chagas, 320',
         manuallyCreated: false,
-        externalId: 'external-place',
+        externalId,
       },
     });
   });
@@ -81,7 +80,9 @@ describeDatabase('Proposal creation with PostgreSQL', () => {
       });
       await prisma.proposal.deleteMany({ where: { eventId: { in: eventIds } } });
       await prisma.event.deleteMany({ where: { id: { in: eventIds } } });
-      await prisma.location.deleteMany({ where: { id: locationId } });
+      await prisma.location.deleteMany({
+        where: { OR: [{ id: locationId }, { externalId: { in: newExternalIds } }] },
+      });
       await prisma.userGroup.deleteMany({ where: { groupId } });
       await prisma.group.deleteMany({ where: { id: groupId } });
       await prisma.user.deleteMany({ where: { id: userId } });
@@ -94,13 +95,13 @@ describeDatabase('Proposal creation with PostgreSQL', () => {
     const original = await prisma.location.findUniqueOrThrow({ where: { id: locationId } });
     const count = await prisma.location.count();
     expect(await events.findGroupMembership(groupId, userId)).toBe(true);
-    expect(await events.findLocationById(locationId)).toEqual({
+    expect(await events.findCatalogLocation(externalId)).toEqual({
       id: locationId,
       description: original.description,
       address: original.address,
     });
     const input = data();
-    const result = await events.createWithExistingLocation(input);
+    const result = await events.createWithCatalogLocation(input);
     expect(result).toMatchObject({
       owner: { id: userId, name: 'Ana', image: null },
       event: {
@@ -136,13 +137,13 @@ describeDatabase('Proposal creation with PostgreSQL', () => {
 
   it('returns null for omitted budgets', async () => {
     const input = { ...data(), budgetStart: null, budgetEnd: null };
-    const result = await events.createWithExistingLocation(input);
+    const result = await events.createWithCatalogLocation(input);
     expect(result.event).toMatchObject({ budgetStart: null, budgetEnd: null });
   });
 
   it('rolls back the event when proposal creation fails', async () => {
     const input = { ...data(), ownerId: randomUUID() };
-    await expect(events.createWithExistingLocation(input)).rejects.toThrow();
+    await expect(events.createWithCatalogLocation(input)).rejects.toThrow();
     expect(await prisma.event.findUnique({ where: { id: input.id } })).toBeNull();
     expect(await prisma.proposal.count({ where: { eventId: input.id } })).toBe(0);
   });
@@ -151,18 +152,42 @@ describeDatabase('Proposal creation with PostgreSQL', () => {
     const responseCount = await prisma.proposalResponse.count({ where: { userId } });
     const input = data();
     // Invalid enum fails at the third write, after real event and proposal INSERTs.
-    input.ownerAnswer = 'invalid' as CreateLocatedEventData['ownerAnswer'];
-    await expect(events.createWithExistingLocation(input)).rejects.toThrow();
+    input.ownerAnswer = 'invalid' as CreateCatalogEventData['ownerAnswer'];
+    await expect(events.createWithCatalogLocation(input)).rejects.toThrow();
     expect(await prisma.event.findUnique({ where: { id: input.id } })).toBeNull();
     expect(await prisma.proposal.count({ where: { eventId: input.id } })).toBe(0);
     expect(await prisma.proposalResponse.count({ where: { userId } })).toBe(responseCount);
   });
 
-  it('rejects a location that disappeared before the transaction without persisting an event', async () => {
-    const input = { ...data(), locationId: randomUUID() };
-    await expect(events.createWithExistingLocation(input)).rejects.toBeInstanceOf(
-      EventLocationNotFoundError
-    );
-    expect(await prisma.event.findUnique({ where: { id: input.id } })).toBeNull();
+  it('stores a place on its first proposal and reuses it on the next one', async () => {
+    const placeId = `place-${randomUUID()}`;
+    newExternalIds.push(placeId);
+    expect(await events.findCatalogLocation(placeId)).toBeNull();
+
+    const first = await events.createWithCatalogLocation(data(placeId));
+    const second = await events.createWithCatalogLocation(data(placeId));
+
+    expect(first.location).toEqual({
+      id: expect.any(String),
+      description: 'Do Google',
+      address: 'Rua do Google',
+    });
+    expect(second.location).toEqual(first.location);
+    expect(
+      await prisma.location.findMany({ where: { externalId: placeId }, select: { id: true } })
+    ).toEqual([{ id: first.location.id }]);
+    expect(
+      await prisma.location.findUniqueOrThrow({ where: { id: first.location.id } })
+    ).toMatchObject({ manuallyCreated: false, externalId: placeId });
+  });
+
+  it('rolls back a new place when the proposal fails', async () => {
+    const placeId = `place-${randomUUID()}`;
+    newExternalIds.push(placeId);
+    const input = { ...data(placeId), ownerId: randomUUID() };
+
+    await expect(events.createWithCatalogLocation(input)).rejects.toThrow();
+
+    expect(await prisma.location.count({ where: { externalId: placeId } })).toBe(0);
   });
 });
