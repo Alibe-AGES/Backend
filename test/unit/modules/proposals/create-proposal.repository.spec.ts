@@ -47,6 +47,7 @@ describe('PrismaEventRepository proposal creation', () => {
           .fn()
           .mockResolvedValue({ id: 'response-id', userId: data.ownerId, answer: 'yes' }),
       },
+      groupNotification: { create: jest.fn() },
     };
     const prisma = {
       location: { findUnique: jest.fn().mockResolvedValue(location) },
@@ -128,6 +129,7 @@ describe('PrismaEventRepository proposal creation', () => {
         },
         select: { id: true, userId: true, answer: true },
       });
+      expect(transaction.groupNotification.create).not.toHaveBeenCalled();
     }
   );
 

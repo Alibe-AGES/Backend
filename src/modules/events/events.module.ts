@@ -20,8 +20,8 @@ import { DistributedTaskLock } from '../../shared/scheduling/distributed-task-lo
 import { PrismaDistributedTaskLock } from '../../infrastructure/scheduling/prisma-distributed-task-lock';
 
 @Module({
-  imports: [PrismaModule, StorageModule],
-  controllers: [EventController],
+  imports: [PrismaModule, StorageModule, MessagingModule, GroupsModule],
+  controllers: [EventController, AttendanceReminderTestController],
   exports: [EventRepository],
   providers: [
     GetEventUseCase,

@@ -90,7 +90,9 @@ export interface ExistingEventLocation {
   address: string | null;
 }
 
-export type CreateLocatedEventData = Omit<CreateEventData, 'location'> & { locationId: string };
+export type CreateLocatedEventData = Omit<CreateEventData, 'location' | 'notification'> & {
+  locationId: string;
+};
 
 export interface CreatedLocationProposal {
   id: string;

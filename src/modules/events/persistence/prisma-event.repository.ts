@@ -89,7 +89,33 @@ export class PrismaEventRepository extends EventRepository {
         select: { id: true },
       });
 
-      return this.createEventProposal(transaction, { ...data, locationId: location.id });
+      const created = await this.createEventProposal(transaction, {
+        id: data.id,
+        groupId: data.groupId,
+        ownerId: data.ownerId,
+        locationId: location.id,
+        name: data.name,
+        timeslot: data.timeslot,
+        image: data.image,
+        budgetStart: data.budgetStart,
+        budgetEnd: data.budgetEnd,
+        status: data.status,
+        ownerAnswer: data.ownerAnswer,
+        createdAt: data.createdAt,
+      });
+
+      await transaction.groupNotification.create({
+        data: {
+          type: data.notification.type,
+          message: data.notification.message,
+          createdAt: data.notification.createdAt,
+          groupId: data.groupId,
+          eventId: data.id,
+        },
+        select: { id: true },
+      });
+
+      return created;
     });
 
     return { event: this.toDomain(event), ownerResponse };
@@ -174,17 +200,6 @@ export class PrismaEventRepository extends EventRepository {
         createdAt: data.createdAt,
       },
       select: { id: true, userId: true, answer: true },
-    });
-
-    await transaction.groupNotification.create({
-      data: {
-        type: data.notification.type,
-        message: data.notification.message,
-        createdAt: data.notification.createdAt,
-        groupId: data.groupId,
-        eventId: data.id,
-      },
-      select: { id: true },
     });
 
     const event = await transaction.event.findUniqueOrThrow({
