@@ -1,10 +1,15 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import {
   CreateProposalUseCase,
   InvalidProposalCreationError,
 } from '../../../../src/modules/proposals/application/create-proposal.use-case';
 import { ProposalsController } from '../../../../src/modules/proposals/http/proposals.controller';
+import { PlacesProviderUnavailableError } from '../../../../src/shared/places/places-provider';
 
 describe('ProposalsController error handling', () => {
   const input = {
@@ -33,6 +38,13 @@ describe('ProposalsController error handling', () => {
     await expect(
       controller.create('group-id', input, { user: { id: 'user-id' } } as AuthenticatedRequest)
     ).rejects.toEqual(new BadRequestException('Invalid input'));
+  });
+
+  it('maps an unavailable places provider to HTTP 503', async () => {
+    execute.mockRejectedValue(new PlacesProviderUnavailableError('down'));
+    await expect(
+      controller.create('group-id', input, { user: { id: 'user-id' } } as AuthenticatedRequest)
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
   it('propagates unexpected failures without converting them to client errors', async () => {

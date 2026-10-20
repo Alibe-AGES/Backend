@@ -5,7 +5,6 @@ import { AppModule } from '../../../../src/app.module';
 import { setupApplication } from '../../../../src/app.setup';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
-import { LocationRepository } from '../../../../src/modules/locations/domain/location.repository';
 import { FeatureFlags } from '../../../../src/shared/feature-flags/feature-flags';
 import {
   PlacesProvider,
@@ -13,16 +12,15 @@ import {
 } from '../../../../src/shared/places/places-provider';
 import { buildPlace } from '../../../helpers/place.fixture';
 
-const LOCATION_ID = '0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d';
+const PLACE_ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
 
 describe('Locations endpoint (e2e)', () => {
   let app: INestApplication;
   const searchNearby = jest.fn();
   const searchText = jest.fn();
+  const getPlaceById = jest.fn();
   const getPhotoUrl = jest.fn();
   const isEnabled = jest.fn();
-  const ensureCatalogLocations = jest.fn();
-  const findById = jest.fn();
   const previousMockAuthEnabled = process.env.MOCK_AUTH_ENABLED;
 
   beforeAll(async () => {
@@ -36,11 +34,9 @@ describe('Locations endpoint (e2e)', () => {
       .overrideProvider(PrismaService)
       .useValue({})
       .overrideProvider(PlacesProvider)
-      .useValue({ searchNearby, searchText, getPhotoUrl })
+      .useValue({ searchNearby, searchText, getPlaceById, getPhotoUrl })
       .overrideProvider(FeatureFlags)
       .useValue({ isEnabled })
-      .overrideProvider(LocationRepository)
-      .useValue({ ensureCatalogLocations, findById })
       .compile();
 
     app = moduleFixture.createNestApplication({ bodyParser: false });
@@ -63,10 +59,8 @@ describe('Locations endpoint (e2e)', () => {
     searchNearby.mockReset();
     searchText.mockReset();
     getPhotoUrl.mockReset().mockResolvedValue('https://lh3.googleusercontent.com/photo-1');
+    getPlaceById.mockReset();
     isEnabled.mockReset().mockResolvedValue(true);
-    ensureCatalogLocations.mockReset();
-    findById.mockReset();
-    ensureCatalogLocations.mockResolvedValue(new Map([['place-1', LOCATION_ID]]));
   });
 
   it('returns the page of nearby catalog locations', async () => {
@@ -95,7 +89,7 @@ describe('Locations endpoint (e2e)', () => {
     expect(response.body).toEqual({
       items: [
         expect.objectContaining({
-          id: LOCATION_ID,
+          id: 'place-1',
           externalId: 'place-1',
           name: 'Bloom Café',
           imageUrl: '/api/locations/photos?name=places%2Fplace-1%2Fphotos%2Fphoto-1',
@@ -130,7 +124,7 @@ describe('Locations endpoint (e2e)', () => {
     );
     expect(searchNearby).not.toHaveBeenCalled();
     expect(response.body).toEqual({
-      items: [expect.objectContaining({ id: LOCATION_ID, name: 'Bloom Café' })],
+      items: [expect.objectContaining({ id: 'place-1', name: 'Bloom Café' })],
       page: 1,
       limit: 20,
       total: 1,
@@ -235,30 +229,37 @@ describe('Locations endpoint (e2e)', () => {
       .expect(503);
   });
 
-  it('returns the details of a location by id', async () => {
-    const location = {
-      id: LOCATION_ID,
-      externalId: 'place-001',
-      description: 'Café com ambiente tranquilo e mesas externas',
-      address: 'Rua Padre Chagas, 320 - Moinhos de Vento, Porto Alegre - RS',
-      manuallyCreated: false,
-    };
-    findById.mockResolvedValue(location);
+  it('returns the details of a place by its Google Place ID', async () => {
+    getPlaceById.mockResolvedValue(
+      buildPlace({ externalId: PLACE_ID, photoName: `places/${PLACE_ID}/photos/photo-1` })
+    );
 
     const response = await request(app.getHttpServer())
-      .get(`/api/locations/${LOCATION_ID}`)
+      .get(`/api/locations/google-places/${PLACE_ID}`)
       .expect(200);
 
-    expect(response.body).toEqual(location);
-    expect(findById).toHaveBeenCalledWith(LOCATION_ID);
+    expect(getPlaceById).toHaveBeenCalledWith(PLACE_ID, { includePriceRange: true });
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        id: PLACE_ID,
+        externalId: PLACE_ID,
+        name: 'Bloom Café',
+        imageUrl: `/api/locations/photos?name=places%2F${PLACE_ID}%2Fphotos%2Fphoto-1`,
+        address: 'Rua Padre Chagas, 320 - Moinhos de Vento, Porto Alegre - RS',
+      })
+    );
+    expect(response.body).not.toHaveProperty('distanceMeters');
   });
 
-  it('validates the location id and returns 404 for unknown locations', async () => {
-    await request(app.getHttpServer()).get('/api/locations/not-a-uuid').expect(400);
-    expect(findById).not.toHaveBeenCalled();
+  it('validates the Place ID and maps missing places and Google failures', async () => {
+    await request(app.getHttpServer()).get('/api/locations/google-places/bad%20id').expect(400);
+    expect(getPlaceById).not.toHaveBeenCalled();
 
-    findById.mockResolvedValue(null);
-    await request(app.getHttpServer()).get(`/api/locations/${LOCATION_ID}`).expect(404);
+    getPlaceById.mockResolvedValue(null);
+    await request(app.getHttpServer()).get(`/api/locations/google-places/${PLACE_ID}`).expect(404);
+
+    getPlaceById.mockRejectedValue(new PlacesProviderUnavailableError('down'));
+    await request(app.getHttpServer()).get(`/api/locations/google-places/${PLACE_ID}`).expect(503);
   });
 
   it('requires an authenticated session', async () => {
@@ -272,6 +273,6 @@ describe('Locations endpoint (e2e)', () => {
       .get('/api/locations/search')
       .query({ q: 'pizza', latitude: -30, longitude: -51 })
       .expect(401);
-    await request(app.getHttpServer()).get(`/api/locations/${LOCATION_ID}`).expect(401);
+    await request(app.getHttpServer()).get(`/api/locations/google-places/${PLACE_ID}`).expect(401);
   });
 });

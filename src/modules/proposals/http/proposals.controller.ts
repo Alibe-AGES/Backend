@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Post,
   Request,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -22,9 +23,11 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiParam,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { PlacesProviderUnavailableError } from '../../../shared/places/places-provider';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import {
   EventGroupAccessDeniedError,
@@ -48,7 +51,7 @@ export class ProposalsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Sugere uma localização existente como encontro do grupo' })
+  @ApiOperation({ summary: 'Sugere um local do catálogo do Google Places como encontro do grupo' })
   @ApiParam({ name: 'groupId', format: 'uuid' })
   @ApiBody({ type: CreateProposalDto })
   @ApiCreatedResponse({ type: CreatedProposalResponseDto })
@@ -56,6 +59,7 @@ export class ProposalsController {
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
   @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo.' })
   @ApiNotFoundResponse({ description: 'Grupo ou localização não encontrado.' })
+  @ApiServiceUnavailableResponse({ description: 'Serviço de locais indisponível.' })
   async create(
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
     @Body() input: CreateProposalDto,
@@ -77,6 +81,9 @@ export class ProposalsController {
       }
       if (error instanceof EventGroupAccessDeniedError) {
         throw new ForbiddenException(error.message);
+      }
+      if (error instanceof PlacesProviderUnavailableError) {
+        throw new ServiceUnavailableException('Serviço de locais indisponível');
       }
       throw error;
     }

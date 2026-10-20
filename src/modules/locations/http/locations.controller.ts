@@ -6,7 +6,6 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
-  ParseUUIDPipe,
   Query,
   Redirect,
   ServiceUnavailableException,
@@ -25,7 +24,11 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { PlacesProviderUnavailableError } from '../../../shared/places/places-provider';
+import {
+  type Place,
+  PLACE_ID_PATTERN,
+  PlacesProviderUnavailableError,
+} from '../../../shared/places/places-provider';
 import { GetLocationUseCase, LocationNotFoundError } from '../application/get-location.use-case';
 import {
   GetLocationPhotoUseCase,
@@ -62,8 +65,8 @@ export class LocationsController {
 
   /**
    * GET /api/locations?latitude=-30.03&longitude=-51.22&page=1&limit=20
-   * Searches Google Places near the user, applies the feed filters and registers the
-   * returned page in the catalog (location with manually_created = false).
+   * Searches Google Places near the user and applies the feed filters. Nothing is persisted;
+   * the location is stored only when a proposal is created with it.
    */
   @Get()
   @ApiOperation({ summary: 'Lista locais do catálogo próximos ao usuário para o feed' })
@@ -101,7 +104,7 @@ export class LocationsController {
   /**
    * GET /api/locations/search?q=pizza+vegana&latitude=-30.03&longitude=-51.22
    * Free-text search on Google Places, prioritizing places near the coordinates, with the same
-   * filters, pagination and catalog registration as the feed.
+   * filters and pagination as the feed.
    */
   @Get('search')
   @ApiOperation({ summary: 'Pesquisa locais do catálogo por texto livre' })
@@ -206,41 +209,52 @@ export class LocationsController {
   }
 
   /**
-   * GET /api/locations/:locationId
-   * Returns a location from the catalog for the detail screen. Declared after the static
-   * routes so `photos` is not parsed as an id; the image comes from the photos route.
+   * GET /api/locations/google-places/:placeId
+   * Looks the place up on Google Places (Place Details) by its Place ID, the same id returned by
+   * the feed and the search.
    */
-  @Get(':locationId')
-  @ApiOperation({ summary: 'Consulta os dados de um local' })
-  @ApiParam({ name: 'locationId', format: 'uuid' })
+  @Get('google-places/:placeId')
+  @ApiOperation({ summary: 'Consulta os dados de um local no Google Places pelo Place ID' })
+  @ApiParam({
+    name: 'placeId',
+    example: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
+    description: 'Place ID do Google retornado no id dos itens do feed e da pesquisa.',
+  })
   @ApiOkResponse({ type: LocationDetailsResponseDto })
-  @ApiBadRequestResponse({ description: 'locationId deve ser um UUID válido.' })
+  @ApiBadRequestResponse({ description: 'placeId deve ser um Place ID válido.' })
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
   @ApiNotFoundResponse({ description: 'Local não encontrado.' })
-  async get(
-    @Param('locationId', new ParseUUIDPipe()) locationId: string
-  ): Promise<LocationDetailsResponseDto> {
+  @ApiServiceUnavailableResponse({ description: 'Serviço de locais indisponível.' })
+  async getByGooglePlaceId(@Param('placeId') placeId: string): Promise<LocationDetailsResponseDto> {
+    if (!PLACE_ID_PATTERN.test(placeId)) {
+      throw new BadRequestException('placeId deve ser um Place ID válido');
+    }
+
     try {
-      return await this.getLocation.execute(locationId);
+      return this.toPlaceResponse(await this.getLocation.execute(placeId));
     } catch (error) {
       if (error instanceof LocationNotFoundError) {
         throw new NotFoundException(error.message);
+      }
+
+      if (error instanceof PlacesProviderUnavailableError) {
+        throw new ServiceUnavailableException('Serviço de locais indisponível');
       }
 
       throw error;
     }
   }
 
-  private toItemResponse({
-    id,
-    place,
-    distanceMeters,
-  }: CatalogLocation): LocationListItemResponseDto {
+  private toItemResponse({ place, distanceMeters }: CatalogLocation): LocationListItemResponseDto {
+    return { ...this.toPlaceResponse(place), distanceMeters };
+  }
+
+  private toPlaceResponse(place: Place): LocationDetailsResponseDto {
     const { priceRange } = place;
     const currencyCode = priceRange?.start?.currencyCode ?? priceRange?.end?.currencyCode;
 
     return {
-      id,
+      id: place.externalId,
       externalId: place.externalId,
       name: place.name,
       imageUrl: place.photoName
@@ -250,7 +264,6 @@ export class LocationsController {
       address: place.address,
       latitude: place.location?.latitude ?? null,
       longitude: place.location?.longitude ?? null,
-      distanceMeters,
       rating: place.rating,
       userRatingCount: place.userRatingCount,
       priceLevel: place.priceLevel,

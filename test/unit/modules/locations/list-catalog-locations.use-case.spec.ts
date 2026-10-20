@@ -4,7 +4,6 @@ import {
   InvalidLocationSearchError,
 } from '../../../../src/modules/locations/application/services/catalog-locations-page.service';
 import { mockPriceRange } from '../../../../src/modules/locations/application/mock-price-range';
-import { LocationRepository } from '../../../../src/modules/locations/domain/location.repository';
 import { FEATURE_FLAGS, FeatureFlags } from '../../../../src/shared/feature-flags/feature-flags';
 import { PlacesProvider } from '../../../../src/shared/places/places-provider';
 import { buildPlace } from '../../../helpers/place.fixture';
@@ -14,7 +13,6 @@ const brl = (amount: number) => ({ amount, currencyCode: 'BRL' });
 
 describe('ListCatalogLocationsUseCase', () => {
   let places: jest.Mocked<PlacesProvider>;
-  let locations: jest.Mocked<LocationRepository>;
   let featureFlags: jest.Mocked<FeatureFlags>;
   let useCase: ListCatalogLocationsUseCase;
 
@@ -22,22 +20,17 @@ describe('ListCatalogLocationsUseCase', () => {
     places = {
       searchNearby: jest.fn(),
       searchText: jest.fn(),
+      getPlaceById: jest.fn(),
       getPhotoUrl: jest.fn(),
-    };
-    locations = {
-      findById: jest.fn(),
-      ensureCatalogLocations: jest.fn(
-        async (items) => new Map(items.map((item) => [item.externalId, `id-${item.externalId}`]))
-      ),
     };
     featureFlags = { isEnabled: jest.fn().mockResolvedValue(true) };
     useCase = new ListCatalogLocationsUseCase(
       places,
-      new CatalogLocationsPageService(locations, featureFlags)
+      new CatalogLocationsPageService(featureFlags)
     );
   });
 
-  it('searches around the user, filters, paginates and registers the page in the catalog', async () => {
+  it('searches around the user, filters and paginates without persisting the page', async () => {
     places.searchNearby.mockResolvedValue([
       buildPlace({ externalId: 'a', goodForGroups: true }),
       buildPlace({ externalId: 'b', goodForGroups: false }),
@@ -60,13 +53,9 @@ describe('ListCatalogLocationsUseCase', () => {
       includedTypes: ['restaurant'],
       includePriceRange: true,
     });
-    expect(locations.ensureCatalogLocations).toHaveBeenCalledWith([
-      { externalId: 'd', description: 'Café com ambiente tranquilo', address: expect.any(String) },
-    ]);
     expect(result).toEqual({
       items: [
         {
-          id: 'id-d',
           place: expect.objectContaining({ externalId: 'd' }),
           distanceMeters: 2705,
         },
@@ -78,7 +67,7 @@ describe('ListCatalogLocationsUseCase', () => {
     expect(places.getPhotoUrl).not.toHaveBeenCalled();
   });
 
-  it('uses the maximum radius and the place name as fallback description', async () => {
+  it('uses the maximum radius when no distance is requested', async () => {
     places.searchNearby.mockResolvedValue([buildPlace({ summary: null, location: null })]);
 
     const result = await useCase.execute({ ...coordinates, page: 1, limit: 20 });
@@ -86,9 +75,6 @@ describe('ListCatalogLocationsUseCase', () => {
     expect(places.searchNearby).toHaveBeenCalledWith(
       expect.objectContaining({ radiusMeters: 50_000, includedTypes: undefined })
     );
-    expect(locations.ensureCatalogLocations).toHaveBeenCalledWith([
-      expect.objectContaining({ description: 'Bloom Café' }),
-    ]);
     expect(result.items[0].distanceMeters).toBeNull();
   });
 

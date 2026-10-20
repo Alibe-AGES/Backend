@@ -12,7 +12,11 @@ export class PriceRangeResponseDto {
 }
 
 export class LocationListItemResponseDto {
-  @ApiProperty({ format: 'uuid', description: 'Id do local no catálogo interno.' })
+  @ApiProperty({
+    example: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
+    description:
+      'Place ID do Google. Use em GET /api/locations/google-places/{placeId} e como locationId da proposta.',
+  })
   id!: string;
 
   @ApiProperty({ example: 'ChIJN1t_tDeuEmsRUsoyG83frY4', description: 'Place ID do Google.' })

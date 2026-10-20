@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  type GetPlaceOptions,
   type Money,
   type Place,
   type PlaceOpeningPeriod,
@@ -24,28 +25,31 @@ export const GOOGLE_PLACES_MAX_RESULT_COUNT = 20;
 
 const REQUEST_TIMEOUT_IN_MS = 10_000;
 
-/** Fields requested from Google; each field affects the SKU billed for the search. */
+/** Fields requested from Google; each field affects the SKU billed for the request. */
 const BASE_FIELDS = [
-  'places.id',
-  'places.displayName',
-  'places.formattedAddress',
-  'places.location',
-  'places.rating',
-  'places.userRatingCount',
-  'places.priceLevel',
-  'places.nationalPhoneNumber',
-  'places.websiteUri',
-  'places.googleMapsUri',
-  'places.primaryType',
-  'places.types',
-  'places.regularOpeningHours',
-  'places.editorialSummary',
-  'places.outdoorSeating',
-  'places.goodForGroups',
-  'places.photos',
+  'id',
+  'displayName',
+  'formattedAddress',
+  'location',
+  'rating',
+  'userRatingCount',
+  'priceLevel',
+  'nationalPhoneNumber',
+  'websiteUri',
+  'googleMapsUri',
+  'primaryType',
+  'types',
+  'regularOpeningHours',
+  'editorialSummary',
+  'outdoorSeating',
+  'goodForGroups',
+  'photos',
 ];
 
-const PRICE_RANGE_FIELD = 'places.priceRange';
+const PRICE_RANGE_FIELD = 'priceRange';
+
+/** Place Details answers these statuses when the id is malformed or the place does not exist. */
+const PLACE_NOT_FOUND_STATUSES = new Set([400, 404]);
 
 interface GoogleMoney {
   currencyCode?: string;
@@ -138,6 +142,25 @@ export class GooglePlacesService extends PlacesProvider {
     );
   }
 
+  /** Place Details (New); the id is the same externalId returned by the searches. */
+  async getPlaceById(placeId: string, options: GetPlaceOptions = {}): Promise<Place | null> {
+    const url = new URL(`${GOOGLE_PLACES_API_BASE_URL}/places/${encodeURIComponent(placeId)}`);
+    url.searchParams.set('languageCode', 'pt-BR');
+    url.searchParams.set('regionCode', 'BR');
+
+    const response = await this.send(url, {
+      headers: { 'X-Goog-FieldMask': this.fieldMask(options.includePriceRange).join(',') },
+    });
+
+    if (PLACE_NOT_FOUND_STATUSES.has(response.status)) {
+      this.logger.warn(`Google Place Details respondeu ${response.status} para ${placeId}`);
+      return null;
+    }
+
+    await this.ensureOk(response);
+    return this.toPlace((await response.json()) as GooglePlace);
+  }
+
   /**
    * Resolves the photo through the Place Photos (New) media route with skipHttpRedirect, so the
    * returned googleusercontent URL can be sent to the app without exposing the API key.
@@ -175,39 +198,50 @@ export class GooglePlacesService extends PlacesProvider {
     body: Record<string, unknown>,
     includePriceRange = false
   ): Promise<Place[]> {
+    const response = await this.send(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-FieldMask': this.fieldMask(includePriceRange)
+          .map((field) => `places.${field}`)
+          .join(','),
+      },
+      body: JSON.stringify(body),
+    });
+    await this.ensureOk(response);
+
+    const payload = (await response.json()) as GoogleSearchResponse;
+    return (payload.places ?? []).map((place) => this.toPlace(place));
+  }
+
+  private async send(url: string | URL, init: RequestInit): Promise<Response> {
     if (!this.apiKey) {
       throw new PlacesProviderUnavailableError('GOOGLE_PLACES_API_KEY não configurada');
     }
 
-    let response: Response;
     try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': this.apiKey,
-          'X-Goog-FieldMask': [
-            ...BASE_FIELDS,
-            ...(includePriceRange ? [PRICE_RANGE_FIELD] : []),
-          ].join(','),
-        },
-        body: JSON.stringify(body),
+      return await fetch(url, {
+        ...init,
+        headers: { ...(init.headers as Record<string, string>), 'X-Goog-Api-Key': this.apiKey },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_IN_MS),
       });
     } catch (error) {
       this.logger.error('Falha de rede ao consultar o Google Places', error as Error);
       throw new PlacesProviderUnavailableError('Não foi possível consultar o Google Places');
     }
+  }
 
+  private async ensureOk(response: Response): Promise<void> {
     if (!response.ok) {
       this.logger.error(
         `Google Places respondeu ${response.status}: ${await response.text().catch(() => '')}`
       );
       throw new PlacesProviderUnavailableError('Não foi possível consultar o Google Places');
     }
+  }
 
-    const payload = (await response.json()) as GoogleSearchResponse;
-    return (payload.places ?? []).map((place) => this.toPlace(place));
+  private fieldMask(includePriceRange = false): string[] {
+    return [...BASE_FIELDS, ...(includePriceRange ? [PRICE_RANGE_FIELD] : [])];
   }
 
   private clampResultCount(maxResultCount: number | undefined): number {

@@ -1,12 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import { Event } from '../../src/modules/events/domain/event.entity';
 import { Prisma } from '../../generated/prisma/client';
 import {
+  type CreateCatalogEventData,
   type CreatedEvent,
   type CreateEventData,
-  type CreateLocatedEventData,
   type CreatedLocationProposal,
   type ExistingEventLocation,
-  EventLocationNotFoundError,
   type EventDetails,
   type EventDetailsAccess,
   type EventImageAccess,
@@ -18,19 +18,27 @@ export class InMemoryEventRepository extends EventRepository {
   private readonly events = new Map<string, Event>();
   private readonly locations = new Map<string, string>();
   private readonly groups = new Map<string, Set<string>>();
-  private readonly existingLocations = new Map<string, ExistingEventLocation>();
+  /** Catalog locations stored by proposals, keyed by Google Place ID. */
+  private readonly catalogLocations = new Map<string, ExistingEventLocation>();
 
-  setLocation(location: ExistingEventLocation): void {
-    this.existingLocations.set(location.id, location);
+  setCatalogLocation(externalId: string, location: ExistingEventLocation): void {
+    this.catalogLocations.set(externalId, location);
   }
 
-  findLocationById(id: string): Promise<ExistingEventLocation | null> {
-    return Promise.resolve(this.existingLocations.get(id) ?? null);
+  findCatalogLocation(externalId: string): Promise<ExistingEventLocation | null> {
+    return Promise.resolve(this.catalogLocations.get(externalId) ?? null);
   }
 
-  async createWithExistingLocation(data: CreateLocatedEventData): Promise<CreatedLocationProposal> {
-    const location = await this.findLocationById(data.locationId);
-    if (!location) throw new EventLocationNotFoundError('Localização não encontrada');
+  createWithCatalogLocation({
+    location: catalogLocation,
+    ...data
+  }: CreateCatalogEventData): Promise<CreatedLocationProposal> {
+    const location = this.catalogLocations.get(catalogLocation.externalId) ?? {
+      id: randomUUID(),
+      description: catalogLocation.description,
+      address: catalogLocation.address,
+    };
+    this.catalogLocations.set(catalogLocation.externalId, location);
     const { event, ownerResponse } = this.persist({
       ...data,
       location: { description: location.description, manuallyCreated: false },
@@ -42,7 +50,7 @@ export class InMemoryEventRepository extends EventRepository {
         location: { ...location, manuallyCreated: false },
       })
     );
-    return {
+    return Promise.resolve({
       id: event.proposals[0].id,
       createdAt: data.createdAt,
       owner: { id: data.ownerId, name: 'Ana Beatriz Silva', image: 'users/ana.jpg' },
@@ -58,7 +66,7 @@ export class InMemoryEventRepository extends EventRepository {
       },
       location,
       myAnswer: ownerResponse.answer,
-    };
+    });
   }
 
   findById(id: string): Promise<Event | null> {

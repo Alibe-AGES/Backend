@@ -73,8 +73,16 @@ export interface SearchTextPlacesInput {
   includePriceRange?: boolean;
 }
 
+export interface GetPlaceOptions {
+  /** Requests the price range from the provider; disabled by default to avoid extra cost. */
+  includePriceRange?: boolean;
+}
+
 /** Photo resource name format, e.g. `places/{placeId}/photos/{photoId}`. */
 export const PLACE_PHOTO_NAME_PATTERN = /^places\/[^/]+\/photos\/[^/]+$/;
+
+/** Google Place ID format, e.g. `ChIJN1t_tDeuEmsRUsoyG83frY4`. */
+export const PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,1024}$/;
 
 export class PlacesProviderUnavailableError extends Error {}
 
@@ -83,6 +91,9 @@ export abstract class PlacesProvider {
 
   /** Free-text search, e.g. "pizza vegana" or "bar com música ao vivo". */
   abstract searchText(input: SearchTextPlacesInput): Promise<Place[]>;
+
+  /** Returns the place by its provider id, or null when it does not exist. */
+  abstract getPlaceById(placeId: string, options?: GetPlaceOptions): Promise<Place | null>;
 
   /** Returns a public image URL for the photo, or null when it cannot be resolved. */
   abstract getPhotoUrl(photoName: string, maxWidthPx: number): Promise<string | null>;

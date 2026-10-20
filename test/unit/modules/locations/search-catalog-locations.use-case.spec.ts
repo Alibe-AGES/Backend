@@ -3,7 +3,6 @@ import {
   CatalogLocationsPageService,
   InvalidLocationSearchError,
 } from '../../../../src/modules/locations/application/services/catalog-locations-page.service';
-import { LocationRepository } from '../../../../src/modules/locations/domain/location.repository';
 import { FeatureFlags } from '../../../../src/shared/feature-flags/feature-flags';
 import { PlacesProvider } from '../../../../src/shared/places/places-provider';
 import { buildPlace } from '../../../helpers/place.fixture';
@@ -12,7 +11,6 @@ const coordinates = { latitude: -30.0277, longitude: -51.2287 };
 
 describe('SearchCatalogLocationsUseCase', () => {
   let places: jest.Mocked<PlacesProvider>;
-  let locations: jest.Mocked<LocationRepository>;
   let featureFlags: jest.Mocked<FeatureFlags>;
   let useCase: SearchCatalogLocationsUseCase;
 
@@ -20,22 +18,17 @@ describe('SearchCatalogLocationsUseCase', () => {
     places = {
       searchNearby: jest.fn(),
       searchText: jest.fn(),
+      getPlaceById: jest.fn(),
       getPhotoUrl: jest.fn(),
-    };
-    locations = {
-      findById: jest.fn(),
-      ensureCatalogLocations: jest.fn(
-        async (items) => new Map(items.map((item) => [item.externalId, `id-${item.externalId}`]))
-      ),
     };
     featureFlags = { isEnabled: jest.fn().mockResolvedValue(true) };
     useCase = new SearchCatalogLocationsUseCase(
       places,
-      new CatalogLocationsPageService(locations, featureFlags)
+      new CatalogLocationsPageService(featureFlags)
     );
   });
 
-  it('searches by text biased around the user and registers the page in the catalog', async () => {
+  it('searches by text biased around the user', async () => {
     places.searchText.mockResolvedValue([buildPlace({ externalId: 'a' })]);
 
     const result = await useCase.execute({
@@ -54,13 +47,8 @@ describe('SearchCatalogLocationsUseCase', () => {
       includePriceRange: true,
     });
     expect(places.searchNearby).not.toHaveBeenCalled();
-    expect(locations.ensureCatalogLocations).toHaveBeenCalledWith([
-      expect.objectContaining({ externalId: 'a' }),
-    ]);
     expect(result).toEqual({
-      items: [
-        { id: 'id-a', place: expect.objectContaining({ externalId: 'a' }), distanceMeters: 2705 },
-      ],
+      items: [{ place: expect.objectContaining({ externalId: 'a' }), distanceMeters: 2705 }],
       page: 1,
       limit: 20,
       total: 1,

@@ -7,10 +7,13 @@ import { ProposalsModule } from '../../../../src/modules/proposals/proposals.mod
 import { ProposalsController } from '../../../../src/modules/proposals/http/proposals.controller';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import { PrismaEventRepository } from '../../../../src/modules/events/persistence/prisma-event.repository';
+import { GooglePlacesService } from '../../../../src/infrastructure/api/google-places/google-places.service';
+import { PlacesProvider } from '../../../../src/shared/places/places-provider';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const PROPOSAL_ID = '55555555-5555-4555-8555-555555555555';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
+const PLACE_ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
 
 describe('ProposalsModule integration', () => {
   let moduleFixture: TestingModule;
@@ -60,17 +63,20 @@ describe('ProposalsModule integration', () => {
     });
   });
 
-  it('injects the exported event repository into the proposal creation flow', async () => {
+  it('injects the exported event repository and Google Places into the proposal creation flow', async () => {
     const repository = moduleFixture.get(EventRepository);
     expect(repository).toBeInstanceOf(PrismaEventRepository);
+    expect(moduleFixture.get(PlacesProvider, { strict: false })).toBeInstanceOf(
+      GooglePlacesService
+    );
     const location = {
       id: '44444444-4444-4444-8444-444444444444',
       description: null,
       address: null,
     };
     const membership = jest.spyOn(repository, 'findGroupMembership').mockResolvedValue(true);
-    const findLocation = jest.spyOn(repository, 'findLocationById').mockResolvedValue(location);
-    const create = jest.spyOn(repository, 'createWithExistingLocation').mockResolvedValue({
+    const findLocation = jest.spyOn(repository, 'findCatalogLocation').mockResolvedValue(location);
+    const create = jest.spyOn(repository, 'createWithCatalogLocation').mockResolvedValue({
       id: PROPOSAL_ID,
       createdAt: new Date('2026-10-09T17:00:00.000Z'),
       owner: { id: USER_ID, name: 'Ana', image: null },
@@ -91,7 +97,7 @@ describe('ProposalsModule integration', () => {
         .get(ProposalsController)
         .create(
           '33333333-3333-4333-8333-333333333333',
-          { locationId: location.id, name: 'Café', date: '2026-10-17', time: '15:00' },
+          { locationId: PLACE_ID, name: 'Café', date: '2026-10-17', time: '15:00' },
           { user: { id: USER_ID } } as AuthenticatedRequest
         );
       expect(result).toMatchObject({
@@ -102,8 +108,12 @@ describe('ProposalsModule integration', () => {
         myAnswer: 'yes',
       });
       expect(create).toHaveBeenCalledWith(
-        expect.objectContaining({ ownerId: USER_ID, locationId: location.id })
+        expect.objectContaining({
+          ownerId: USER_ID,
+          location: { externalId: PLACE_ID, description: null, address: null },
+        })
       );
+      expect(findLocation).toHaveBeenCalledWith(PLACE_ID);
     } finally {
       membership.mockRestore();
       findLocation.mockRestore();

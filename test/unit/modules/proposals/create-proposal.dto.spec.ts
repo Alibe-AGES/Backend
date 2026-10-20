@@ -1,7 +1,7 @@
 import { CreateProposalDto } from '../../../../src/modules/proposals/http/dto/create-proposal.dto';
 
 const body = {
-  locationId: '44444444-4444-4444-8444-444444444444',
+  locationId: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
   name: 'Café',
   date: '2026-10-17',
   time: '15:00',

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { FEATURE_FLAGS, FeatureFlags } from '../../../../shared/feature-flags/feature-flags';
 import type { GeoPoint, Place } from '../../../../shared/places/places-provider';
-import { LocationRepository } from '../../domain/location.repository';
 import {
   distanceInMeters,
   matchesPlaceFilters,
@@ -28,7 +27,6 @@ export interface CatalogSearchArea {
 }
 
 export interface CatalogLocation {
-  id: string;
   place: Place;
   distanceMeters: number | null;
 }
@@ -44,14 +42,11 @@ export class InvalidLocationSearchError extends Error {}
 
 /**
  * Shared by the feed and the text search: validates the filters, applies the budget flag,
- * filters, paginates and registers the returned page in the catalog.
+ * filters and paginates. Nothing is persisted; a location is only stored when a proposal uses it.
  */
 @Injectable()
 export class CatalogLocationsPageService {
-  constructor(
-    private readonly locations: LocationRepository,
-    private readonly featureFlags: FeatureFlags
-  ) {}
+  constructor(private readonly featureFlags: FeatureFlags) {}
 
   async build(
     input: CatalogSearchInput,
@@ -83,17 +78,8 @@ export class CatalogLocationsPageService {
     );
     const pageItems = filtered.slice((input.page - 1) * input.limit, input.page * input.limit);
 
-    const ids = await this.locations.ensureCatalogLocations(
-      pageItems.map((place) => ({
-        externalId: place.externalId,
-        description: place.summary ?? place.name,
-        address: place.address,
-      }))
-    );
-
     return {
       items: pageItems.map((place) => ({
-        id: ids.get(place.externalId) as string,
         place,
         distanceMeters: place.location ? distanceInMeters(center, place.location) : null,
       })),

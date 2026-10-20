@@ -470,17 +470,17 @@ O cliente da [Places API (New)](https://developers.google.com/maps/documentation
 ```text
 api/google-places/
 ├── google-places.config.ts    # Lê GOOGLE_PLACES_API_KEY
-├── google-places.service.ts   # Chama places:searchNearby e normaliza a resposta
+├── google-places.service.ts   # Chama searchNearby, searchText e Place Details e normaliza a resposta
 └── google-places.module.ts    # Exporta o PlacesProvider
 ```
 
 A chave é lida de `GOOGLE_PLACES_API_KEY`. A API inicializa sem ela, mas as buscas respondem `503`. Para gerar a chave, ative a **Places API (New)** no Google Cloud e restrinja a chave a essa API. O field mask solicita campos de atmosfera (`outdoorSeating`, `goodForGroups`), que entram no SKU Enterprise + Atmosphere.
 
-`GET /api/locations?latitude=&longitude=` usa esse cliente para montar o feed: busca até 20 locais no raio informado (`maxDistanceKm`, padrão de 50 km), aplica os filtros (`budgetMin`, `budgetMax`, `period`, `environment`, `groupSize`, `type`), pagina o resultado e registra os locais da página na tabela `location` com `manually_created = false`.
+`GET /api/locations?latitude=&longitude=` usa esse cliente para montar o feed: busca até 20 locais no raio informado (`maxDistanceKm`, padrão de 50 km), aplica os filtros (`budgetMin`, `budgetMax`, `period`, `environment`, `groupSize`, `type`), e pagina o resultado. A pesquisa `GET /api/locations/search?q=` segue o mesmo fluxo com Text Search. Nenhuma das duas rotas grava no banco: o `id` de cada item é o Place ID do Google, e a linha em `location` só é criada quando uma proposta usa o local.
 
 Cada item traz `imageUrl` no formato `/api/locations/photos?name=places/{placeId}/photos/{photoId}`, sem chamada extra ao Google durante a busca do feed. Quando o app carrega a imagem (com a mesma sessão das demais rotas), o Backend consulta a rota de mídia do [Place Photos (New)](https://developers.google.com/maps/documentation/places/web-service/place-photos) com `skipHttpRedirect=true` e responde `302` para a URL pública do Google (`googleusercontent.com`), que não contém a API key. Assim, cada foto custa uma chamada somente quando é exibida. O parâmetro opcional `maxWidthPx` (padrão 800) define a largura, e a resposta usa `Cache-Control: private, max-age=3600`; fotos que não puderem ser resolvidas retornam `404`.
 
-`GET /api/locations/:locationId` retorna um local da tabela `location` (`id`, `externalId`, `description`, `address`, `manuallyCreated`) para a tela de detalhe, ou `404` quando não existe. A imagem do detalhe continua vindo do `imageUrl` do feed.
+`GET /api/locations/google-places/:placeId` consulta o [Place Details (New)](https://developers.google.com/maps/documentation/places/web-service/place-details) pelo Place ID e devolve os mesmos campos de um item do feed, sem `distanceMeters`. Responde `400` para um Place ID malformado, `404` quando o Google não encontra o local e `503` quando o Google está indisponível. O orçamento segue a flag `google_places_budget`, como no feed.
 
 ### Feature flags
 
@@ -901,20 +901,22 @@ expõem `/api/events/:eventId/image`. Essa rota entrega os bytes apenas para usu
 que participam do grupo do evento. Campos obrigatórios ausentes respondem `400`, grupo inexistente
 `404`, usuário fora do grupo `403` e ausência de autenticação `401`.
 
-### Criação de proposta com localização existente
+### Criação de proposta com local do catálogo
 
 ```http
 POST /api/groups/:groupId/proposals
 ```
 
 O endpoint fica no módulo `proposals` e reutiliza o repository exportado por `EventsModule`.
-O body JSON estrito exige `locationId` (UUID), `name` (não vazio após `trim()`), `date`
+O body JSON estrito exige `locationId` (Place ID do Google, o `id` dos itens do feed e da pesquisa), `name` (não vazio após `trim()`), `date`
 (`YYYY-MM-DD`) e `time` (`HH:mm`). `budgetStart` e `budgetEnd` são strings decimais opcionais
 e independentes, seguindo a validação da criação de eventos; não aceitam `null` explícito.
 Campos extras, incluindo `ownerId` e `userId`, respondem `400`. O autor vem somente da sessão.
 
 Uma transação cria `Event` com status `pending`, `Proposal` e `ProposalResponse` do autor com
-resposta `yes`. A `Location` selecionada é reutilizada sem criação ou alteração de seus dados.
+resposta `yes`. Na mesma transação, a `Location` com esse `external_id` e `manually_created = false`
+é reutilizada ou, no primeiro uso do local, criada com nome ou resumo e endereço do Google. O Google
+só é consultado quando o local ainda não está salvo.
 Data e horário são interpretados em UTC, como no fluxo manual existente.
 
 A resposta `201` contém `id` e `createdAt` da proposta, `owner` (`id`, `name`, `image`),
@@ -922,8 +924,8 @@ A resposta `201` contém `id` e `createdAt` da proposta, `owner` (`id`, `name`, 
 `location` (`id`, `description`, `address`) e `myAnswer: "yes"`. Orçamentos são apresentados
 com duas casas decimais, como nos detalhes de evento, ou `null` quando omitidos. A imagem
 do autor usa `/users/:id/profile-picture` ou `null`; descrição e endereço preservam valores
-nulos. `createdAt` é serializado em ISO. Grupo ou localização inexistentes respondem `404`,
-usuário fora do grupo `403` e ausência de autenticação `401`.
+nulos. `createdAt` é serializado em ISO. Grupo inexistente ou local que o Google não encontra
+respondem `404`, usuário fora do grupo `403`, ausência de autenticação `401` e Google indisponível `503`.
 
 O teste de persistência e rollback com PostgreSQL é opt-in. Use um banco local exclusivo cujo
 nome termine em `_test`, aplique as migrations existentes com `prisma migrate deploy` apontando

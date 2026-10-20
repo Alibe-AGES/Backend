@@ -2,36 +2,54 @@ import {
   GetLocationUseCase,
   LocationNotFoundError,
 } from '../../../../src/modules/locations/application/get-location.use-case';
-import { LocationRepository } from '../../../../src/modules/locations/domain/location.repository';
+import { mockPriceRange } from '../../../../src/modules/locations/application/mock-price-range';
+import { FEATURE_FLAGS, FeatureFlags } from '../../../../src/shared/feature-flags/feature-flags';
+import { PlacesProvider } from '../../../../src/shared/places/places-provider';
+import { buildPlace } from '../../../helpers/place.fixture';
 
-const LOCATION_ID = '0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d';
+const PLACE_ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
 
 describe('GetLocationUseCase', () => {
-  let locations: jest.Mocked<LocationRepository>;
+  let places: jest.Mocked<PlacesProvider>;
+  let featureFlags: jest.Mocked<FeatureFlags>;
   let useCase: GetLocationUseCase;
 
   beforeEach(() => {
-    locations = { findById: jest.fn(), ensureCatalogLocations: jest.fn() };
-    useCase = new GetLocationUseCase(locations);
-  });
-
-  it('returns the location found by id', async () => {
-    const location = {
-      id: LOCATION_ID,
-      externalId: 'place-001',
-      description: 'Café com ambiente tranquilo e mesas externas',
-      address: 'Rua Padre Chagas, 320 - Moinhos de Vento, Porto Alegre - RS',
-      manuallyCreated: false,
+    places = {
+      searchNearby: jest.fn(),
+      searchText: jest.fn(),
+      getPlaceById: jest.fn(),
+      getPhotoUrl: jest.fn(),
     };
-    locations.findById.mockResolvedValue(location);
-
-    await expect(useCase.execute(LOCATION_ID)).resolves.toEqual(location);
-    expect(locations.findById).toHaveBeenCalledWith(LOCATION_ID);
+    featureFlags = { isEnabled: jest.fn().mockResolvedValue(true) };
+    useCase = new GetLocationUseCase(places, featureFlags);
   });
 
-  it('fails when the location does not exist', async () => {
-    locations.findById.mockResolvedValue(null);
+  it('looks the place up on the provider with the budget from Google', async () => {
+    const place = buildPlace({
+      externalId: PLACE_ID,
+      priceRange: { start: { amount: 20, currencyCode: 'BRL' }, end: null },
+    });
+    places.getPlaceById.mockResolvedValue(place);
 
-    await expect(useCase.execute(LOCATION_ID)).rejects.toBeInstanceOf(LocationNotFoundError);
+    await expect(useCase.execute(PLACE_ID)).resolves.toEqual(place);
+    expect(featureFlags.isEnabled).toHaveBeenCalledWith(FEATURE_FLAGS.googlePlacesBudget);
+    expect(places.getPlaceById).toHaveBeenCalledWith(PLACE_ID, { includePriceRange: true });
+  });
+
+  it('uses the mocked budget when the budget flag is disabled', async () => {
+    featureFlags.isEnabled.mockResolvedValue(false);
+    places.getPlaceById.mockResolvedValue(buildPlace({ externalId: PLACE_ID }));
+
+    const place = await useCase.execute(PLACE_ID);
+
+    expect(places.getPlaceById).toHaveBeenCalledWith(PLACE_ID, { includePriceRange: false });
+    expect(place.priceRange).toEqual(mockPriceRange(PLACE_ID));
+  });
+
+  it('fails when the place does not exist', async () => {
+    places.getPlaceById.mockResolvedValue(null);
+
+    await expect(useCase.execute(PLACE_ID)).rejects.toBeInstanceOf(LocationNotFoundError);
   });
 });

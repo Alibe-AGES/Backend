@@ -225,6 +225,76 @@ describe('GooglePlacesService', () => {
     );
   });
 
+  describe('getPlaceById', () => {
+    const placeId = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
+
+    it('requests Place Details with the unprefixed field mask and maps the place', async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          id: placeId,
+          displayName: { text: 'Bloom Café' },
+          formattedAddress: 'Rua A',
+        })
+      );
+      const service = new GooglePlacesService('secret-key');
+
+      const place = await service.getPlaceById(placeId, { includePriceRange: true });
+
+      expect(place).toEqual(
+        expect.objectContaining({ externalId: placeId, name: 'Bloom Café', address: 'Rua A' })
+      );
+      const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
+      expect(url.toString()).toBe(
+        `${GOOGLE_PLACES_API_BASE_URL}/places/${placeId}?languageCode=pt-BR&regionCode=BR`
+      );
+      expect(init.method).toBeUndefined();
+      const headers = init.headers as Record<string, string>;
+      expect(headers['X-Goog-Api-Key']).toBe('secret-key');
+      const fieldMask = headers['X-Goog-FieldMask'].split(',');
+      expect(fieldMask).toEqual(expect.arrayContaining(['id', 'displayName', 'priceRange']));
+      expect(fieldMask.some((field) => field.startsWith('places.'))).toBe(false);
+    });
+
+    it('does not request the price range unless asked', async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ id: placeId }));
+
+      await new GooglePlacesService('key').getPlaceById(placeId);
+
+      const init = fetchMock.mock.calls[0][1] as RequestInit;
+      expect((init.headers as Record<string, string>)['X-Goog-FieldMask']).not.toContain(
+        'priceRange'
+      );
+    });
+
+    it.each([400, 404])('returns null when Google answers %s', async (status) => {
+      const service = new GooglePlacesService('key');
+      jest.spyOn(service['logger'], 'warn').mockImplementation();
+      fetchMock.mockResolvedValue(jsonResponse({ error: 'not found' }, status));
+
+      await expect(service.getPlaceById(placeId)).resolves.toBeNull();
+    });
+
+    it('converts other failures and a missing key into an unavailable error', async () => {
+      const service = new GooglePlacesService('key');
+      jest.spyOn(service['logger'], 'error').mockImplementation();
+
+      fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'denied' }, 403));
+      await expect(service.getPlaceById(placeId)).rejects.toBeInstanceOf(
+        PlacesProviderUnavailableError
+      );
+
+      fetchMock.mockRejectedValueOnce(new Error('timeout'));
+      await expect(service.getPlaceById(placeId)).rejects.toBeInstanceOf(
+        PlacesProviderUnavailableError
+      );
+
+      await expect(new GooglePlacesService(null).getPlaceById(placeId)).rejects.toBeInstanceOf(
+        PlacesProviderUnavailableError
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('getPhotoUrl', () => {
     const photoName = 'places/place-1/photos/photo-1';
 

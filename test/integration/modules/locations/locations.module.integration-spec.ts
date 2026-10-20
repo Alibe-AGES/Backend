@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GOOGLE_PLACES_API_KEY } from '../../../../src/infrastructure/api/google-places/google-places.config';
 import {
+  GOOGLE_PLACES_API_BASE_URL,
   GOOGLE_PLACES_SEARCH_NEARBY_URL,
   GOOGLE_PLACES_SEARCH_TEXT_URL,
   GooglePlacesService,
@@ -12,10 +13,8 @@ import { GetLocationPhotoUseCase } from '../../../../src/modules/locations/appli
 import { ListCatalogLocationsUseCase } from '../../../../src/modules/locations/application/list-catalog-locations.use-case';
 import { SearchCatalogLocationsUseCase } from '../../../../src/modules/locations/application/search-catalog-locations.use-case';
 import { mockPriceRange } from '../../../../src/modules/locations/application/mock-price-range';
-import { LocationRepository } from '../../../../src/modules/locations/domain/location.repository';
 import { LocationsController } from '../../../../src/modules/locations/http/locations.controller';
 import { LocationsModule } from '../../../../src/modules/locations/locations.module';
-import { PrismaLocationRepository } from '../../../../src/modules/locations/persistence/prisma-location.repository';
 import { FeatureFlags } from '../../../../src/shared/feature-flags/feature-flags';
 
 const PHOTO_NAME = 'places/place-1/photos/photo-1';
@@ -24,10 +23,7 @@ const PHOTO_URI = 'https://lh3.googleusercontent.com/photo-1';
 describe('LocationsModule integration', () => {
   let module: TestingModule;
   let fetchMock: jest.SpyInstance;
-  const findMany = jest.fn();
-  const createManyAndReturn = jest.fn();
   const findUniqueFlag = jest.fn();
-  const findUniqueLocation = jest.fn();
 
   beforeAll(async () => {
     module = await Test.createTestingModule({
@@ -36,10 +32,7 @@ describe('LocationsModule integration', () => {
       .overrideProvider(GOOGLE_PLACES_API_KEY)
       .useValue('test-key')
       .overrideProvider(PrismaService)
-      .useValue({
-        location: { findMany, createManyAndReturn, findUnique: findUniqueLocation },
-        featureFlag: { findUnique: findUniqueFlag },
-      })
+      .useValue({ featureFlag: { findUnique: findUniqueFlag } })
       .compile();
   });
 
@@ -49,27 +42,22 @@ describe('LocationsModule integration', () => {
 
   beforeEach(() => {
     fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
+      const place = {
+        id: 'place-1',
+        displayName: { text: 'Bloom Café' },
+        formattedAddress: 'Rua A',
+        photos: [{ name: PHOTO_NAME }],
+      };
       const body =
         String(url) === GOOGLE_PLACES_SEARCH_NEARBY_URL ||
         String(url) === GOOGLE_PLACES_SEARCH_TEXT_URL
-          ? {
-              places: [
-                {
-                  id: 'place-1',
-                  displayName: { text: 'Bloom Café' },
-                  formattedAddress: 'Rua A',
-                  photos: [{ name: PHOTO_NAME }],
-                },
-              ],
-            }
-          : { name: PHOTO_NAME, photoUri: PHOTO_URI };
+          ? { places: [place] }
+          : String(url).includes('/media')
+            ? { name: PHOTO_NAME, photoUri: PHOTO_URI }
+            : place;
 
       return new Response(JSON.stringify(body), { status: 200 });
     });
-    findMany.mockReset().mockResolvedValue([]);
-    createManyAndReturn
-      .mockReset()
-      .mockResolvedValue([{ id: 'location-id', externalId: 'place-1' }]);
     findUniqueFlag.mockReset();
   });
 
@@ -77,16 +65,15 @@ describe('LocationsModule integration', () => {
     jest.restoreAllMocks();
   });
 
-  it('registers the controller, use case, Prisma adapters and Google Places adapter', () => {
+  it('registers the controller, use cases and Google Places adapter', () => {
     expect(module.get(LocationsController)).toBeInstanceOf(LocationsController);
     expect(module.get(ListCatalogLocationsUseCase)).toBeInstanceOf(ListCatalogLocationsUseCase);
     expect(module.get(SearchCatalogLocationsUseCase)).toBeInstanceOf(SearchCatalogLocationsUseCase);
-    expect(module.get(LocationRepository)).toBeInstanceOf(PrismaLocationRepository);
     expect(module.get(GooglePlacesService, { strict: false })).toBeInstanceOf(GooglePlacesService);
     expect(module.get(FeatureFlags, { strict: false })).toBeInstanceOf(PrismaFeatureFlagsService);
   });
 
-  it('connects Google Places, the catalog and the disabled budget flag', async () => {
+  it('connects Google Places and the disabled budget flag without persisting the page', async () => {
     findUniqueFlag.mockResolvedValue({ enabled: false });
 
     const result = await module.get(ListCatalogLocationsUseCase).execute({
@@ -97,9 +84,7 @@ describe('LocationsModule integration', () => {
     });
 
     expect(result.total).toBe(1);
-    expect(result.items[0]).toEqual(
-      expect.objectContaining({ id: 'location-id', distanceMeters: null })
-    );
+    expect(result.items[0]).toEqual(expect.objectContaining({ distanceMeters: null }));
     expect(result.items[0].place.photoName).toBe(PHOTO_NAME);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.items[0].place.priceRange).toEqual(mockPriceRange('place-1'));
@@ -110,18 +95,6 @@ describe('LocationsModule integration', () => {
     const searchInit = fetchMock.mock.calls[0][1] as RequestInit;
     expect((searchInit.headers as Record<string, string>)['X-Goog-FieldMask']).not.toContain(
       'places.priceRange'
-    );
-    expect(createManyAndReturn).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: [
-          {
-            externalId: 'place-1',
-            description: 'Bloom Café',
-            address: 'Rua A',
-            manuallyCreated: false,
-          },
-        ],
-      })
     );
   });
 
@@ -142,7 +115,7 @@ describe('LocationsModule integration', () => {
     expect(result.items[0].place.priceRange).toBeNull();
   });
 
-  it('connects the text search to Google Places Text Search and the catalog', async () => {
+  it('connects the text search to Google Places Text Search', async () => {
     findUniqueFlag.mockResolvedValue({ enabled: true });
 
     const result = await module.get(SearchCatalogLocationsUseCase).execute({
@@ -156,8 +129,7 @@ describe('LocationsModule integration', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(GOOGLE_PLACES_SEARCH_TEXT_URL);
     expect(JSON.parse(init.body as string)).toEqual(expect.objectContaining({ textQuery: 'café' }));
-    expect(result.items[0]).toEqual(expect.objectContaining({ id: 'location-id' }));
-    expect(createManyAndReturn).toHaveBeenCalledTimes(1);
+    expect(result.items[0].place.externalId).toBe('place-1');
   });
 
   it('connects the photo use case to the Google Places media route', async () => {
@@ -165,19 +137,14 @@ describe('LocationsModule integration', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain(`${PHOTO_NAME}/media`);
   });
 
-  it('connects the get location use case to the Prisma repository', async () => {
-    const location = {
-      id: '0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d',
-      externalId: 'place-1',
-      description: 'Bloom Café',
-      address: 'Rua A',
-      manuallyCreated: false,
-    };
-    findUniqueLocation.mockResolvedValue(location);
+  it('connects the get location use case to Google Place Details', async () => {
+    findUniqueFlag.mockResolvedValue({ enabled: true });
 
-    await expect(module.get(GetLocationUseCase).execute(location.id)).resolves.toEqual(location);
-    expect(findUniqueLocation).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: location.id } })
-    );
+    const place = await module.get(GetLocationUseCase).execute('place-1');
+
+    expect(place).toEqual(expect.objectContaining({ externalId: 'place-1', name: 'Bloom Café' }));
+    const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(String(url)).toContain(`${GOOGLE_PLACES_API_BASE_URL}/places/place-1?`);
+    expect((init.headers as Record<string, string>)['X-Goog-FieldMask']).toContain('priceRange');
   });
 });
