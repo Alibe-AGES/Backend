@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GOOGLE_PLACES_API_KEY } from '../../../../src/infrastructure/api/google-places/google-places.config';
 import {
   GOOGLE_PLACES_SEARCH_NEARBY_URL,
+  GOOGLE_PLACES_SEARCH_TEXT_URL,
   GooglePlacesService,
 } from '../../../../src/infrastructure/api/google-places/google-places.service';
 import { PrismaFeatureFlagsService } from '../../../../src/infrastructure/feature-flags/prisma-feature-flags.service';
@@ -9,6 +10,7 @@ import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.serv
 import { GetLocationUseCase } from '../../../../src/modules/locations/application/get-location.use-case';
 import { GetLocationPhotoUseCase } from '../../../../src/modules/locations/application/get-location-photo.use-case';
 import { ListCatalogLocationsUseCase } from '../../../../src/modules/locations/application/list-catalog-locations.use-case';
+import { SearchCatalogLocationsUseCase } from '../../../../src/modules/locations/application/search-catalog-locations.use-case';
 import { mockPriceRange } from '../../../../src/modules/locations/application/mock-price-range';
 import { LocationRepository } from '../../../../src/modules/locations/domain/location.repository';
 import { LocationsController } from '../../../../src/modules/locations/http/locations.controller';
@@ -48,7 +50,8 @@ describe('LocationsModule integration', () => {
   beforeEach(() => {
     fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
       const body =
-        String(url) === GOOGLE_PLACES_SEARCH_NEARBY_URL
+        String(url) === GOOGLE_PLACES_SEARCH_NEARBY_URL ||
+        String(url) === GOOGLE_PLACES_SEARCH_TEXT_URL
           ? {
               places: [
                 {
@@ -77,6 +80,7 @@ describe('LocationsModule integration', () => {
   it('registers the controller, use case, Prisma adapters and Google Places adapter', () => {
     expect(module.get(LocationsController)).toBeInstanceOf(LocationsController);
     expect(module.get(ListCatalogLocationsUseCase)).toBeInstanceOf(ListCatalogLocationsUseCase);
+    expect(module.get(SearchCatalogLocationsUseCase)).toBeInstanceOf(SearchCatalogLocationsUseCase);
     expect(module.get(LocationRepository)).toBeInstanceOf(PrismaLocationRepository);
     expect(module.get(GooglePlacesService, { strict: false })).toBeInstanceOf(GooglePlacesService);
     expect(module.get(FeatureFlags, { strict: false })).toBeInstanceOf(PrismaFeatureFlagsService);
@@ -136,6 +140,24 @@ describe('LocationsModule integration', () => {
       'places.priceRange'
     );
     expect(result.items[0].place.priceRange).toBeNull();
+  });
+
+  it('connects the text search to Google Places Text Search and the catalog', async () => {
+    findUniqueFlag.mockResolvedValue({ enabled: true });
+
+    const result = await module.get(SearchCatalogLocationsUseCase).execute({
+      latitude: -30.0277,
+      longitude: -51.2287,
+      page: 1,
+      limit: 20,
+      text: 'café',
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(GOOGLE_PLACES_SEARCH_TEXT_URL);
+    expect(JSON.parse(init.body as string)).toEqual(expect.objectContaining({ textQuery: 'café' }));
+    expect(result.items[0]).toEqual(expect.objectContaining({ id: 'location-id' }));
+    expect(createManyAndReturn).toHaveBeenCalledTimes(1);
   });
 
   it('connects the photo use case to the Google Places media route', async () => {

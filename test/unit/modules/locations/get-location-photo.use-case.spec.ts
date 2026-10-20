@@ -12,7 +12,7 @@ describe('GetLocationPhotoUseCase', () => {
   let useCase: GetLocationPhotoUseCase;
 
   beforeEach(() => {
-    places = { searchNearby: jest.fn(), getPhotoUrl: jest.fn() };
+    places = { searchNearby: jest.fn(), searchText: jest.fn(), getPhotoUrl: jest.fn() };
     useCase = new GetLocationPhotoUseCase(places);
   });
 

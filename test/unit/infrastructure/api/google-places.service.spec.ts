@@ -2,6 +2,7 @@ import { getGooglePlacesApiKey } from '../../../../src/infrastructure/api/google
 import {
   GOOGLE_PLACES_API_BASE_URL,
   GOOGLE_PLACES_SEARCH_NEARBY_URL,
+  GOOGLE_PLACES_SEARCH_TEXT_URL,
   GooglePlacesService,
 } from '../../../../src/infrastructure/api/google-places/google-places.service';
 import { PlacesProviderUnavailableError } from '../../../../src/shared/places/places-provider';
@@ -160,6 +161,53 @@ describe('GooglePlacesService', () => {
     expect(
       JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
     ).not.toHaveProperty('includedTypes');
+  });
+
+  it('sends a text search biased around the center and maps the places', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ places: [{ id: 'place-1', displayName: { text: 'Pizzaria' } }] })
+    );
+
+    const places = await new GooglePlacesService('secret-key').searchText({
+      textQuery: 'pizza vegana',
+      center,
+      radiusMeters: 90_000,
+      includedType: 'restaurant',
+      maxResultCount: 50,
+      includePriceRange: true,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(GOOGLE_PLACES_SEARCH_TEXT_URL);
+    expect((init.headers as Record<string, string>)['X-Goog-FieldMask']).toContain(
+      'places.priceRange'
+    );
+    expect(JSON.parse(init.body as string)).toEqual({
+      textQuery: 'pizza vegana',
+      includedType: 'restaurant',
+      pageSize: 20,
+      rankPreference: 'RELEVANCE',
+      languageCode: 'pt-BR',
+      regionCode: 'BR',
+      locationBias: { circle: { center, radius: 50_000 } },
+    });
+    expect(places).toEqual([expect.objectContaining({ externalId: 'place-1', name: 'Pizzaria' })]);
+  });
+
+  it('omits the included type and fails without a key on text search', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}));
+
+    await expect(
+      new GooglePlacesService('key').searchText({ textQuery: 'bar', center, radiusMeters: 5000 })
+    ).resolves.toEqual([]);
+    expect(
+      JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+    ).not.toHaveProperty('includedType');
+
+    await expect(
+      new GooglePlacesService(null).searchText({ textQuery: 'bar', center, radiusMeters: 5000 })
+    ).rejects.toBeInstanceOf(PlacesProviderUnavailableError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('converts HTTP and network failures into an unavailable error', async () => {

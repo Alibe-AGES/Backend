@@ -62,6 +62,17 @@ export interface SearchNearbyPlacesInput {
   includePriceRange?: boolean;
 }
 
+export interface SearchTextPlacesInput {
+  textQuery: string;
+  /** Biases the results around this point; Google may still return farther places. */
+  center: GeoPoint;
+  radiusMeters: number;
+  includedType?: string;
+  maxResultCount?: number;
+  /** Requests the price range from the provider; disabled by default to avoid extra cost. */
+  includePriceRange?: boolean;
+}
+
 /** Photo resource name format, e.g. `places/{placeId}/photos/{photoId}`. */
 export const PLACE_PHOTO_NAME_PATTERN = /^places\/[^/]+\/photos\/[^/]+$/;
 
@@ -69,6 +80,9 @@ export class PlacesProviderUnavailableError extends Error {}
 
 export abstract class PlacesProvider {
   abstract searchNearby(input: SearchNearbyPlacesInput): Promise<Place[]>;
+
+  /** Free-text search, e.g. "pizza vegana" or "bar com música ao vivo". */
+  abstract searchText(input: SearchTextPlacesInput): Promise<Place[]>;
 
   /** Returns a public image URL for the photo, or null when it cannot be resolved. */
   abstract getPhotoUrl(photoName: string, maxWidthPx: number): Promise<string | null>;

@@ -8,11 +8,14 @@ import {
   PlacesProvider,
   PlacesProviderUnavailableError,
   type SearchNearbyPlacesInput,
+  type SearchTextPlacesInput,
 } from '../../../shared/places/places-provider';
 import { GOOGLE_PLACES_API_KEY } from './google-places.config';
 
 export const GOOGLE_PLACES_SEARCH_NEARBY_URL =
   'https://places.googleapis.com/v1/places:searchNearby';
+
+export const GOOGLE_PLACES_SEARCH_TEXT_URL = 'https://places.googleapis.com/v1/places:searchText';
 
 export const GOOGLE_PLACES_API_BASE_URL = 'https://places.googleapis.com/v1';
 
@@ -80,7 +83,7 @@ interface GooglePlace {
   photos?: Array<{ name?: string }>;
 }
 
-interface GoogleSearchNearbyResponse {
+interface GoogleSearchResponse {
   places?: GooglePlace[];
 }
 
@@ -97,56 +100,42 @@ export class GooglePlacesService extends PlacesProvider {
   }
 
   async searchNearby(input: SearchNearbyPlacesInput): Promise<Place[]> {
-    if (!this.apiKey) {
-      throw new PlacesProviderUnavailableError('GOOGLE_PLACES_API_KEY não configurada');
-    }
-
-    const body = {
-      ...(input.includedTypes?.length ? { includedTypes: input.includedTypes } : {}),
-      maxResultCount: Math.min(
-        input.maxResultCount ?? GOOGLE_PLACES_MAX_RESULT_COUNT,
-        GOOGLE_PLACES_MAX_RESULT_COUNT
-      ),
-      rankPreference: 'POPULARITY',
-      languageCode: 'pt-BR',
-      regionCode: 'BR',
-      locationRestriction: {
-        circle: {
-          center: input.center,
-          radius: Math.min(input.radiusMeters, GOOGLE_PLACES_MAX_RADIUS_METERS),
+    return this.search(
+      GOOGLE_PLACES_SEARCH_NEARBY_URL,
+      {
+        ...(input.includedTypes?.length ? { includedTypes: input.includedTypes } : {}),
+        maxResultCount: this.clampResultCount(input.maxResultCount),
+        rankPreference: 'POPULARITY',
+        languageCode: 'pt-BR',
+        regionCode: 'BR',
+        locationRestriction: {
+          circle: { center: input.center, radius: this.clampRadius(input.radiusMeters) },
         },
       },
-    };
+      input.includePriceRange
+    );
+  }
 
-    let response: Response;
-    try {
-      response = await fetch(GOOGLE_PLACES_SEARCH_NEARBY_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': this.apiKey,
-          'X-Goog-FieldMask': [
-            ...BASE_FIELDS,
-            ...(input.includePriceRange ? [PRICE_RANGE_FIELD] : []),
-          ].join(','),
+  /**
+   * Text Search (New) only accepts a rectangle as restriction, so the circle is sent as a bias;
+   * callers that need a hard distance limit must filter the results.
+   */
+  async searchText(input: SearchTextPlacesInput): Promise<Place[]> {
+    return this.search(
+      GOOGLE_PLACES_SEARCH_TEXT_URL,
+      {
+        textQuery: input.textQuery,
+        ...(input.includedType ? { includedType: input.includedType } : {}),
+        pageSize: this.clampResultCount(input.maxResultCount),
+        rankPreference: 'RELEVANCE',
+        languageCode: 'pt-BR',
+        regionCode: 'BR',
+        locationBias: {
+          circle: { center: input.center, radius: this.clampRadius(input.radiusMeters) },
         },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_IN_MS),
-      });
-    } catch (error) {
-      this.logger.error('Falha de rede ao consultar o Google Places', error as Error);
-      throw new PlacesProviderUnavailableError('Não foi possível consultar o Google Places');
-    }
-
-    if (!response.ok) {
-      this.logger.error(
-        `Google Places respondeu ${response.status}: ${await response.text().catch(() => '')}`
-      );
-      throw new PlacesProviderUnavailableError('Não foi possível consultar o Google Places');
-    }
-
-    const payload = (await response.json()) as GoogleSearchNearbyResponse;
-    return (payload.places ?? []).map((place) => this.toPlace(place));
+      },
+      input.includePriceRange
+    );
   }
 
   /**
@@ -179,6 +168,57 @@ export class GooglePlacesService extends PlacesProvider {
       this.logger.warn(`Falha ao consultar a foto ${photoName}: ${(error as Error).message}`);
       return null;
     }
+  }
+
+  private async search(
+    url: string,
+    body: Record<string, unknown>,
+    includePriceRange = false
+  ): Promise<Place[]> {
+    if (!this.apiKey) {
+      throw new PlacesProviderUnavailableError('GOOGLE_PLACES_API_KEY não configurada');
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': this.apiKey,
+          'X-Goog-FieldMask': [
+            ...BASE_FIELDS,
+            ...(includePriceRange ? [PRICE_RANGE_FIELD] : []),
+          ].join(','),
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_IN_MS),
+      });
+    } catch (error) {
+      this.logger.error('Falha de rede ao consultar o Google Places', error as Error);
+      throw new PlacesProviderUnavailableError('Não foi possível consultar o Google Places');
+    }
+
+    if (!response.ok) {
+      this.logger.error(
+        `Google Places respondeu ${response.status}: ${await response.text().catch(() => '')}`
+      );
+      throw new PlacesProviderUnavailableError('Não foi possível consultar o Google Places');
+    }
+
+    const payload = (await response.json()) as GoogleSearchResponse;
+    return (payload.places ?? []).map((place) => this.toPlace(place));
+  }
+
+  private clampResultCount(maxResultCount: number | undefined): number {
+    return Math.min(
+      maxResultCount ?? GOOGLE_PLACES_MAX_RESULT_COUNT,
+      GOOGLE_PLACES_MAX_RESULT_COUNT
+    );
+  }
+
+  private clampRadius(radiusMeters: number): number {
+    return Math.min(radiusMeters, GOOGLE_PLACES_MAX_RADIUS_METERS);
   }
 
   private toPlace(place: GooglePlace): Place {

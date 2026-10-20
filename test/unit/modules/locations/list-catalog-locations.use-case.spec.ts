@@ -1,7 +1,8 @@
+import { ListCatalogLocationsUseCase } from '../../../../src/modules/locations/application/list-catalog-locations.use-case';
 import {
+  CatalogLocationsPageService,
   InvalidLocationSearchError,
-  ListCatalogLocationsUseCase,
-} from '../../../../src/modules/locations/application/list-catalog-locations.use-case';
+} from '../../../../src/modules/locations/application/services/catalog-locations-page.service';
 import { mockPriceRange } from '../../../../src/modules/locations/application/mock-price-range';
 import { LocationRepository } from '../../../../src/modules/locations/domain/location.repository';
 import { FEATURE_FLAGS, FeatureFlags } from '../../../../src/shared/feature-flags/feature-flags';
@@ -20,6 +21,7 @@ describe('ListCatalogLocationsUseCase', () => {
   beforeEach(() => {
     places = {
       searchNearby: jest.fn(),
+      searchText: jest.fn(),
       getPhotoUrl: jest.fn(),
     };
     locations = {
@@ -29,7 +31,10 @@ describe('ListCatalogLocationsUseCase', () => {
       ),
     };
     featureFlags = { isEnabled: jest.fn().mockResolvedValue(true) };
-    useCase = new ListCatalogLocationsUseCase(places, locations, featureFlags);
+    useCase = new ListCatalogLocationsUseCase(
+      places,
+      new CatalogLocationsPageService(locations, featureFlags)
+    );
   });
 
   it('searches around the user, filters, paginates and registers the page in the catalog', async () => {

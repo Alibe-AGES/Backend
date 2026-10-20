@@ -18,6 +18,7 @@ const LOCATION_ID = '0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d';
 describe('Locations endpoint (e2e)', () => {
   let app: INestApplication;
   const searchNearby = jest.fn();
+  const searchText = jest.fn();
   const getPhotoUrl = jest.fn();
   const isEnabled = jest.fn();
   const ensureCatalogLocations = jest.fn();
@@ -35,7 +36,7 @@ describe('Locations endpoint (e2e)', () => {
       .overrideProvider(PrismaService)
       .useValue({})
       .overrideProvider(PlacesProvider)
-      .useValue({ searchNearby, getPhotoUrl })
+      .useValue({ searchNearby, searchText, getPhotoUrl })
       .overrideProvider(FeatureFlags)
       .useValue({ isEnabled })
       .overrideProvider(LocationRepository)
@@ -60,6 +61,7 @@ describe('Locations endpoint (e2e)', () => {
   beforeEach(() => {
     process.env.MOCK_AUTH_ENABLED = 'true';
     searchNearby.mockReset();
+    searchText.mockReset();
     getPhotoUrl.mockReset().mockResolvedValue('https://lh3.googleusercontent.com/photo-1');
     isEnabled.mockReset().mockResolvedValue(true);
     ensureCatalogLocations.mockReset();
@@ -108,6 +110,54 @@ describe('Locations endpoint (e2e)', () => {
       limit: 20,
       total: 1,
     });
+  });
+
+  it('searches catalog locations by free text', async () => {
+    searchText.mockResolvedValue([buildPlace()]);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/locations/search')
+      .query({ q: '  pizza vegana  ', latitude: -30.0277, longitude: -51.2287, type: 'restaurant' })
+      .expect(200);
+
+    expect(searchText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        textQuery: 'pizza vegana',
+        center: { latitude: -30.0277, longitude: -51.2287 },
+        radiusMeters: 50_000,
+        includedType: 'restaurant',
+      })
+    );
+    expect(searchNearby).not.toHaveBeenCalled();
+    expect(response.body).toEqual({
+      items: [expect.objectContaining({ id: LOCATION_ID, name: 'Bloom Café' })],
+      page: 1,
+      limit: 20,
+      total: 1,
+    });
+  });
+
+  it('validates the search text and the shared filters', async () => {
+    for (const query of [
+      { latitude: -30, longitude: -51 },
+      { q: '   ', latitude: -30, longitude: -51 },
+      { q: 'a'.repeat(201), latitude: -30, longitude: -51 },
+      { q: 'pizza', longitude: -51 },
+      { q: 'pizza', latitude: -30, longitude: -51, budgetMin: 100, budgetMax: 10 },
+    ]) {
+      await request(app.getHttpServer()).get('/api/locations/search').query(query).expect(400);
+    }
+
+    expect(searchText).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when the text search is unavailable', async () => {
+    searchText.mockRejectedValue(new PlacesProviderUnavailableError('down'));
+
+    await request(app.getHttpServer())
+      .get('/api/locations/search')
+      .query({ q: 'pizza', latitude: -30, longitude: -51 })
+      .expect(503);
   });
 
   it('returns mocked budgets when the Google Places budget flag is disabled', async () => {
@@ -217,6 +267,10 @@ describe('Locations endpoint (e2e)', () => {
     await request(app.getHttpServer())
       .get('/api/locations')
       .query({ latitude: -30, longitude: -51 })
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/api/locations/search')
+      .query({ q: 'pizza', latitude: -30, longitude: -51 })
       .expect(401);
     await request(app.getHttpServer()).get(`/api/locations/${LOCATION_ID}`).expect(401);
   });

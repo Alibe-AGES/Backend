@@ -31,15 +31,18 @@ import {
   GetLocationPhotoUseCase,
   LocationPhotoNotFoundError,
 } from '../application/get-location-photo.use-case';
+import { ListCatalogLocationsUseCase } from '../application/list-catalog-locations.use-case';
+import { SearchCatalogLocationsUseCase } from '../application/search-catalog-locations.use-case';
 import {
   type CatalogLocation,
+  type CatalogLocationsPage,
   InvalidLocationSearchError,
-  ListCatalogLocationsUseCase,
-} from '../application/list-catalog-locations.use-case';
+} from '../application/services/catalog-locations-page.service';
 import { DAY_PERIODS, GROUP_SIZES, PLACE_ENVIRONMENTS } from '../domain/place-filters';
 import { GetLocationPhotoQueryDto } from './dto/get-location-photo-query.dto';
 import { ListLocationsQueryDto } from './dto/list-locations-query.dto';
 import { LocationDetailsResponseDto } from './dto/location-details-response.dto';
+import { SearchLocationsQueryDto } from './dto/search-locations-query.dto';
 import {
   LocationListItemResponseDto,
   LocationListResponseDto,
@@ -52,6 +55,7 @@ import {
 export class LocationsController {
   constructor(
     private readonly listCatalogLocations: ListCatalogLocationsUseCase,
+    private readonly searchCatalogLocations: SearchCatalogLocationsUseCase,
     private readonly getLocationPhoto: GetLocationPhotoUseCase,
     private readonly getLocation: GetLocationUseCase
   ) {}
@@ -90,27 +94,55 @@ export class LocationsController {
   @ApiBadRequestResponse({ description: 'Coordenadas, paginação ou filtros inválidos.' })
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
   @ApiServiceUnavailableResponse({ description: 'Serviço de locais indisponível.' })
-  async list(@Query() query: ListLocationsQueryDto): Promise<LocationListResponseDto> {
-    try {
-      const result = await this.listCatalogLocations.execute(query);
+  list(@Query() query: ListLocationsQueryDto): Promise<LocationListResponseDto> {
+    return this.toListResponse(this.listCatalogLocations.execute(query));
+  }
 
-      return {
-        items: result.items.map((item) => this.toItemResponse(item)),
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-      };
-    } catch (error) {
-      if (error instanceof InvalidLocationSearchError) {
-        throw new BadRequestException(error.message);
-      }
-
-      if (error instanceof PlacesProviderUnavailableError) {
-        throw new ServiceUnavailableException('Serviço de locais indisponível');
-      }
-
-      throw error;
-    }
+  /**
+   * GET /api/locations/search?q=pizza+vegana&latitude=-30.03&longitude=-51.22
+   * Free-text search on Google Places, prioritizing places near the coordinates, with the same
+   * filters, pagination and catalog registration as the feed.
+   */
+  @Get('search')
+  @ApiOperation({ summary: 'Pesquisa locais do catálogo por texto livre' })
+  @ApiQuery({
+    name: 'q',
+    type: String,
+    maxLength: 200,
+    example: 'pizza vegana',
+    description: 'Texto da pesquisa, como nome, culinária ou tipo de local.',
+  })
+  @ApiQuery({ name: 'latitude', type: Number, example: -30.0277 })
+  @ApiQuery({ name: 'longitude', type: Number, example: -51.2287 })
+  @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
+  @ApiQuery({ name: 'limit', type: Number, required: false, example: 20, maximum: 20 })
+  @ApiQuery({
+    name: 'maxDistanceKm',
+    type: Number,
+    required: false,
+    maximum: 50,
+    description:
+      'Distância máxima em km. Omitida, o Google apenas prioriza locais em até 50 km e pode ' +
+      'retornar locais mais distantes.',
+  })
+  @ApiQuery({ name: 'budgetMin', type: Number, required: false, description: 'Valor em R$.' })
+  @ApiQuery({ name: 'budgetMax', type: Number, required: false, description: 'Valor em R$.' })
+  @ApiQuery({ name: 'period', enum: DAY_PERIODS, required: false })
+  @ApiQuery({ name: 'environment', enum: PLACE_ENVIRONMENTS, required: false })
+  @ApiQuery({ name: 'groupSize', enum: GROUP_SIZES, required: false })
+  @ApiQuery({
+    name: 'type',
+    type: String,
+    required: false,
+    example: 'restaurant',
+    description: 'Tipo de local do Google Places para restringir a pesquisa.',
+  })
+  @ApiOkResponse({ type: LocationListResponseDto })
+  @ApiBadRequestResponse({ description: 'Texto, coordenadas, paginação ou filtros inválidos.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiServiceUnavailableResponse({ description: 'Serviço de locais indisponível.' })
+  search(@Query() { q, ...filters }: SearchLocationsQueryDto): Promise<LocationListResponseDto> {
+    return this.toListResponse(this.searchCatalogLocations.execute({ ...filters, text: q }));
   }
 
   /**
@@ -142,6 +174,31 @@ export class LocationsController {
     } catch (error) {
       if (error instanceof LocationPhotoNotFoundError) {
         throw new NotFoundException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  private async toListResponse(
+    pending: Promise<CatalogLocationsPage>
+  ): Promise<LocationListResponseDto> {
+    try {
+      const result = await pending;
+
+      return {
+        items: result.items.map((item) => this.toItemResponse(item)),
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+      };
+    } catch (error) {
+      if (error instanceof InvalidLocationSearchError) {
+        throw new BadRequestException(error.message);
+      }
+
+      if (error instanceof PlacesProviderUnavailableError) {
+        throw new ServiceUnavailableException('Serviço de locais indisponível');
       }
 
       throw error;
