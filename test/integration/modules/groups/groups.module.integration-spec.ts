@@ -11,6 +11,11 @@ import { GroupsController } from '../../../../src/modules/groups/http/groups.con
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryObjectStorage } from '../../../../test/helpers/in-memory-object.storage';
 import { randomUUID } from 'crypto';
+import { GroupNotificationsController } from '../../../../src/modules/groups/http/group-notifications.controller';
+import { ListGroupNotificationsUseCase } from '../../../../src/modules/groups/application/list-group-notifications.use-case';
+import { GroupNotificationRepository } from '../../../../src/modules/groups/domain/group-notification.repository';
+import { MarkAllGroupNotificationsReadUseCase } from '../../../../src/modules/groups/application/mark-all-group-notifications-read.use-case';
+import { MarkGroupNotificationReadUseCase } from '../../../../src/modules/groups/application/mark-group-notification-read.use-case';
 
 const authenticatedRequest = {
   user: { id: '11111111-1111-4111-8111-111111111111' },
@@ -23,9 +28,30 @@ describe('GroupsModule integration', () => {
   const create = jest.fn();
   const inviteFindFirst = jest.fn();
   const inviteCreate = jest.fn();
+  const notificationCount = jest.fn();
+  const notificationFindMany = jest.fn();
+  const notificationFindFirst = jest.fn();
+  const notificationReadCreateMany = jest.fn();
+  const notificationReadUpsert = jest.fn();
+  const notificationUserFindMany = jest.fn();
   const prisma = {
     group: { findMany, findUnique, create },
     inviteLink: { findFirst: inviteFindFirst, create: inviteCreate },
+    groupNotification: {
+      count: notificationCount,
+      findMany: notificationFindMany,
+      findFirst: notificationFindFirst,
+    },
+    groupNotificationRead: {
+      createMany: notificationReadCreateMany,
+      upsert: notificationReadUpsert,
+    },
+    user: { findMany: notificationUserFindMany },
+    $transaction: jest.fn((operationsOrCallback: unknown) =>
+      typeof operationsOrCallback === 'function'
+        ? (operationsOrCallback as (transaction: unknown) => unknown)(prisma)
+        : Promise.all(operationsOrCallback as Array<Promise<unknown>>)
+    ),
   } as unknown as PrismaService;
 
   beforeAll(async () => {
@@ -53,6 +79,12 @@ describe('GroupsModule integration', () => {
     create.mockReset();
     inviteFindFirst.mockReset();
     inviteCreate.mockReset();
+    notificationCount.mockReset();
+    notificationFindMany.mockReset();
+    notificationFindFirst.mockReset();
+    notificationReadCreateMany.mockReset();
+    notificationReadUpsert.mockReset();
+    notificationUserFindMany.mockReset();
   });
 
   it('connects the use case, repository and Prisma adapter', async () => {
@@ -83,6 +115,91 @@ describe('GroupsModule integration', () => {
   it('registers the groups controllers', () => {
     expect(module.get(GroupsController)).toBeInstanceOf(GroupsController);
     expect(module.get(GroupInvitesController)).toBeInstanceOf(GroupInvitesController);
+    expect(module.get(GroupNotificationsController)).toBeInstanceOf(GroupNotificationsController);
+    expect(module.get(GroupNotificationRepository)).toBeDefined();
+  });
+
+  it('connects membership validation to the paginated notification repository', async () => {
+    const groupId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    findUnique.mockResolvedValue({ users: [{ userId: authenticatedRequest.user.id }] });
+    notificationCount.mockResolvedValue(1);
+    notificationFindMany.mockResolvedValue([
+      {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        type: 'createdEvent',
+        message:
+          '${user:22222222-2222-4222-8222-222222222222} criou o evento "Cinema" para o dia 18/10/2026.',
+        createdAt: new Date('2026-10-18T18:00:00.000Z'),
+        eventId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      },
+    ]);
+    notificationUserFindMany.mockResolvedValue([
+      { id: '22222222-2222-4222-8222-222222222222', name: 'Ana Souza' },
+    ]);
+
+    const result = await module.get(ListGroupNotificationsUseCase).execute({
+      groupId,
+      userId: authenticatedRequest.user.id,
+      page: 1,
+      limit: 7,
+    });
+
+    expect(result).toMatchObject({ page: 1, limit: 7, total: 1, totalPages: 1 });
+    expect(result.items[0].message).toBe(
+      'Ana Souza criou o evento "Cinema" para o dia 18/10/2026.'
+    );
+    expect(notificationFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          groupId,
+          reads: { none: { userId: authenticatedRequest.user.id } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: 0,
+        take: 7,
+      })
+    );
+  });
+
+  it('connects both read use cases to the Prisma receipt adapter', async () => {
+    const groupId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const notificationId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    findUnique.mockResolvedValue({ users: [{ userId: authenticatedRequest.user.id }] });
+    notificationFindMany.mockResolvedValue([{ id: notificationId }]);
+    notificationReadCreateMany.mockResolvedValue({ count: 1 });
+    notificationFindFirst.mockResolvedValue({ id: notificationId });
+    notificationReadUpsert.mockResolvedValue({});
+
+    await module.get(MarkAllGroupNotificationsReadUseCase).execute({
+      groupId,
+      userId: authenticatedRequest.user.id,
+    });
+    await module.get(MarkGroupNotificationReadUseCase).execute({
+      groupId,
+      notificationId,
+      userId: authenticatedRequest.user.id,
+    });
+
+    expect(notificationReadCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          notificationId,
+          userId: authenticatedRequest.user.id,
+          readAt: expect.any(Date),
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(notificationReadUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          notificationId_userId: {
+            notificationId,
+            userId: authenticatedRequest.user.id,
+          },
+        },
+      })
+    );
   });
 
   it('connects the group details use case to the Prisma repository', async () => {

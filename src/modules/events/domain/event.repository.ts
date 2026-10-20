@@ -72,12 +72,46 @@ export interface CreateEventData {
   status: EventStatus;
   ownerAnswer: ProposalAnswer;
   createdAt: Date;
+  notification: {
+    type: 'createdEvent';
+    message: string;
+    createdAt: Date;
+  };
 }
 
 export interface CreatedEvent {
   event: Event;
   ownerResponse: EventProposalResponse;
 }
+
+export interface ExistingEventLocation {
+  id: string;
+  description: string | null;
+  address: string | null;
+}
+
+export type CreateLocatedEventData = Omit<CreateEventData, 'location' | 'notification'> & {
+  locationId: string;
+};
+
+export interface CreatedLocationProposal {
+  id: string;
+  createdAt: Date;
+  owner: { id: string; name: string; image: string | null };
+  event: {
+    id: string;
+    name: string;
+    timeslot: Date;
+    budgetStart: string | null;
+    budgetEnd: string | null;
+    status: EventStatus;
+    groupId: string;
+  };
+  location: ExistingEventLocation;
+  myAnswer: ProposalAnswer;
+}
+
+export class EventLocationNotFoundError extends Error {}
 
 export interface EventImageAccess {
   imageKey: string | null;
@@ -92,6 +126,13 @@ export abstract class EventRepository {
 
   /** Cria location, evento, proposta e resposta do criador de forma atômica. */
   abstract create(data: CreateEventData): Promise<CreatedEvent>;
+
+  abstract findLocationById(id: string): Promise<ExistingEventLocation | null>;
+
+  /** Reutiliza uma location e cria evento, proposta e resposta atomicamente. */
+  abstract createWithExistingLocation(
+    data: CreateLocatedEventData
+  ): Promise<CreatedLocationProposal>;
 
   abstract update(id: string, data: UpdateEventData): Promise<Event>;
 

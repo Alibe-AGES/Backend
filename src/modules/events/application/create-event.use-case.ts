@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ObjectStorage } from '../../../shared/storage/object-storage';
 import { safeExtension } from '../../../shared/utils';
+import { groupNotificationUserReference } from '../../groups/domain/group-notification-message';
 import { type CreatedEvent, EventRepository } from '../domain/event.repository';
+import { GroupPushNotificationService } from './group-push-notification.service';
 
 export interface CreateEventInput {
   groupId: string;
@@ -26,9 +28,12 @@ export class EventGroupAccessDeniedError extends Error {}
 
 @Injectable()
 export class CreateEventUseCase {
+  private readonly logger = new Logger(CreateEventUseCase.name);
+
   constructor(
     private readonly events: EventRepository,
-    private readonly storage: ObjectStorage
+    private readonly storage: ObjectStorage,
+    private readonly groupNotifications: GroupPushNotificationService
   ) {}
 
   async execute(input: CreateEventInput): Promise<CreatedEvent> {
@@ -60,6 +65,19 @@ export class CreateEventUseCase {
 
     const eventId = randomUUID();
     let imageKey: string | null = null;
+    const createdAt = new Date();
+
+    const hasTime = input.time !== null && input.time !== undefined && input.time.trim() !== '';
+
+    const scheduleText = hasTime
+      ? `para o dia ${formatDate(input.date)} às ${input.time}`
+      : `para o dia ${formatDate(input.date)}`;
+
+    const notificationMessage = `O evento "${name}" foi criado ${scheduleText}.`;
+
+    // O push continua usando notificationMessage. Somente o mural persiste a referência do autor,
+    // que será resolvida pelo GET e também poderá ser repetida para vários usuários no match.
+    const muralNotificationMessage = `${groupNotificationUserReference(input.userId)} criou o evento \"${name}\" ${scheduleText}.`;
 
     if (input.image) {
       imageKey = `events/${eventId}/images/${randomUUID()}${extension}`;
@@ -72,7 +90,7 @@ export class CreateEventUseCase {
     }
 
     try {
-      return await this.events.create({
+      const created = await this.events.create({
         id: eventId,
         groupId: input.groupId,
         ownerId: input.userId,
@@ -89,8 +107,36 @@ export class CreateEventUseCase {
         budgetEnd: input.budgetEnd ?? null,
         status: 'pending',
         ownerAnswer: 'yes',
-        createdAt: new Date(),
+        createdAt,
+        notification: {
+          type: 'createdEvent',
+          message: muralNotificationMessage,
+          createdAt,
+        },
       });
+
+      try {
+        await this.groupNotifications.sendToGroup(
+          input.groupId,
+          {
+            title: 'Novo encontro no grupo',
+            body: notificationMessage,
+            data: {
+              type: 'new_event',
+              eventId: created.event.id,
+              groupId: input.groupId,
+            },
+          },
+          input.userId
+        );
+      } catch (error) {
+        this.logger.error(
+          `Evento ${created.event.id} criado, mas os destinatários da notificação não puderam ser consultados`,
+          error instanceof Error ? error.stack : undefined
+        );
+      }
+
+      return created;
     } catch (error) {
       if (imageKey) {
         await this.storage.delete(imageKey).catch(() => undefined);
@@ -98,4 +144,9 @@ export class CreateEventUseCase {
       throw error;
     }
   }
+}
+
+function formatDate(date: string): string {
+  const [year, month, day] = date.split('-');
+  return `${day}/${month}/${year}`;
 }

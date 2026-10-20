@@ -1,0 +1,209 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 privado e RDS PostgreSQL de producao do projeto Alibe
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: alibe
+    Description: Nome usado para identificar os recursos do projeto.
+
+  MediaBucketName:
+    Type: String
+    Description: Nome globalmente unico do bucket de imagens.
+    MinLength: 3
+
+  NetworkStackName:
+    Type: String
+    Default: alibe-prod-network
+    Description: Nome da stack criada pelo arquivo 01-network.yml.
+
+  DatabaseName:
+    Type: String
+    Default: alibe
+    Description: Nome do banco PostgreSQL criado dentro da instancia RDS.
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9]{0,62}$'
+    ConstraintDescription: Use de 1 a 63 caracteres alfanumericos, iniciando por uma letra.
+
+  DatabaseUsername:
+    Type: String
+    Default: alibe_admin
+    Description: Usuario administrador do PostgreSQL; o valor nao e uma credencial secreta.
+    AllowedPattern: '^[A-Za-z][A-Za-z0-9_]{0,62}$'
+    ConstraintDescription: Use de 1 a 63 letras, numeros ou underscores, iniciando por uma letra.
+
+  DatabasePassword:
+    Type: String
+    NoEcho: true # Mascara a senha nas exibicoes normais do CloudFormation.
+    MinLength: 16
+    MaxLength: 128
+    Description: Senha recebida no deploy por um secret do CI; nunca salvar no Git ou em prod.json.
+    AllowedPattern: '^[A-Za-z0-9!#$%&*+,:;<=>?^_{}~.-]+$'
+    ConstraintDescription: Use de 16 a 128 caracteres e nao utilize espaco, aspas, barra ou arroba.
+
+Resources:
+  AlibeMediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain # Excluir a stack nao deve apagar as imagens dos usuarios.
+    UpdateReplacePolicy: Retain # Se o bucket for substituido, o anterior continua preservado.
+    Properties:
+      BucketName: !Ref MediaBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256 # Criptografia gerenciada pelo S3, sem uma chave KMS paga.
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced # Desabilita ACLs; acesso sera controlado por IAM.
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: AbortIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7 # Remove uploads interrompidos para nao acumular armazenamento inutil.
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlibeMediaBucketTlsPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AlibeMediaBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*' # Nao concede acesso; a regra abaixo apenas nega requisicoes HTTP.
+            Action: 's3:*'
+            Resource:
+              - !GetAtt AlibeMediaBucket.Arn
+              - !Sub '${AlibeMediaBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false' # Todo acesso permitido por IAM ainda devera usar HTTPS.
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Duas subnets privadas para o RDS PostgreSQL do Alibe
+      SubnetIds:
+        # O RDS exige subnets em pelo menos duas zonas, mesmo com apenas uma instancia Single-AZ.
+        - Fn::ImportValue: !Sub '${NetworkStackName}-PrivateSubnetAId'
+        - Fn::ImportValue: !Sub '${NetworkStackName}-PrivateSubnetBId'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Acesso privado ao PostgreSQL do Alibe
+      VpcId:
+        Fn::ImportValue: !Sub '${NetworkStackName}-VpcId'
+      # Nao existe regra de entrada aqui: o banco nasce fechado para toda origem.
+      # O 04-compute.yml permitira a porta 5432 somente a partir do Security Group da EC2.
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-prod-database'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete # Evita snapshot esquecido gerando custo depois de um encerramento intencional.
+    UpdateReplacePolicy: Delete # O projeto prioriza o teto de custo; mudancas destrutivas exigem change set revisado.
+    Properties:
+      Engine: postgres
+      # Nao fixa uma versao: a AWS escolhe uma versao atual suportada na regiao.
+      EngineLifecycleSupport: open-source-rds-extended-support-disabled # Impede cobranca de suporte estendido.
+      DBInstanceClass: db.t4g.micro # Uma instancia ARM pequena, conforme a estimativa de custo do projeto.
+      DBName: !Ref DatabaseName
+      MasterUsername: !Ref DatabaseUsername
+      MasterUserPassword: !Ref DatabasePassword
+      Port: '5432'
+
+      AllocatedStorage: '20' # Quantidade prevista na estimativa oficial do projeto.
+      StorageType: gp2 # Tipo de volume previsto no PDF de custos.
+      StorageEncrypted: true # Usa a chave AWS gerenciada; nao cria uma chave KMS cobrada separadamente.
+
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt DatabaseSecurityGroup.GroupId
+      AvailabilityZone:
+        Fn::ImportValue: !Sub '${NetworkStackName}-ComputeAvailabilityZone'
+      MultiAZ: false # O orcamento contempla somente uma instancia do banco.
+      PubliclyAccessible: false # O RDS recebe apenas IP privado e nunca fica acessivel pela internet.
+
+      BackupRetentionPeriod: 1 # Mantem um dia de backup automatico sem ampliar a retencao cobrada.
+      AutoMinorVersionUpgrade: true # Recebe correcoes menores de seguranca na janela de manutencao.
+      AllowMajorVersionUpgrade: false # Evita troca acidental para outra versao principal.
+      DeletionProtection: true # Para apagar o banco, primeiro sera necessario desativar esta protecao.
+
+      EnablePerformanceInsights: false # Recurso fora da estimativa de custos do projeto.
+      MonitoringInterval: 0 # Nao habilita Enhanced Monitoring nem cria role adicional.
+
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-prod-postgres'
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  MediaBucketName:
+    Description: Nome que a API usara para acessar as imagens.
+    Value: !Ref AlibeMediaBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-MediaBucketName'
+
+  MediaBucketArn:
+    Description: ARN usado posteriormente na politica IAM da EC2.
+    Value: !GetAtt AlibeMediaBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-MediaBucketArn'
+
+  DatabaseEndpoint:
+    Description: Host privado do PostgreSQL, sem usuario ou senha.
+    Value: !GetAtt Database.Endpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-DatabaseEndpoint'
+
+  DatabasePort:
+    Description: Porta privada do PostgreSQL.
+    Value: !GetAtt Database.Endpoint.Port
+    Export:
+      Name: !Sub '${AWS::StackName}-DatabasePort'
+
+  DatabaseName:
+    Description: Nome do banco PostgreSQL.
+    Value: !Ref DatabaseName
+    Export:
+      Name: !Sub '${AWS::StackName}-DatabaseName'
+
+  DatabaseUsername:
+    Description: Usuario do banco; a senha nunca e publicada em Outputs.
+    Value: !Ref DatabaseUsername
+    Export:
+      Name: !Sub '${AWS::StackName}-DatabaseUsername'
+
+  DatabaseSecurityGroupId:
+    Description: Security Group que o compute podera acessar somente pela porta 5432.
+    Value: !GetAtt DatabaseSecurityGroup.GroupId
+    Export:
+      Name: !Sub '${AWS::StackName}-DatabaseSecurityGroupId'

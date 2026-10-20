@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Orçamento mensal e alerta de custos da infraestrutura de produção do Alibe
+
+Parameters: #Os parâmetros são informações que são infornecidas somente no momento de deploy
+  AlertEmail: #Primeiro parâmetro que usaremos, ele só é passado quandoa  gente inicia o processo de deploy, é como Safety(Email)
+    Type: String
+    Description: E-mail que receberá o alerta quando o gasto mensal ultrapassar US$ 33
+
+Resources: # Lista de recursos que o CloudFormation deve criar na AWS
+  MonthlyCostBudget: #é uo nome de um recurso interno dentro do cloud formation, a gente que escolhe esse nome
+    Type: AWS::Budgets::Budget #Esse é o tipo do recurso isso aqui é um padrão AWS: namespace aws Budgets: serviço AWS Budget: recurso que será criado
+    Properties: #configurações do recurso
+      Budget:
+        BudgetName: alibe-prod-monthly-cost
+        BudgetType: COST # valor padrão aceito pela AWS
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 35
+          Unit: USD
+      NotificationsWithSubscribers: #Propriedade do recurso de Budget para notificação de subscrivers sobre determinadas condições
+        - Notification: # podem haver diversos notifications, aqui vamos usar um só, mas isso é uma lista de vários
+            ComparisonOperator: GREATER_THAN #Maior que
+            NotificationType: ACTUAL #ACTUAL sigifnica umg gasto que já aconteceu
+            Threshold: 33 # 33 ponto que dispara o alerta
+            ThresholdType: ABSOLUTE_VALUE # valor absoluto
+          Subscribers: # pessoas que vão receber
+            - Address: !Ref AlertEmail # o email que vamos configurar no momento em que subir para AWS
+              SubscriptionType: EMAIL

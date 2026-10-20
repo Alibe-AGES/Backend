@@ -38,7 +38,7 @@ O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID,
 - GitHub Actions
 - SonarQube Cloud
 - AWS CloudFormation
-- AWS SDK for JavaScript v3 (`@aws-sdk/client-s3`)
+- AWS SDK for JavaScript v3 (`@aws-sdk/client-s3` e `@aws-sdk/client-sqs`)
 - MiniStack para emulação local de serviços AWS
 
 ## Requisitos
@@ -83,22 +83,24 @@ O `.env` não deve ser enviado ao Git. O arquivo `.env.template` contém somente
 
 Variáveis atuais:
 
-| Variável                      | Responsabilidade                                                     |
-| ----------------------------- | -------------------------------------------------------------------- |
-| `DATABASE_USER`               | Usuário criado no PostgreSQL pelo Docker Compose.                    |
-| `DATABASE_PASSWORD`           | Senha do usuário do PostgreSQL.                                      |
-| `DATABASE_NAME`               | Nome do banco da aplicação.                                          |
-| `APP_PORT`                    | Porta exposta pela API quando executada pelo Docker Compose.         |
-| `DATABASE_URL`                | URL de conexão utilizada pelo Prisma.                                |
-| `BETTER_AUTH_SECRET`          | Segredo de alta entropia usado para assinar dados de autenticação.   |
-| `BETTER_AUTH_URL`             | URL pública da API utilizada pelo Better Auth.                       |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | Origens web e schemes Expo aceitos, separados por vírgula.           |
-| `AWS_REGION`                  | Região usada pelo MiniStack e pelos comandos da AWS CLI.             |
-| `AWS_S3_BUCKET`               | Nome do bucket utilizado pela aplicação.                             |
-| `AWS_ENDPOINT_URL`            | Endpoint global dos serviços AWS; presente apenas no MiniStack.      |
-| `AWS_ACCESS_KEY_ID`           | Credencial fictícia local; em produção, prefira role ou OIDC.        |
-| `AWS_SECRET_ACCESS_KEY`       | Segredo fictício local; nunca versionar um valor real.               |
-| `GOOGLE_PLACES_API_KEY`       | Chave da Places API (New); sem ela `GET /api/locations` retorna 503. |
+| Variável                            | Responsabilidade                                                     |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| `DATABASE_USER`                     | Usuário criado no PostgreSQL pelo Docker Compose.                    |
+| `DATABASE_PASSWORD`                 | Senha do usuário do PostgreSQL.                                      |
+| `DATABASE_NAME`                     | Nome do banco da aplicação.                                          |
+| `APP_PORT`                          | Porta exposta pela API quando executada pelo Docker Compose.         |
+| `DATABASE_URL`                      | URL de conexão utilizada pelo Prisma.                                |
+| `BETTER_AUTH_SECRET`                | Segredo de alta entropia usado para assinar dados de autenticação.   |
+| `BETTER_AUTH_URL`                   | URL pública da API utilizada pelo Better Auth.                       |
+| `BETTER_AUTH_TRUSTED_ORIGINS`       | Origens web e schemes Expo aceitos, separados por vírgula.           |
+| `AWS_REGION`                        | Região usada pelo MiniStack e pelos comandos da AWS CLI.             |
+| `AWS_S3_BUCKET`                     | Nome do bucket utilizado pela aplicação.                             |
+| `AWS_SQS_NOTIFICATION_QUEUE_URL`    | URL da fila usada para publicar notificações.                        |
+| `AWS_ENDPOINT_URL`                  | Endpoint global dos serviços AWS; presente apenas no MiniStack.      |
+| `ENABLE_NOTIFICATION_TEST_ENDPOINT` | Habilita somente localmente o envio de push sintético.               |
+| `AWS_ACCESS_KEY_ID`                 | Credencial fictícia local; em produção, prefira role ou OIDC.        |
+| `AWS_SECRET_ACCESS_KEY`             | Segredo fictício local; nunca versionar um valor real.               |
+| `GOOGLE_PLACES_API_KEY`             | Chave da Places API (New); sem ela `GET /api/locations` retorna 503. |
 
 Nunca coloque tokens, senhas reais ou credenciais de produção no `.env.template`.
 
@@ -196,23 +198,27 @@ Não utilize `docker compose down -v` ou `docker compose down --volumes` na roti
 
 Os endereços abaixo consideram o ambiente local com `docker compose up` em execução:
 
-| Recurso              | Endereço                                           | Finalidade                                          |
-| -------------------- | -------------------------------------------------- | --------------------------------------------------- |
-| API                  | <http://localhost:3000>                            | URL base do Backend.                                |
-| Endpoint de exemplo  | <http://localhost:3000/example>                    | Verificação rápida da API.                          |
-| Better Auth          | <http://localhost:3000/api/auth/get-session>       | Consulta a sessão autenticada ou retorna `null`.    |
-| Imagem de grupo      | `/groups/{groupId}/profile-picture`                | Entrega a foto somente para integrantes do grupo.   |
-| Imagem de usuário    | `/users/{userId}/profile-picture`                  | Entrega a própria foto ou a de participante comum.  |
-| Swagger UI           | <http://localhost:3000/docs>                       | Documentação interativa e teste dos endpoints.      |
-| OpenAPI JSON         | <http://localhost:3000/docs-json>                  | Contrato OpenAPI consumível por outras ferramentas. |
-| Métricas do Backend  | <http://localhost:3000/metrics>                    | Métricas brutas no formato Prometheus.              |
-| Prometheus           | <http://localhost:9090>                            | Consulta e inspeção das métricas coletadas.         |
-| Grafana              | <http://localhost:3001>                            | Página inicial do Grafana.                          |
-| Dashboard do Backend | <http://localhost:3001/d/alibe-backend-monitoring> | Monitoramento do Backend.                           |
-| Adminer              | <http://localhost:8080>                            | Interface para inspecionar o PostgreSQL.            |
-| MiniStack            | <http://localhost:4566>                            | Endpoint local compatível com APIs da AWS.          |
-| PostgreSQL           | `localhost:5432`                                   | Conexão ao banco a partir do computador.            |
-| Prisma Studio        | <http://localhost:5555>                            | Interface do Prisma, quando iniciada manualmente.   |
+| Recurso              | Endereço                                            | Finalidade                                           |
+| -------------------- | --------------------------------------------------- | ---------------------------------------------------- |
+| API                  | <http://localhost:3000>                             | URL base do Backend.                                 |
+| Endpoint de exemplo  | <http://localhost:3000/example>                     | Verificação rápida da API.                           |
+| Better Auth          | <http://localhost:3000/api/auth/get-session>        | Consulta a sessão autenticada ou retorna `null`.     |
+| Token de push        | `PUT /api/users/me/push-token`                      | Associa um Expo Push Token ao usuário autenticado.   |
+| Teste de notificação | `POST /api/users/me/test-notification`              | Enfileira um push para o usuário autenticado.        |
+| Teste dos lembretes  | `POST /api/notifications/test/attendance-reminders` | Executa uma vez o processamento diário de lembretes. |
+| Imagem de grupo      | `/groups/{groupId}/profile-picture`                 | Entrega a foto somente para integrantes do grupo.    |
+| Mural do grupo       | `GET /groups/{groupId}/notifications`               | Lista acontecimentos compartilhados e paginados.     |
+| Imagem de usuário    | `/users/{userId}/profile-picture`                   | Entrega a própria foto ou a de participante comum.   |
+| Swagger UI           | <http://localhost:3000/docs>                        | Documentação interativa e teste dos endpoints.       |
+| OpenAPI JSON         | <http://localhost:3000/docs-json>                   | Contrato OpenAPI consumível por outras ferramentas.  |
+| Métricas do Backend  | <http://localhost:3000/metrics>                     | Métricas brutas no formato Prometheus.               |
+| Prometheus           | <http://localhost:9090>                             | Consulta e inspeção das métricas coletadas.          |
+| Grafana              | <http://localhost:3001>                             | Página inicial do Grafana.                           |
+| Dashboard do Backend | <http://localhost:3001/d/alibe-backend-monitoring>  | Monitoramento do Backend.                            |
+| Adminer              | <http://localhost:8080>                             | Interface para inspecionar o PostgreSQL.             |
+| MiniStack            | <http://localhost:4566>                             | Endpoint local compatível com APIs da AWS.           |
+| PostgreSQL           | `localhost:5432`                                    | Conexão ao banco a partir do computador.             |
+| Prisma Studio        | <http://localhost:5555>                             | Interface do Prisma, quando iniciada manualmente.    |
 
 Para iniciar o Prisma Studio pelo container do Backend:
 
@@ -222,41 +228,151 @@ docker compose exec backend npx prisma studio --hostname 0.0.0.0 --port 5555
 
 No Adminer, use `alibe-db` como servidor. Dentro da rede do Compose, containers utilizam nomes de serviços como `alibe-db`, `backend` e `prometheus`; no navegador e em programas executados diretamente no computador, utilize `localhost` e a porta publicada.
 
+### Tokens de notificação
+
+O aplicativo registra o token do Expo Push Service com `PUT /api/users/me/push-token` depois de
+um cadastro ou login bem-sucedido. A rota exige uma sessão Better Auth válida e não recebe um
+identificador de usuário no body; o usuário sempre vem da sessão autenticada.
+
+O token fica na coluna `user.expo_push_token`. Um novo cadastro ou login sobrescreve o token
+anterior do usuário. Antes de associar um token a outra conta, o Backend remove esse mesmo token da
+conta anterior, evitando que notificações antigas sejam entregues ao usuário errado. A migration
+precisa ser aplicada com `prisma migrate deploy` antes de executar uma versão do Backend que utilize
+essa rota.
+
+### Notificações de encontros
+
+O contrato compartilhado [`PushNotificationQueue`](src/shared/messaging/push-notification-queue.ts)
+recebe uma mensagem destinada a um Expo Push Token. O módulo de eventos resolve os integrantes do
+grupo que possuem token registrado e publica uma mensagem por dispositivo na SQS; o serviço Go
+continua responsável apenas por consumir a fila e chamar o Expo Push Service.
+
+Quando `POST /groups/:groupId/events` cria um encontro, todos os demais integrantes do grupo com
+token registrado recebem uma notificação `new_event`. O criador não recebe a própria notificação.
+Uma falha ao enfileirar o push é registrada no log, mas não desfaz o encontro que já foi salvo.
+
+A criação do encontro também persiste, na mesma transação do PostgreSQL, uma entrada
+`createdEvent` no mural compartilhado do grupo. O mural não é uma caixa individual: todos os
+integrantes autorizados consultam os mesmos registros. O lembrete diário não é persistido no mural.
+Os tipos públicos do mural são `createdEvent` e `match`; o segundo será produzido quando o fluxo de
+match for integrado.
+
+As mensagens persistidas usam referências no formato `${user:<uuid>}`. Ao listar o mural, a API
+resolve todas as referências da página em uma única consulta e devolve os nomes dos usuários. O
+mesmo mecanismo aceita vários usuários e já está pronto para a futura mensagem de `match`. Esse
+template pertence somente ao mural e não altera o conteúdo publicado na SQS para o push do celular.
+
+O endpoint `GET /groups/:groupId/notifications` exige autenticação e participação no grupo. Os
+parâmetros opcionais são `page`, com padrão `1`, e `limit`, com padrão `7` e máximo `50`. A resposta
+contém somente as notificações ainda não lidas pelo usuário autenticado. Ela é ordenada por
+`createdAt` decrescente e usa o `id` como desempate para manter a paginação estável:
+
+```http
+GET /groups/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/notifications?page=1&limit=7
+```
+
+```json
+{
+  "items": [
+    {
+      "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "type": "createdEvent",
+      "message": "Ana Souza criou o evento \"Cinema\" para o dia 18/10/2026.",
+      "createdAt": "2026-10-18T18:00:00.000Z",
+      "eventId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 7,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
+
+Cada leitura é persistida individualmente na tabela `group_notification_read`; marcar uma
+notificação para um integrante não a remove do mural nem altera a leitura dos demais. As operações
+são idempotentes e retornam `204 No Content`:
+
+```http
+PATCH /groups/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/notifications/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/read
+PATCH /groups/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/notifications/read
+```
+
+A primeira marca somente a notificação informada. A segunda marca todas as notificações atualmente
+existentes no grupo para o usuário autenticado; notificações criadas depois continuam não lidas.
+
+O agendador do Nest executa diariamente à meia-noite no fuso `America/Sao_Paulo`. Ele procura
+encontros `pending` marcados para o dia que acabou de começar e envia `attendance_reminder` somente
+aos integrantes que ainda não responderam `yes` ou `no`. Usuários sem Expo Push Token não podem
+receber push e são ignorados.
+
+Antes de executar, cada réplica tenta obter um advisory lock transacional no PostgreSQL. Somente a
+réplica que recebe a trava processa os lembretes; as demais encerram a execução sem enviar nada. A
+trava é liberada automaticamente ao concluir a transaction ou perder a conexão, sem criar outro
+processo, tabela ou serviço de infraestrutura. O endpoint manual local permanece fora dessa trava
+para permitir testes repetidos e deve continuar desabilitado em produção.
+
+No ambiente local, com `ENABLE_NOTIFICATION_TEST_ENDPOINT=true`, é possível executar exatamente o
+mesmo processamento uma vez pelo Swagger ou por uma requisição autenticada:
+
+```bash
+curl -X POST http://localhost:3000/api/notifications/test/attendance-reminders \
+  -H 'Authorization: Bearer <BETTER_AUTH_SESSION_TOKEN>'
+```
+
+A resposta informa a data processada, a quantidade de encontros encontrados e quantas notificações
+foram tentadas, enfileiradas ou falharam. O endpoint retorna `404` quando a flag está desabilitada e
+deve permanecer desabilitado em produção.
+
 ## Infraestrutura AWS com MiniStack e CloudFormation
 
-O projeto utiliza o MiniStack para simular serviços da AWS no ambiente local. Ele fica disponível em <http://localhost:4566>, enquanto a infraestrutura é descrita de forma versionável pelo template [`infra/cloudformation/alibe.yml`](infra/cloudformation/alibe.yml).
+O projeto utiliza o MiniStack para simular serviços da AWS no ambiente local. Ele fica disponível em <http://localhost:4566>. O ambiente local utiliza [`infra/local/cloudformation/storage.yml`](infra/local/cloudformation/storage.yml), enquanto os templates da AWS ficam em [`infra/prod/cloudformation/`](infra/prod/cloudformation/).
 
-Atualmente, o template cria um bucket S3 privado para mídias, com versionamento, criptografia AES-256, bloqueio de acesso público, tags de projeto e ambiente e outputs com o nome e o ARN do bucket.
+O ambiente local cria:
+
+- um bucket S3 privado para mídias;
+- uma fila SQS chamada `alibe-local-notifications`;
+- uma Lambda Go chamada `alibe-local-notification`;
+- um mapeamento que entrega as mensagens da fila para a Lambda.
+
+O ZIP da Lambda fica no mesmo bucket local de mídias, sob a chave
+`local-infrastructure/notification-service.zip`; nenhum segundo bucket é criado. O MiniStack executa
+a função localmente e a função faz a requisição HTTPS ao Expo Push Service.
 
 ### Pré-requisitos
 
 - Docker Compose em execução;
+- a pasta `Notification-Service` ao lado da pasta `Backend`;
 - AWS CLI instalada, verificável com `aws --version`;
 - `AWS_REGION=us-east-2` configurada no `.env` a partir do `.env.template`.
 
 ### Executar localmente
 
-Suba o MiniStack:
+Suba todo o ambiente. O Compose compila o serviço Go, empacota a Lambda, aplica as stacks locais e
+só então inicia o Backend:
 
 ```bash
-docker compose up -d ministack
-docker compose logs -f ministack
+docker compose up --build
 ```
 
-Em outro terminal, na raiz do Backend, faça o deploy da stack local:
+O `aws-bootstrap` faz o processo automaticamente. Para repetir manualmente apenas a stack de
+armazenamento, use:
 
 ```bash
 AWS_ACCESS_KEY_ID=test \
 AWS_SECRET_ACCESS_KEY=test \
 AWS_DEFAULT_REGION=us-east-2 \
 aws --endpoint-url=http://localhost:4566 cloudformation deploy \
-    --template-file infra/cloudformation/alibe.yml \
+    --template-file infra/local/cloudformation/storage.yml \
     --stack-name alibe-local \
-    --parameter-overrides MediaBucketName=alibe-local-media \
+    --parameter-overrides \
+        MediaBucketName=alibe-local-media \
     --region us-east-2
 ```
 
-As credenciais `test` são fictícias e servem somente para o emulador local. O parâmetro `Environment` não aparece nesse comando porque seu valor padrão no template é `local`.
+As credenciais `test` são fictícias e servem somente para o emulador local.
 
 Para confirmar que a stack foi criada e consultar seus outputs:
 
@@ -300,6 +416,29 @@ aws --endpoint-url=http://localhost:4566 s3 ls \
 ```
 
 O volume `ministack-data` preserva o estado local entre reinicializações. `docker compose down` mantém esse volume; `docker compose down -v` o remove.
+
+### Fluxo local de notificações
+
+Depois do cadastro ou login no aplicativo, o Frontend registra o token do dispositivo em
+`PUT /api/users/me/push-token`. Para testar o caminho completo com a mesma sessão autenticada,
+execute `POST /api/users/me/test-notification` pelo aplicativo ou Swagger:
+
+```text
+Backend -> SQS no MiniStack -> Lambda Go no MiniStack -> Expo Push Service -> dispositivo
+```
+
+A rota só funciona quando `ENABLE_NOTIFICATION_TEST_ENDPOINT=true`, como no Compose local; o modelo
+de produção a mantém desabilitada. Ela devolve `202` quando a mensagem foi aceita pela fila, `409`
+quando o usuário ainda não possui token e `401` sem autenticação. Em caso de falha da Lambda ou do
+Expo, a mensagem volta a ficar visível na SQS após 60 segundos e é tentada novamente.
+
+Para acompanhar o fluxo:
+
+```bash
+docker compose logs -f backend ministack aws-bootstrap
+
+curl http://localhost:4566/_ministack/sqs/messages
+```
 
 ### Integração do Backend com S3
 
@@ -528,40 +667,13 @@ No React Native, a utilização segue a mesma ideia da imagem de grupo:
 O banco armazena somente uma key como `users/{userId}/profile-picture.png`; os bytes permanecem
 no S3.
 
-### Placeholder para uma AWS remota
+### Produção na AWS
 
-Antes do deploy real, autentique a AWS CLI por um perfil, SSO ou role e confirme a conta selecionada:
+Os templates de produção ficam separados em [`infra/prod/cloudformation/`](infra/prod/cloudformation/) e são implantados em stacks numeradas. Eles não utilizam o endpoint, as credenciais fictícias nem os recursos do MiniStack.
 
-```bash
-aws sts get-caller-identity \
-    --profile YOUR_AWS_PROFILE \
-    --region YOUR_AWS_REGION
-```
+Antes do K3s, o deploy manual da API na EC2 usa exclusivamente [`infra/prod/compose.ec2.yml`](infra/prod/compose.ec2.yml). Esse Compose executa somente as migrations e a API; PostgreSQL, S3 e demais recursos são os serviços reais da AWS.
 
-Depois, substitua todos os valores iniciados por `YOUR_` antes de executar:
-
-```bash
-AWS_PROFILE=YOUR_AWS_PROFILE \
-AWS_DEFAULT_REGION=YOUR_AWS_REGION \
-aws cloudformation deploy \
-    --template-file infra/cloudformation/alibe.yml \
-    --stack-name YOUR_REMOTE_STACK_NAME \
-    --parameter-overrides \
-        Environment=production \
-        MediaBucketName=YOUR_GLOBALLY_UNIQUE_BUCKET_NAME \
-    --region YOUR_AWS_REGION
-```
-
-Exemplo de significado dos placeholders:
-
-| Placeholder                        | O que informar                                       |
-| ---------------------------------- | ---------------------------------------------------- |
-| `YOUR_AWS_PROFILE`                 | Perfil local autenticado na conta correta.           |
-| `YOUR_AWS_REGION`                  | Região real escolhida, por exemplo `us-east-2`.      |
-| `YOUR_REMOTE_STACK_NAME`           | Nome da stack, por exemplo `alibe-production`.       |
-| `YOUR_GLOBALLY_UNIQUE_BUCKET_NAME` | Nome globalmente único para o bucket S3 de produção. |
-
-No ambiente remoto, não utilize `--endpoint-url`, pois esse argumento direciona os comandos ao emulador local. Também não coloque `AWS_ACCESS_KEY_ID` ou `AWS_SECRET_ACCESS_KEY` reais no README, no Git ou em comandos compartilhados. Em CI, prefira autenticação por OIDC ou secrets protegidos da plataforma.
+Não coloque `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, senhas do RDS ou outros segredos reais no README, no Git ou nos arquivos de parâmetros versionados.
 
 > **Atenção:** o comando remoto é apenas um modelo e não deve ser executado sem substituir os placeholders, confirmar conta e região e revisar o template. Um deploy remoto cria recursos reais e pode gerar custos.
 
@@ -788,6 +900,36 @@ persistência falhar. A key do storage permanece interna; as respostas de criaç
 expõem `/api/events/:eventId/image`. Essa rota entrega os bytes apenas para usuários autenticados
 que participam do grupo do evento. Campos obrigatórios ausentes respondem `400`, grupo inexistente
 `404`, usuário fora do grupo `403` e ausência de autenticação `401`.
+
+### Criação de proposta com localização existente
+
+```http
+POST /api/groups/:groupId/proposals
+```
+
+O endpoint fica no módulo `proposals` e reutiliza o repository exportado por `EventsModule`.
+O body JSON estrito exige `locationId` (UUID), `name` (não vazio após `trim()`), `date`
+(`YYYY-MM-DD`) e `time` (`HH:mm`). `budgetStart` e `budgetEnd` são strings decimais opcionais
+e independentes, seguindo a validação da criação de eventos; não aceitam `null` explícito.
+Campos extras, incluindo `ownerId` e `userId`, respondem `400`. O autor vem somente da sessão.
+
+Uma transação cria `Event` com status `pending`, `Proposal` e `ProposalResponse` do autor com
+resposta `yes`. A `Location` selecionada é reutilizada sem criação ou alteração de seus dados.
+Data e horário são interpretados em UTC, como no fluxo manual existente.
+
+A resposta `201` contém `id` e `createdAt` da proposta, `owner` (`id`, `name`, `image`),
+`event` (`id`, `name`, `date`, `time`, `budgetStart`, `budgetEnd`, `status`, `groupId`),
+`location` (`id`, `description`, `address`) e `myAnswer: "yes"`. Orçamentos são apresentados
+com duas casas decimais, como nos detalhes de evento, ou `null` quando omitidos. A imagem
+do autor usa `/users/:id/profile-picture` ou `null`; descrição e endereço preservam valores
+nulos. `createdAt` é serializado em ISO. Grupo ou localização inexistentes respondem `404`,
+usuário fora do grupo `403` e ausência de autenticação `401`.
+
+O teste de persistência e rollback com PostgreSQL é opt-in. Use um banco local exclusivo cujo
+nome termine em `_test`, aplique as migrations existentes com `prisma migrate deploy` apontando
+`DATABASE_URL` para esse banco e execute `npm run test:integration` com `TEST_DATABASE_URL`
+apontando para ele. Sem essa variável, os testes de PostgreSQL são ignorados; os testes de
+composição do módulo continuam executando. Os dados criados pelos testes são removidos no teardown.
 
 ### Endpoints de resposta à proposta do evento
 
