@@ -1,7 +1,12 @@
 import { Event } from '../../src/modules/events/domain/event.entity';
+import { Prisma } from '../../generated/prisma/client';
 import {
   type CreatedEvent,
   type CreateEventData,
+  type CreateLocatedEventData,
+  type CreatedLocationProposal,
+  type ExistingEventLocation,
+  EventLocationNotFoundError,
   type EventDetails,
   type EventDetailsAccess,
   type EventImageAccess,
@@ -13,6 +18,48 @@ export class InMemoryEventRepository extends EventRepository {
   private readonly events = new Map<string, Event>();
   private readonly locations = new Map<string, string>();
   private readonly groups = new Map<string, Set<string>>();
+  private readonly existingLocations = new Map<string, ExistingEventLocation>();
+
+  setLocation(location: ExistingEventLocation): void {
+    this.existingLocations.set(location.id, location);
+  }
+
+  findLocationById(id: string): Promise<ExistingEventLocation | null> {
+    return Promise.resolve(this.existingLocations.get(id) ?? null);
+  }
+
+  async createWithExistingLocation(data: CreateLocatedEventData): Promise<CreatedLocationProposal> {
+    const location = await this.findLocationById(data.locationId);
+    if (!location) throw new EventLocationNotFoundError('Localização não encontrada');
+    const { event, ownerResponse } = this.persist({
+      ...data,
+      location: { description: location.description, manuallyCreated: false },
+    });
+    this.events.set(
+      event.id,
+      new Event({
+        ...event,
+        location: { ...location, manuallyCreated: false },
+      })
+    );
+    return {
+      id: event.proposals[0].id,
+      createdAt: data.createdAt,
+      owner: { id: data.ownerId, name: 'Ana Beatriz Silva', image: 'users/ana.jpg' },
+      event: {
+        id: event.id,
+        name: event.name,
+        timeslot: event.timeslot,
+        budgetStart:
+          data.budgetStart === null ? null : new Prisma.Decimal(data.budgetStart).toFixed(2),
+        budgetEnd: data.budgetEnd === null ? null : new Prisma.Decimal(data.budgetEnd).toFixed(2),
+        status: data.status,
+        groupId: event.groupId,
+      },
+      location,
+      myAnswer: ownerResponse.answer,
+    };
+  }
 
   findById(id: string): Promise<Event | null> {
     return Promise.resolve(this.events.get(id) ?? null);
@@ -37,6 +84,10 @@ export class InMemoryEventRepository extends EventRepository {
   }
 
   create(data: CreateEventData): Promise<CreatedEvent> {
+    return Promise.resolve(this.persist(data));
+  }
+
+  private persist(data: Omit<CreateEventData, 'notification'>): CreatedEvent {
     const event = new Event({
       id: data.id,
       name: data.name,
@@ -75,14 +126,14 @@ export class InMemoryEventRepository extends EventRepository {
     });
     this.events.set(event.id, event);
 
-    return Promise.resolve({
+    return {
       event,
       ownerResponse: {
         id: '66666666-6666-4666-8666-666666666666',
         userId: data.ownerId,
         answer: data.ownerAnswer,
       },
-    });
+    };
   }
 
   update(id: string, data: UpdateEventData): Promise<Event> {

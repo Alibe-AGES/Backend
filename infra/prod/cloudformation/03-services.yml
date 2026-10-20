@@ -1,0 +1,269 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECR da API, fila SQS e Lambda Go de notificacoes do projeto Alibe
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: alibe
+    Description: Nome usado para identificar os recursos do projeto.
+
+  DeployNotificationLambda:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: >-
+      Use true somente apos enviar a imagem Docker da Lambda Go ao ECR.
+      O valor false nao cria a Lambda; se ela ja existir, uma atualizacao com
+      false removera a funcao, a role e o consumidor da fila.
+
+  NotificationImageTag:
+    Type: String
+    Default: not-deployed
+    AllowedPattern: '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$'
+    ConstraintDescription: >-
+      Use uma tag Docker valida, preferencialmente o SHA do commit.
+    Description: >-
+      Tag imutavel da imagem Go ja publicada no ECR. Use o SHA do commit e nao latest.
+
+Conditions:
+  ShouldDeployNotificationLambda: !Equals [!Ref DeployNotificationLambda, 'true']
+
+Resources:
+  BackendRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RepositoryName: !Sub '${ProjectName}/backend'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      EmptyOnDelete: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove imagens sem tag depois de um dia",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 1
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Mantem somente as cinco imagens mais recentes",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+        - Key: Workload
+          Value: backend
+
+  NotificationLambdaRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RepositoryName: !Sub '${ProjectName}/notification-service'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      EmptyOnDelete: true
+      RepositoryPolicyText:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: LambdaECRImageRetrievalPolicy
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub >-
+                  arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-prod-notification
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove imagens sem tag depois de um dia",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 1
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Mantem somente as cinco imagens mais recentes",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+        - Key: Workload
+          Value: notification-service
+
+  NotificationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${ProjectName}-prod-notifications'
+      SqsManagedSseEnabled: true
+      MessageRetentionPeriod: 345600
+      VisibilityTimeout: 60
+      ReceiveMessageWaitTimeSeconds: 20
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  NotificationLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: ShouldDeployNotificationLambda
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ConsumeNotificationQueue
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt NotificationQueue.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  NotificationLambda:
+    Type: AWS::Lambda::Function
+    Condition: ShouldDeployNotificationLambda
+    Properties:
+      FunctionName: !Sub '${ProjectName}-prod-notification'
+      Description: Consome a fila de notificacoes e encaminha cada push ao Expo via container Go.
+      PackageType: Image
+      Code:
+        ImageUri:
+          Fn::Sub:
+            - '${RepositoryUri}:${ImageTag}'
+            - RepositoryUri: !GetAtt NotificationLambdaRepository.RepositoryUri
+              ImageTag: !Ref NotificationImageTag
+      Architectures:
+        - x86_64
+      Role: !GetAtt NotificationLambdaRole.Arn
+      MemorySize: 256
+      Timeout: 10
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+
+  NotificationQueueConsumer:
+    Type: AWS::Lambda::EventSourceMapping
+    Condition: ShouldDeployNotificationLambda
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt NotificationQueue.Arn
+      FunctionName: !Ref NotificationLambda
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      ScalingConfig:
+        MaximumConcurrency: 2
+
+Outputs:
+  BackendRepositoryName:
+    Description: Repositorio das imagens da API executada na EC2.
+    Value: !Ref BackendRepository
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendRepositoryName'
+
+  BackendRepositoryArn:
+    Value: !GetAtt BackendRepository.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendRepositoryArn'
+
+  BackendRepositoryUri:
+    Value: !GetAtt BackendRepository.RepositoryUri
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendRepositoryUri'
+
+  NotificationLambdaRepositoryUri:
+    Description: Repositorio ECR da imagem do Notification Service em Go.
+    Value: !GetAtt NotificationLambdaRepository.RepositoryUri
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationLambdaRepositoryUri'
+
+  NotificationQueueUrl:
+    Description: URL que a API usara para publicar notificacoes.
+    Value: !Ref NotificationQueue
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationQueueUrl'
+
+  NotificationQueueArn:
+    Value: !GetAtt NotificationQueue.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationQueueArn'
+
+  NotificationLambdaName:
+    Condition: ShouldDeployNotificationLambda
+    Description: Nome da Lambda Go consumidora da fila.
+    Value: !Ref NotificationLambda
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationLambdaName'
+
+  NotificationLambdaArn:
+    Condition: ShouldDeployNotificationLambda
+    Description: ARN da Lambda Go consumidora da fila.
+    Value: !GetAtt NotificationLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationLambdaArn'

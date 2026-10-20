@@ -4,6 +4,11 @@ type NodeResponse = {
   statusCode: number;
 };
 
+process.env.AWS_REGION ??= 'us-east-2';
+process.env.AWS_SQS_NOTIFICATION_QUEUE_URL ??=
+  'http://localhost:4566/000000000000/alibe-test-notifications';
+process.env.ENABLE_NOTIFICATION_TEST_ENDPOINT ??= 'true';
+
 type NodeRequest = {
   method?: string;
   url?: string;

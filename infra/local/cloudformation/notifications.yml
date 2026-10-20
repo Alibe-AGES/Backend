@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Fila SQS e Lambda Go locais para notificacoes do Alibe no MiniStack
+
+Parameters:
+  MediaBucketName:
+    Type: String
+    Description: Bucket local que tambem armazena o pacote da Lambda
+
+  NotificationCodeS3Key:
+    Type: String
+    Description: Chave do arquivo ZIP da Lambda Go no bucket local
+
+Resources:
+  NotificationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: alibe-local-notifications
+      SqsManagedSseEnabled: true
+      MessageRetentionPeriod: 86400
+      VisibilityTimeout: 60
+      ReceiveMessageWaitTimeSeconds: 20
+
+  NotificationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ConsumeLocalNotificationQueue
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt NotificationQueue.Arn
+
+  NotificationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: alibe-local-notification
+      Architectures:
+        - x86_64
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Role: !GetAtt NotificationLambdaRole.Arn
+      MemorySize: 128
+      Timeout: 10
+      Code:
+        S3Bucket: !Ref MediaBucketName
+        S3Key: !Ref NotificationCodeS3Key
+
+  NotificationQueueConsumer:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt NotificationQueue.Arn
+      FunctionName: !Ref NotificationLambda
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+
+Outputs:
+  NotificationQueueUrl:
+    Description: URL usada pelo Backend local para publicar notificacoes
+    Value: !Ref NotificationQueue
+
+  NotificationLambdaName:
+    Description: Nome da Lambda Go local
+    Value: !Ref NotificationLambda

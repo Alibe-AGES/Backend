@@ -9,6 +9,7 @@ import { EventRepository } from '../../../../src/modules/events/domain/event.rep
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryEventRepository } from '../../../helpers/in-memory-event.repository';
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
+import { GroupPushNotificationService } from '../../../../src/modules/events/application/group-push-notification.service';
 
 const GROUP_ID = '33333333-3333-4333-8333-333333333333';
 const OWNER_ID = '11111111-1111-4111-8111-111111111111';
@@ -42,6 +43,11 @@ describe('Create event endpoint (e2e)', () => {
       .useClass(InMemoryEventRepository)
       .overrideProvider(ObjectStorage)
       .useClass(InMemoryObjectStorage)
+      .overrideProvider(GroupPushNotificationService)
+      .useValue({
+        sendToGroup: jest.fn().mockResolvedValue({ attempted: 0, sent: 0, failed: 0 }),
+        sendToRecipients: jest.fn(),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();

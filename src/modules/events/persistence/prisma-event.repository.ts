@@ -5,6 +5,10 @@ import { Event } from '../domain/event.entity';
 import {
   type CreatedEvent,
   type CreateEventData,
+  type CreateLocatedEventData,
+  type CreatedLocationProposal,
+  type ExistingEventLocation,
+  EventLocationNotFoundError,
   type EventDetails,
   type EventDetailsAccess,
   type EventImageAccess,
@@ -85,46 +89,125 @@ export class PrismaEventRepository extends EventRepository {
         select: { id: true },
       });
 
-      await transaction.event.create({
+      const created = await this.createEventProposal(transaction, {
+        id: data.id,
+        groupId: data.groupId,
+        ownerId: data.ownerId,
+        locationId: location.id,
+        name: data.name,
+        timeslot: data.timeslot,
+        image: data.image,
+        budgetStart: data.budgetStart,
+        budgetEnd: data.budgetEnd,
+        status: data.status,
+        ownerAnswer: data.ownerAnswer,
+        createdAt: data.createdAt,
+      });
+
+      await transaction.groupNotification.create({
         data: {
-          id: data.id,
-          name: data.name,
-          timeslot: data.timeslot,
-          image: data.image,
-          budgetStart: data.budgetStart,
-          budgetEnd: data.budgetEnd,
-          status: data.status,
-          createdAt: data.createdAt,
+          type: data.notification.type,
+          message: data.notification.message,
+          createdAt: data.notification.createdAt,
           groupId: data.groupId,
-          locationId: location.id,
+          eventId: data.id,
         },
         select: { id: true },
       });
 
-      const proposal = await transaction.proposal.create({
-        data: { eventId: data.id, ownerId: data.ownerId, createdAt: data.createdAt },
-        select: { id: true },
-      });
-
-      const ownerResponse = await transaction.proposalResponse.create({
-        data: {
-          proposalId: proposal.id,
-          userId: data.ownerId,
-          answer: data.ownerAnswer,
-          createdAt: data.createdAt,
-        },
-        select: { id: true, userId: true, answer: true },
-      });
-
-      const event = await transaction.event.findUniqueOrThrow({
-        where: { id: data.id },
-        include: eventInclude,
-      });
-
-      return { event, ownerResponse };
+      return created;
     });
 
     return { event: this.toDomain(event), ownerResponse };
+  }
+
+  findLocationById(id: string): Promise<ExistingEventLocation | null> {
+    return this.prisma.location.findUnique({
+      where: { id },
+      select: { id: true, description: true, address: true },
+    });
+  }
+
+  createWithExistingLocation(data: CreateLocatedEventData): Promise<CreatedLocationProposal> {
+    return this.prisma.$transaction(async (transaction) => {
+      const location = await transaction.location.findUnique({
+        where: { id: data.locationId },
+        select: { id: true, description: true, address: true },
+      });
+      if (!location) {
+        throw new EventLocationNotFoundError('Localização não encontrada');
+      }
+
+      const { event, proposal, ownerResponse } = await this.createEventProposal(transaction, data);
+      const record = await transaction.proposal.findUniqueOrThrow({
+        where: { id: proposal.id },
+        select: {
+          id: true,
+          createdAt: true,
+          owner: { select: { id: true, name: true, profilePic: true } },
+        },
+      });
+
+      return {
+        id: record.id,
+        createdAt: record.createdAt,
+        owner: { id: record.owner.id, name: record.owner.name, image: record.owner.profilePic },
+        event: {
+          id: event.id,
+          name: event.name,
+          timeslot: event.timeslot,
+          budgetStart: event.budgetStart?.toFixed(2) ?? null,
+          budgetEnd: event.budgetEnd?.toFixed(2) ?? null,
+          status: event.status,
+          groupId: event.groupId,
+        },
+        location,
+        myAnswer: ownerResponse.answer,
+      };
+    });
+  }
+
+  private async createEventProposal(
+    transaction: Prisma.TransactionClient,
+    data: CreateLocatedEventData
+  ) {
+    await transaction.event.create({
+      data: {
+        id: data.id,
+        name: data.name,
+        timeslot: data.timeslot,
+        image: data.image,
+        budgetStart: data.budgetStart,
+        budgetEnd: data.budgetEnd,
+        status: data.status,
+        createdAt: data.createdAt,
+        groupId: data.groupId,
+        locationId: data.locationId,
+      },
+      select: { id: true },
+    });
+
+    const proposal = await transaction.proposal.create({
+      data: { eventId: data.id, ownerId: data.ownerId, createdAt: data.createdAt },
+      select: { id: true },
+    });
+
+    const ownerResponse = await transaction.proposalResponse.create({
+      data: {
+        proposalId: proposal.id,
+        userId: data.ownerId,
+        answer: data.ownerAnswer,
+        createdAt: data.createdAt,
+      },
+      select: { id: true, userId: true, answer: true },
+    });
+
+    const event = await transaction.event.findUniqueOrThrow({
+      where: { id: data.id },
+      include: eventInclude,
+    });
+
+    return { event, proposal, ownerResponse };
   }
 
   async update(id: string, data: UpdateEventData): Promise<Event> {
