@@ -69,6 +69,23 @@ export interface ProposalDetailsAccess {
   userIsMember: boolean;
 }
 
+export interface ProposalAnswerCount {
+  yes: number;
+  no: number;
+  pending: number;
+}
+
+export interface ActiveSuggestion {
+  id: string;
+  type: 'suggestion';
+  groupId: string;
+  name: string | null;
+  createdAt: Date;
+  owner: { id: string; name: string; image: string | null };
+  location: StoredProposalLocation | null;
+  responses: ProposalAnswerCount;
+}
+
 export class ProposalLocationNotFoundError extends Error {}
 
 export abstract class ProposalRepository {
@@ -81,6 +98,12 @@ export abstract class ProposalRepository {
   abstract findLocationById(id: string): Promise<StoredProposalLocation | null>;
 
   abstract findDetails(id: string, userId: string): Promise<ProposalDetailsAccess | null>;
+
+  /**
+   * Sugestões do grupo ainda sem match que o usuário ainda não respondeu, da mais recente para
+   * a mais antiga. As sugestões do próprio usuário ficam de fora, pois o autor já nasce com `yes`.
+   */
+  abstract findActiveSuggestions(groupId: string, userId: string): Promise<ActiveSuggestion[]>;
 
   /**
    * Reutiliza ou cria a location do catálogo e cria a sugestão com o aceite do autor

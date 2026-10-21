@@ -941,6 +941,25 @@ nome termine em `_test`, aplique as migrations existentes com `prisma migrate de
 apontando para ele. Sem essa variável, os testes de PostgreSQL são ignorados; os testes de
 composição do módulo continuam executando. Os dados criados pelos testes são removidos no teardown.
 
+### Listagem de propostas ativas do grupo
+
+```http
+GET /api/groups/:groupId/proposals
+```
+
+Retorna as propostas ativas do grupo para um membro autenticado: as sugestões
+(`type: "suggestion"`) que ainda não deram match (`matched_at` nulo) e que o usuário logado ainda
+não respondeu. Assim que o usuário responde uma sugestão, com `yes` ou `no`, ela sai da lista dele.
+As sugestões criadas pelo próprio usuário também não aparecem, porque o autor já nasce com resposta
+`yes`. Propostas do tipo `event` não são listadas. A ordem é da sugestão mais recente para a mais
+antiga (`created_at` decrescente).
+
+Cada item contém `id`, `type`, `groupId`, `name`, `createdAt`, `owner`, `location` (o local da
+sugestão, ou `null`) e `responses` (quantidade de respostas `yes`, `no` e `pending` já registradas
+pelos outros membros). Grupo sem sugestões pendentes para o usuário responde `200` com lista vazia,
+`groupId` inválido `400`, grupo inexistente `404`, usuário fora do grupo `403` e ausência de
+autenticação `401`.
+
 ### Endpoints de resposta à proposta
 
 O módulo `proposals` registra a resposta do usuário autenticado (`request.user`). A proposta é
@@ -991,6 +1010,7 @@ nos decorators do Swagger de cada controller.
 | GET    | `/api/events/:eventId/image`                 | `200`   | `400`, `401`, `403`, `404`, `500` |
 | POST   | `/api/events/:eventId/proposal/responses`    | `201`   | `400`, `401`, `403`, `404`, `409` |
 | PATCH  | `/api/events/:eventId/proposal/responses/me` | `200`   | `400`, `401`, `403`, `404`        |
+| GET    | `/api/groups/:groupId/proposals`             | `200`   | `400`, `401`, `403`, `404`        |
 | POST   | `/api/proposals/:proposalId/responses`       | `201`   | `400`, `401`, `403`, `404`, `409` |
 | PATCH  | `/api/proposals/:proposalId/responses/me`    | `200`   | `400`, `401`, `403`, `404`        |
 

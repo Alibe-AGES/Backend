@@ -29,7 +29,8 @@ describe('ProposalsModule integration', () => {
   };
   const prisma = {
     event: { findUnique: jest.fn() },
-    proposal: { findUnique: jest.fn() },
+    group: { findUnique: jest.fn() },
+    proposal: { findUnique: jest.fn(), findMany: jest.fn() },
     $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) => callback(transaction)),
   };
 
@@ -183,5 +184,42 @@ describe('ProposalsModule integration', () => {
       findLocation.mockRestore();
       create.mockRestore();
     }
+  });
+
+  it('connects the active proposals route to the Prisma repository', async () => {
+    prisma.group.findUnique.mockResolvedValue({ users: [{ userId: USER_ID }] });
+    prisma.proposal.findMany.mockResolvedValue([
+      {
+        id: PROPOSAL_ID,
+        groupId: GROUP_ID,
+        name: 'Café',
+        createdAt: new Date('2026-10-09T17:00:00.000Z'),
+        owner: { id: OWNER_ID, name: 'Ana', profilePic: null },
+        location: null,
+        responses: [{ answer: 'yes' }],
+      },
+    ]);
+
+    const result = await moduleFixture
+      .get(ProposalsController)
+      .listActive(GROUP_ID, { user: { id: USER_ID } } as AuthenticatedRequest);
+
+    expect(prisma.proposal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          groupId: GROUP_ID,
+          type: 'suggestion',
+          matchedAt: null,
+          responses: { none: { userId: USER_ID } },
+        },
+      })
+    );
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: PROPOSAL_ID,
+        type: 'suggestion',
+        responses: { yes: 1, no: 0, pending: 0 },
+      }),
+    ]);
   });
 });

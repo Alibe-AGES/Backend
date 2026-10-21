@@ -13,6 +13,7 @@ import { PrismaProposalRepository } from './persistence/prisma-proposal.reposito
 import { PrismaProposalResponseRepository } from './persistence/prisma-proposal-response.repository';
 import { GetProposalByIdUseCase } from './application/get-proposal-by-id.use-case';
 import { ProposalQueryController } from './http/proposal-query.controller';
+import { ListActiveProposalsUseCase } from './application/list-active-proposals.use-case';
 
 @Module({
   imports: [PrismaModule, GooglePlacesModule, StorageModule],
@@ -22,6 +23,7 @@ import { ProposalQueryController } from './http/proposal-query.controller';
     CreateProposalResponseUseCase,
     UpdateProposalResponseUseCase,
     GetProposalByIdUseCase,
+    ListActiveProposalsUseCase,
     {
       provide: ProposalRepository,
       useClass: PrismaProposalRepository,

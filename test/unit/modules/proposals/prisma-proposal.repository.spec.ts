@@ -88,6 +88,7 @@ describe('PrismaProposalRepository', () => {
     };
     const prisma = {
       group: { findUnique: jest.fn() },
+      proposal: { findMany: jest.fn() },
       location: { findUnique: jest.fn().mockResolvedValue(location) },
       $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
         callback(transaction)
@@ -219,5 +220,61 @@ describe('PrismaProposalRepository', () => {
 
     await expect(repository.createSuggestion(data)).rejects.toBe(failure);
     expect(transaction.proposal.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+
+  describe('findActiveSuggestions', () => {
+    const record = {
+      id: 'proposal-id',
+      groupId: 'group-id',
+      name: 'Café',
+      createdAt: data.createdAt,
+      owner: { id: 'owner-id', name: 'Ana', profilePic: 'users/ana.jpg' },
+      location,
+      responses: [{ answer: 'yes' }, { answer: 'no' }, { answer: 'yes' }, { answer: 'pending' }],
+    };
+
+    it('queries only the unmatched suggestions of the group the user has not answered, newest first', async () => {
+      const { repository, prisma } = setup();
+      prisma.proposal.findMany.mockResolvedValue([]);
+
+      await expect(repository.findActiveSuggestions('group-id', 'user-id')).resolves.toEqual([]);
+      expect(prisma.proposal.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            groupId: 'group-id',
+            type: 'suggestion',
+            matchedAt: null,
+            responses: { none: { userId: 'user-id' } },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      );
+    });
+
+    it('counts the answers registered by the other members', async () => {
+      const { repository, prisma } = setup();
+      prisma.proposal.findMany.mockResolvedValue([record]);
+
+      await expect(repository.findActiveSuggestions('group-id', 'user-id')).resolves.toEqual([
+        {
+          id: 'proposal-id',
+          type: 'suggestion',
+          groupId: 'group-id',
+          name: 'Café',
+          createdAt: data.createdAt,
+          owner: { id: 'owner-id', name: 'Ana', image: 'users/ana.jpg' },
+          location: storedLocation,
+          responses: { yes: 2, no: 1, pending: 1 },
+        },
+      ]);
+    });
+
+    it('returns a null location and zeroed counts when there is neither', async () => {
+      const { repository, prisma } = setup();
+      prisma.proposal.findMany.mockResolvedValue([{ ...record, location: null, responses: [] }]);
+
+      const [result] = await repository.findActiveSuggestions('group-id', 'user-id');
+      expect(result).toMatchObject({ location: null, responses: { yes: 0, no: 0, pending: 0 } });
+    });
   });
 });

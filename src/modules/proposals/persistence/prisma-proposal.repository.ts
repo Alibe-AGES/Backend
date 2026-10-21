@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import {
+  type ActiveSuggestion,
   type CreatedSuggestion,
   type CreateSuggestionData,
   ProposalRepository,
   type StoredProposalLocation,
   type NewSuggestionLocation,
+  type ProposalAnswerCount,
   type ProposalDetailsAccess,
 } from '../domain/proposal.repository';
 import { registerMatchIfComplete } from './proposal-match.transaction';
@@ -107,6 +109,42 @@ export class PrismaProposalRepository extends ProposalRepository {
       },
       userIsMember: proposal.group.users.length > 0,
     };
+  }
+
+  async findActiveSuggestions(groupId: string, userId: string): Promise<ActiveSuggestion[]> {
+    const suggestions = await this.prisma.proposal.findMany({
+      where: { groupId, type: 'suggestion', matchedAt: null, responses: { none: { userId } } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        groupId: true,
+        name: true,
+        createdAt: true,
+        owner: { select: { id: true, name: true, profilePic: true } },
+        location: { select: locationSelect },
+        responses: { select: { answer: true } },
+      },
+    });
+
+    return suggestions.map((suggestion) => {
+      const responses: ProposalAnswerCount = { yes: 0, no: 0, pending: 0 };
+      suggestion.responses.forEach(({ answer }) => responses[answer]++);
+
+      return {
+        id: suggestion.id,
+        type: 'suggestion',
+        groupId: suggestion.groupId,
+        name: suggestion.name,
+        createdAt: suggestion.createdAt,
+        owner: {
+          id: suggestion.owner.id,
+          name: suggestion.owner.name,
+          image: suggestion.owner.profilePic,
+        },
+        location: suggestion.location ? this.toStoredLocation(suggestion.location) : null,
+        responses,
+      };
+    });
   }
 
   createSuggestion({

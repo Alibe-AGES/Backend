@@ -1,4 +1,5 @@
 import {
+  type ActiveSuggestion,
   type CreatedSuggestion,
   type CreateSuggestionData,
   type ProposalDetailsAccess,
@@ -12,6 +13,8 @@ export class InMemoryProposalRepository extends ProposalRepository {
   private readonly catalogLocations = new Map<string, StoredProposalLocation>();
   private readonly locations = new Map<string, StoredProposalLocation>();
   readonly suggestions = new Map<string, CreatedSuggestion>();
+  /** Active suggestions per group, already filtered and ordered as the Prisma adapter returns them. */
+  private readonly activeSuggestions = new Map<string, ActiveSuggestion[]>();
 
   setGroupMembers(groupId: string, userIds: string[]): void {
     this.groups.set(groupId, new Set(userIds));
@@ -20,6 +23,10 @@ export class InMemoryProposalRepository extends ProposalRepository {
   setCatalogLocation(externalId: string, location: StoredProposalLocation): void {
     this.catalogLocations.set(externalId, location);
     this.locations.set(location.id, location);
+  }
+
+  setActiveSuggestions(groupId: string, suggestions: ActiveSuggestion[]): void {
+    this.activeSuggestions.set(groupId, suggestions);
   }
 
   findGroupMembership(groupId: string, userId: string): Promise<boolean | null> {
@@ -53,6 +60,10 @@ export class InMemoryProposalRepository extends ProposalRepository {
       },
       userIsMember: this.groups.get(suggestion.groupId)?.has(userId) ?? false,
     });
+  }
+
+  findActiveSuggestions(groupId: string): Promise<ActiveSuggestion[]> {
+    return Promise.resolve(this.activeSuggestions.get(groupId) ?? []);
   }
 
   createSuggestion({
