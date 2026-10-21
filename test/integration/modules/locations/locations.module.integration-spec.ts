@@ -8,6 +8,7 @@ import {
 } from '../../../../src/infrastructure/api/google-places/google-places.service';
 import { PrismaFeatureFlagsService } from '../../../../src/infrastructure/feature-flags/prisma-feature-flags.service';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { FindLocationByIdUseCase } from '../../../../src/modules/locations/application/find-location-by-id.use-case';
 import { GetLocationUseCase } from '../../../../src/modules/locations/application/get-location.use-case';
 import { GetLocationPhotoUseCase } from '../../../../src/modules/locations/application/get-location-photo.use-case';
@@ -40,6 +41,10 @@ describe('LocationsModule integration', () => {
         featureFlag: { findUnique: findUniqueFlag },
         location: { findUnique: findUniqueLocation },
       })
+      .overrideProvider(S3_CLIENT)
+      .useValue({ send: jest.fn() })
+      .overrideProvider(S3_BUCKET)
+      .useValue('alibe-test-media')
       .compile();
   });
 
@@ -160,15 +165,35 @@ describe('LocationsModule integration', () => {
     const location = {
       id: '0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d',
       externalId: 'place-1',
+      name: 'Bloom Café',
       description: 'Bloom Café',
       address: 'Rua A',
+      openingHours: [],
+      rating: 4.5,
+      phoneNumber: null,
+      website: null,
+      priceStart: null,
+      priceEnd: null,
+      priceCurrency: null,
+      image: null,
       manuallyCreated: false,
     };
     findUniqueLocation.mockResolvedValue(location);
 
-    await expect(module.get(FindLocationByIdUseCase).execute(location.id)).resolves.toEqual(
-      location
-    );
+    await expect(module.get(FindLocationByIdUseCase).execute(location.id)).resolves.toEqual({
+      id: location.id,
+      externalId: 'place-1',
+      name: 'Bloom Café',
+      description: 'Bloom Café',
+      address: 'Rua A',
+      openingHours: [],
+      rating: 4.5,
+      phoneNumber: null,
+      website: null,
+      priceRange: { start: null, end: null, currencyCode: null },
+      image: null,
+      manuallyCreated: false,
+    });
     expect(findUniqueLocation).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: location.id } })
     );

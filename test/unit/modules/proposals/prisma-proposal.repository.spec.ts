@@ -3,23 +3,65 @@ import type { CreateSuggestionData } from '../../../../src/modules/proposals/dom
 import { PrismaProposalRepository } from '../../../../src/modules/proposals/persistence/prisma-proposal.repository';
 
 describe('PrismaProposalRepository', () => {
-  const catalogLocation = { externalId: 'place-1', description: 'Café', address: 'Rua A' };
+  const location = {
+    id: 'location-id',
+    externalId: 'place-1',
+    name: 'Café',
+    description: 'Café',
+    address: 'Rua A',
+    openingHours: [],
+    rating: 4.5,
+    phoneNumber: null,
+    website: null,
+    priceStart: null,
+    priceEnd: null,
+    priceCurrency: null,
+    image: null,
+    manuallyCreated: false,
+  };
+  const newLocation = {
+    id: 'new-location-id',
+    externalId: 'place-2',
+    name: 'Novo café',
+    description: 'Café novo',
+    address: 'Rua B',
+    openingHours: ['segunda: 09:00–18:00'],
+    rating: 4.8,
+    phoneNumber: '+55 51 3333-4444',
+    website: 'https://cafe.example',
+    priceRange: { start: '50.00', end: '70.00', currencyCode: 'BRL' },
+    image: null,
+    manuallyCreated: false,
+  };
   const data: CreateSuggestionData = {
     id: 'proposal-id',
     groupId: 'group-id',
     ownerId: 'owner-id',
-    location: catalogLocation,
+    location: { kind: 'existing', id: location.id },
     name: 'Café',
     createdAt: new Date('2026-10-10T12:00:00.000Z'),
   };
-  const location = { id: 'location-id', description: null, address: 'Rua A' };
-  const select = { id: true, description: true, address: true };
+  const storedLocation = {
+    id: location.id,
+    externalId: location.externalId,
+    name: location.name,
+    description: location.description,
+    address: location.address,
+    openingHours: [],
+    rating: location.rating,
+    phoneNumber: null,
+    website: null,
+    priceRange: { start: null, end: null, currencyCode: null },
+    image: null,
+    manuallyCreated: false,
+  };
 
   function setup({ memberIds = ['owner-id', 'other-id'] } = {}) {
     const transaction = {
       location: {
-        findFirst: jest.fn().mockResolvedValue(location),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(location),
         create: jest.fn().mockResolvedValue(location),
+        upsert: jest.fn().mockResolvedValue(location),
       },
       proposal: {
         create: jest.fn().mockResolvedValue({
@@ -46,7 +88,7 @@ describe('PrismaProposalRepository', () => {
     };
     const prisma = {
       group: { findUnique: jest.fn() },
-      location: { findFirst: jest.fn().mockResolvedValue(location) },
+      location: { findUnique: jest.fn().mockResolvedValue(location) },
       $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
         callback(transaction)
       ),
@@ -73,11 +115,13 @@ describe('PrismaProposalRepository', () => {
     'looks up a stored catalog location by Place ID without writing: %p',
     async (result) => {
       const { repository, prisma } = setup();
-      prisma.location.findFirst.mockResolvedValue(result);
-      await expect(repository.findCatalogLocation('place-1')).resolves.toEqual(result);
-      expect(prisma.location.findFirst).toHaveBeenCalledWith({
+      prisma.location.findUnique.mockResolvedValue(result);
+      await expect(repository.findCatalogLocation('place-1')).resolves.toEqual(
+        result ? storedLocation : null
+      );
+      expect(prisma.location.findUnique).toHaveBeenCalledWith({
         where: { externalId: 'place-1', manuallyCreated: false },
-        select,
+        select: expect.any(Object),
       });
       expect(prisma.$transaction).not.toHaveBeenCalled();
     }
@@ -92,7 +136,7 @@ describe('PrismaProposalRepository', () => {
       name: data.name,
       createdAt: data.createdAt,
       owner: { id: data.ownerId, name: 'Ana', image: null },
-      location,
+      location: storedLocation,
       myAnswer: 'yes',
       matched: false,
     });
@@ -126,20 +170,36 @@ describe('PrismaProposalRepository', () => {
 
   it('stores the catalog location in the same transaction when it is used for the first time', async () => {
     const { repository, transaction } = setup();
-    const created = { id: 'new-location-id', description: 'Café', address: 'Rua A' };
-    transaction.location.findFirst.mockResolvedValue(null);
-    transaction.location.create.mockResolvedValue(created);
+    const created = {
+      ...location,
+      ...newLocation,
+      priceStart: { toFixed: () => '50.00' },
+      priceEnd: { toFixed: () => '70.00' },
+      priceCurrency: 'BRL',
+    };
+    transaction.location.upsert.mockResolvedValue(created);
 
-    const result = await repository.createSuggestion(data);
-
-    expect(transaction.location.create).toHaveBeenCalledWith({
-      data: { ...catalogLocation, manuallyCreated: false },
-      select,
+    const result = await repository.createSuggestion({
+      ...data,
+      location: { kind: 'new', value: newLocation },
     });
+
+    expect(transaction.location.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { externalId: newLocation.externalId },
+        update: {},
+        create: expect.objectContaining({
+          id: newLocation.id,
+          externalId: newLocation.externalId,
+          priceStart: '50.00',
+          priceEnd: '70.00',
+        }),
+      })
+    );
     expect(transaction.proposal.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ locationId: created.id }) })
     );
-    expect(result.location).toEqual(created);
+    expect(result.location).toEqual(newLocation);
   });
 
   it('registers the match right away when the owner is the only group member', async () => {

@@ -119,8 +119,17 @@ describe('ProposalsModule integration', () => {
     );
     const location = {
       id: '44444444-4444-4444-8444-444444444444',
+      externalId: PLACE_ID,
+      name: 'Café',
       description: null,
       address: null,
+      openingHours: [],
+      rating: null,
+      phoneNumber: null,
+      website: null,
+      priceRange: { start: null, end: null, currencyCode: null },
+      image: null,
+      manuallyCreated: false,
     };
     const membership = jest.spyOn(repository, 'findGroupMembership').mockResolvedValue(true);
     const findLocation = jest.spyOn(repository, 'findCatalogLocation').mockResolvedValue(location);
@@ -138,21 +147,34 @@ describe('ProposalsModule integration', () => {
     try {
       const result = await moduleFixture
         .get(ProposalsController)
-        .create(GROUP_ID, { locationId: PLACE_ID, name: 'Café' }, {
+        .create(GROUP_ID, { externalId: PLACE_ID }, undefined, {
           user: { id: USER_ID },
         } as AuthenticatedRequest);
       expect(result).toMatchObject({
         id: PROPOSAL_ID,
         type: 'suggestion',
         owner: { id: USER_ID, image: null },
-        location,
+        location: {
+          id: location.id,
+          externalId: location.externalId,
+          name: location.name,
+          description: location.description,
+          address: location.address,
+          openingHours: location.openingHours,
+          rating: location.rating,
+          phoneNumber: location.phoneNumber,
+          website: location.website,
+          priceRange: location.priceRange,
+          imageUrl: null,
+          manuallyCreated: location.manuallyCreated,
+        },
         myAnswer: 'yes',
         matched: false,
       });
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({
           ownerId: USER_ID,
-          location: { externalId: PLACE_ID, description: null, address: null },
+          location: { kind: 'existing', id: location.id },
         })
       );
       expect(findLocation).toHaveBeenCalledWith(PLACE_ID);

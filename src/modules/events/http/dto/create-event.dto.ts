@@ -8,6 +8,7 @@ const createEventSchema = z
     date: z.iso.date().optional(),
     time: z.iso.time({ precision: -1 }).optional(),
     location: z.string().optional(),
+    locationId: z.uuid().nullable().optional(),
     budgetStart: decimalSchema.optional(),
     budgetEnd: decimalSchema.optional(),
   })

@@ -4,6 +4,7 @@ import {
   type CreateEventData,
   type EventDetails,
   type EventDetailsAccess,
+  type EventCreationLocation,
   type EventImageAccess,
   EventRepository,
   type UpdateEventData,
@@ -13,6 +14,10 @@ export class InMemoryEventRepository extends EventRepository {
   private readonly events = new Map<string, Event>();
   private readonly locations = new Map<string, string>();
   private readonly groups = new Map<string, Set<string>>();
+  private readonly creationLocations = new Map<
+    string,
+    EventCreationLocation & { description: string | null; manuallyCreated: boolean | null }
+  >();
 
   findById(id: string): Promise<Event | null> {
     return Promise.resolve(this.events.get(id) ?? null);
@@ -21,6 +26,19 @@ export class InMemoryEventRepository extends EventRepository {
   findGroupMembership(groupId: string, userId: string): Promise<boolean | null> {
     const members = this.groups.get(groupId);
     return Promise.resolve(members ? members.has(userId) : null);
+  }
+
+  setLocation(
+    location: EventCreationLocation & {
+      description: string | null;
+      manuallyCreated: boolean | null;
+    }
+  ): void {
+    this.creationLocations.set(location.id, location);
+  }
+
+  findLocationById(id: string): Promise<EventCreationLocation | null> {
+    return Promise.resolve(this.creationLocations.get(id) ?? null);
   }
 
   findImageAccess(eventId: string, userId: string): Promise<EventImageAccess | null> {
@@ -41,6 +59,19 @@ export class InMemoryEventRepository extends EventRepository {
   }
 
   private persist(data: Omit<CreateEventData, 'notification'>): CreatedEvent {
+    const existingLocation =
+      data.location.kind === 'existing' ? this.creationLocations.get(data.location.id) : null;
+    const eventLocation = existingLocation
+      ? {
+          id: existingLocation.id,
+          description: existingLocation.description,
+          manuallyCreated: existingLocation.manuallyCreated,
+        }
+      : {
+          id: data.location.id,
+          description: data.location.kind === 'new' ? data.location.address : null,
+          manuallyCreated: true,
+        };
     const event = new Event({
       id: data.id,
       name: data.name,
@@ -50,7 +81,7 @@ export class InMemoryEventRepository extends EventRepository {
       budgetEnd: data.budgetEnd,
       status: data.status,
       groupId: data.groupId,
-      location: { id: '44444444-4444-4444-8444-444444444444', ...data.location },
+      location: eventLocation,
       proposals: [
         {
           id: '55555555-5555-4555-8555-555555555555',

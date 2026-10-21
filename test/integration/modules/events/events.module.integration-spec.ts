@@ -113,7 +113,13 @@ describe('EventsModule integration', () => {
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(transaction.location.create).toHaveBeenCalledWith({
-      data: { description: 'Casa', manuallyCreated: true },
+      data: {
+        id: expect.any(String),
+        description: 'Casa',
+        address: 'Casa',
+        image: null,
+        manuallyCreated: true,
+      },
       select: { id: true },
     });
     expect(transaction.groupNotification.create).toHaveBeenCalledWith({

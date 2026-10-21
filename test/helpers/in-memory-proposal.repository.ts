@@ -1,23 +1,25 @@
-import { randomUUID } from 'node:crypto';
 import {
   type CreatedSuggestion,
   type CreateSuggestionData,
+  type ProposalDetailsAccess,
   ProposalRepository,
-  type StoredCatalogLocation,
+  type StoredProposalLocation,
 } from '../../src/modules/proposals/domain/proposal.repository';
 
 export class InMemoryProposalRepository extends ProposalRepository {
   private readonly groups = new Map<string, Set<string>>();
   /** Catalog locations stored by proposals, keyed by Google Place ID. */
-  private readonly catalogLocations = new Map<string, StoredCatalogLocation>();
+  private readonly catalogLocations = new Map<string, StoredProposalLocation>();
+  private readonly locations = new Map<string, StoredProposalLocation>();
   readonly suggestions = new Map<string, CreatedSuggestion>();
 
   setGroupMembers(groupId: string, userIds: string[]): void {
     this.groups.set(groupId, new Set(userIds));
   }
 
-  setCatalogLocation(externalId: string, location: StoredCatalogLocation): void {
+  setCatalogLocation(externalId: string, location: StoredProposalLocation): void {
     this.catalogLocations.set(externalId, location);
+    this.locations.set(location.id, location);
   }
 
   findGroupMembership(groupId: string, userId: string): Promise<boolean | null> {
@@ -25,20 +27,49 @@ export class InMemoryProposalRepository extends ProposalRepository {
     return Promise.resolve(members ? members.has(userId) : null);
   }
 
-  findCatalogLocation(externalId: string): Promise<StoredCatalogLocation | null> {
+  findCatalogLocation(externalId: string): Promise<StoredProposalLocation | null> {
     return Promise.resolve(this.catalogLocations.get(externalId) ?? null);
   }
 
+  findLocationById(id: string): Promise<StoredProposalLocation | null> {
+    return Promise.resolve(this.locations.get(id) ?? null);
+  }
+
+  findDetails(id: string, userId: string): Promise<ProposalDetailsAccess | null> {
+    const suggestion = this.suggestions.get(id);
+    if (!suggestion) return Promise.resolve(null);
+    return Promise.resolve({
+      proposal: {
+        id: suggestion.id,
+        type: suggestion.type,
+        groupId: suggestion.groupId,
+        eventId: null,
+        name: suggestion.name,
+        createdAt: suggestion.createdAt,
+        matchedAt: suggestion.matched ? suggestion.createdAt : null,
+        owner: suggestion.owner,
+        location: suggestion.location,
+        myAnswer: suggestion.owner.id === userId ? suggestion.myAnswer : null,
+      },
+      userIsMember: this.groups.get(suggestion.groupId)?.has(userId) ?? false,
+    });
+  }
+
   createSuggestion({
-    location: catalogLocation,
+    location: requestedLocation,
     ...data
   }: CreateSuggestionData): Promise<CreatedSuggestion> {
-    const location = this.catalogLocations.get(catalogLocation.externalId) ?? {
-      id: randomUUID(),
-      description: catalogLocation.description,
-      address: catalogLocation.address,
-    };
-    this.catalogLocations.set(catalogLocation.externalId, location);
+    const location =
+      requestedLocation.kind === 'existing'
+        ? this.locations.get(requestedLocation.id)
+        : requestedLocation.value;
+    if (!location) {
+      throw new Error('Location not found');
+    }
+    this.locations.set(location.id, location);
+    if (location.externalId) {
+      this.catalogLocations.set(location.externalId, location);
+    }
     const members = this.groups.get(data.groupId) ?? new Set<string>();
 
     const suggestion: CreatedSuggestion = {

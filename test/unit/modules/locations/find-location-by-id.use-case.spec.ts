@@ -9,7 +9,7 @@ describe('FindLocationByIdUseCase', () => {
   let useCase: FindLocationByIdUseCase;
 
   beforeEach(() => {
-    locations = { findById: jest.fn() };
+    locations = { findById: jest.fn(), findImageAccess: jest.fn() };
     useCase = new FindLocationByIdUseCase(locations);
   });
 
@@ -17,8 +17,15 @@ describe('FindLocationByIdUseCase', () => {
     const location = {
       id: LOCATION_ID,
       externalId: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
+      name: 'Café',
       description: 'Café com ambiente tranquilo',
       address: 'Rua Padre Chagas, 320',
+      openingHours: [],
+      rating: 4.5,
+      phoneNumber: null,
+      website: null,
+      priceRange: { start: null, end: null, currencyCode: null },
+      image: null,
       manuallyCreated: false,
     };
     locations.findById.mockResolvedValue(location);

@@ -48,6 +48,7 @@ import {
   CreateEventUseCase,
   EventGroupAccessDeniedError,
   EventGroupNotFoundError,
+  EventLocationNotFoundError,
   InvalidEventCreationError,
 } from '../application/create-event.use-case';
 import {
@@ -91,12 +92,18 @@ export class EventController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['name', 'date', 'time', 'location'],
+      required: ['name', 'date', 'time'],
       properties: {
         name: { type: 'string', example: 'Jantar de aniversário' },
         date: { type: 'string', format: 'date', example: '2026-10-15' },
         time: { type: 'string', example: '20:00' },
         location: { type: 'string', example: 'Rua dos Andradas, 1234, Porto Alegre' },
+        locationId: {
+          type: 'string',
+          format: 'uuid',
+          nullable: true,
+          description: 'Location salva que será reutilizada no evento.',
+        },
         image: { type: 'string', format: 'binary' },
         budgetStart: { type: 'string', example: '50.00' },
         budgetEnd: { type: 'string', example: '120.00' },
@@ -104,7 +111,9 @@ export class EventController {
     },
   })
   @ApiCreatedResponse({ type: CreatedEventResponseDto })
-  @ApiBadRequestResponse({ description: 'Nome, dia, horário e endereço são obrigatórios.' })
+  @ApiBadRequestResponse({
+    description: 'Nome, dia, horário e locationId ou endereço são obrigatórios.',
+  })
   @ApiPayloadTooLargeResponse({ description: 'A imagem ultrapassa o limite de 5 MB.' })
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
   @ApiForbiddenResponse({ description: 'O usuário não pertence a este grupo.' })
@@ -139,7 +148,7 @@ export class EventController {
         throw new BadRequestException(error.message);
       }
 
-      if (error instanceof EventGroupNotFoundError) {
+      if (error instanceof EventGroupNotFoundError || error instanceof EventLocationNotFoundError) {
         throw new NotFoundException(error.message);
       }
 

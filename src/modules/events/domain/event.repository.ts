@@ -62,10 +62,9 @@ export interface CreateEventData {
   ownerId: string;
   name: string;
   timeslot: Date;
-  location: {
-    description: string;
-    manuallyCreated: boolean;
-  };
+  location:
+    | { kind: 'existing'; id: string }
+    | { kind: 'new'; id: string; address: string; image: string | null };
   image: string | null;
   budgetStart: string | null;
   budgetEnd: string | null;
@@ -77,6 +76,13 @@ export interface CreateEventData {
     message: string;
     createdAt: Date;
   };
+}
+
+export interface EventCreationLocation {
+  id: string;
+  image: string | null;
+  priceStart: string | null;
+  priceEnd: string | null;
 }
 
 export interface CreatedEvent {
@@ -98,6 +104,8 @@ export abstract class EventRepository {
 
   /** Retorna null quando o grupo não existe. */
   abstract findGroupMembership(groupId: string, userId: string): Promise<boolean | null>;
+
+  abstract findLocationById(id: string): Promise<EventCreationLocation | null>;
 
   /** Cria location, evento, proposta e resposta do criador de forma atômica. */
   abstract create(data: CreateEventData): Promise<CreatedEvent>;

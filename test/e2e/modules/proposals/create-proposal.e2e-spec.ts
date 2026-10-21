@@ -18,9 +18,23 @@ const PLACE_ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
 const UNKNOWN_ID = '77777777-7777-4777-8777-777777777777';
 const PATH = `/api/groups/${GROUP_ID}/proposals`;
 const body = {
-  locationId: PLACE_ID,
-  name: '  Café de sábado  ',
+  externalId: PLACE_ID,
 };
+const storedLocation = (overrides: Record<string, unknown> = {}) => ({
+  id: LOCATION_ID,
+  externalId: PLACE_ID,
+  name: 'Bloom Café',
+  description: 'Café tranquilo',
+  address: 'Rua Padre Chagas, 320',
+  openingHours: [],
+  rating: null,
+  phoneNumber: null,
+  website: null,
+  priceRange: { start: null, end: null, currencyCode: null },
+  image: null,
+  manuallyCreated: false,
+  ...overrides,
+});
 
 describe('Create proposal endpoint (e2e)', () => {
   let app: INestApplication;
@@ -52,11 +66,7 @@ describe('Create proposal endpoint (e2e)', () => {
     process.env.MOCK_AUTH_ENABLED = 'true';
     process.env.MOCK_AUTH_USER_ID = USER_ID;
     proposals.setGroupMembers(GROUP_ID, [USER_ID, MEMBER_ID]);
-    proposals.setCatalogLocation(PLACE_ID, {
-      id: LOCATION_ID,
-      description: 'Café tranquilo',
-      address: 'Rua Padre Chagas, 320',
-    });
+    proposals.setCatalogLocation(PLACE_ID, storedLocation());
     getPlaceById.mockReset().mockResolvedValue(null);
   });
 
@@ -74,13 +84,22 @@ describe('Create proposal endpoint (e2e)', () => {
       id: expect.any(String),
       type: 'suggestion',
       groupId: GROUP_ID,
-      name: 'Café de sábado',
+      name: 'Bloom Café',
       createdAt: expect.any(String),
       owner: { id: USER_ID, name: 'Ana Beatriz Silva', image: `/users/${USER_ID}/profile-picture` },
       location: {
         id: LOCATION_ID,
+        externalId: PLACE_ID,
+        name: 'Bloom Café',
         description: 'Café tranquilo',
         address: 'Rua Padre Chagas, 320',
+        openingHours: [],
+        rating: null,
+        phoneNumber: null,
+        website: null,
+        priceRange: { start: null, end: null, currencyCode: null },
+        imageUrl: null,
+        manuallyCreated: false,
       },
       myAnswer: 'yes',
       matched: false,
@@ -90,8 +109,45 @@ describe('Create proposal endpoint (e2e)', () => {
       owner: { id: USER_ID },
       location: { id: LOCATION_ID },
     });
-    expect(await proposals.findCatalogLocation(PLACE_ID)).toEqual(response.body.location);
+    const publicLocation = Object.fromEntries(
+      Object.entries(response.body.location).filter(([key]) => key !== 'imageUrl')
+    );
+    expect(await proposals.findCatalogLocation(PLACE_ID)).toEqual({
+      ...publicLocation,
+      image: null,
+    });
     expect(getPlaceById).not.toHaveBeenCalled();
+  });
+
+  it('returns a proposal by id to a member of its group', async () => {
+    const created = await request(app.getHttpServer()).post(PATH).send(body).expect(201);
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/proposals/${created.body.id}`)
+      .expect(200);
+
+    expect(response.body).toEqual({
+      id: created.body.id,
+      type: 'suggestion',
+      groupId: GROUP_ID,
+      eventId: null,
+      name: 'Bloom Café',
+      createdAt: created.body.createdAt,
+      matchedAt: null,
+      matched: false,
+      owner: created.body.owner,
+      location: created.body.location,
+      myAnswer: 'yes',
+    });
+  });
+
+  it('protects proposal details by id', async () => {
+    await request(app.getHttpServer()).get('/api/proposals/not-a-uuid').expect(400);
+    await request(app.getHttpServer()).get(`/api/proposals/${UNKNOWN_ID}`).expect(404);
+
+    const created = await request(app.getHttpServer()).post(PATH).send(body).expect(201);
+    process.env.MOCK_AUTH_USER_ID = UNKNOWN_ID;
+    await request(app.getHttpServer()).get(`/api/proposals/${created.body.id}`).expect(403);
   });
 
   it('reports the match right away when the owner is the only group member', async () => {
@@ -128,35 +184,56 @@ describe('Create proposal endpoint (e2e)', () => {
 
     const response = await request(app.getHttpServer())
       .post(PATH)
-      .send({ ...body, locationId: newPlaceId })
+      .send({ ...body, externalId: newPlaceId })
       .expect(201);
 
-    expect(getPlaceById).toHaveBeenCalledWith(newPlaceId);
-    expect(response.body.location).toEqual({
+    expect(getPlaceById).toHaveBeenCalledWith(newPlaceId, { includePriceRange: true });
+    expect(response.body.location).toMatchObject({
       id: expect.any(String),
+      externalId: newPlaceId,
       description: 'Bar novo',
       address: 'Rua Nova, 10',
+      manuallyCreated: false,
     });
-    expect(await proposals.findCatalogLocation(newPlaceId)).toEqual(response.body.location);
+    const publicLocation = Object.fromEntries(
+      Object.entries(response.body.location).filter(([key]) => key !== 'imageUrl')
+    );
+    expect(await proposals.findCatalogLocation(newPlaceId)).toEqual({
+      ...publicLocation,
+      image: null,
+    });
   });
 
   it('preserves null location fields', async () => {
-    proposals.setCatalogLocation(PLACE_ID, { id: LOCATION_ID, description: null, address: null });
+    proposals.setCatalogLocation(PLACE_ID, storedLocation({ description: null, address: null }));
     const response = await request(app.getHttpServer()).post(PATH).send(body).expect(201);
-    expect(response.body.location).toEqual({ id: LOCATION_ID, description: null, address: null });
+    expect(response.body.location).toMatchObject({
+      id: LOCATION_ID,
+      description: null,
+      address: null,
+    });
   });
 
-  it.each(['name', 'locationId'])('rejects missing %s', async (field) => {
-    const input = { ...body };
-    delete input[field];
-    await request(app.getHttpServer()).post(PATH).send(input).expect(400);
+  it('creates a manual suggestion when all location fields are omitted', async () => {
+    const response = await request(app.getHttpServer()).post(PATH).send({}).expect(201);
+    expect(response.body).toMatchObject({
+      name: null,
+      location: {
+        externalId: null,
+        name: null,
+        description: null,
+        address: null,
+        imageUrl: null,
+        manuallyCreated: true,
+      },
+    });
   });
 
   it.each([
     { name: null },
     { name: '' },
     { name: '   ' },
-    { locationId: 'places/../bad id' },
+    { externalId: 'places/../bad id' },
     { ownerId: USER_ID },
     { userId: USER_ID },
     { extra: true },
@@ -189,9 +266,9 @@ describe('Create proposal endpoint (e2e)', () => {
   it('returns 404 for a place unknown to Google Places', async () => {
     await request(app.getHttpServer())
       .post(PATH)
-      .send({ ...body, locationId: 'ChIJ-unknown' })
+      .send({ ...body, externalId: 'ChIJ-unknown' })
       .expect(404);
-    expect(getPlaceById).toHaveBeenCalledWith('ChIJ-unknown');
+    expect(getPlaceById).toHaveBeenCalledWith('ChIJ-unknown', { includePriceRange: true });
   });
 
   it('returns 401 without an authenticated session', async () => {
@@ -208,10 +285,13 @@ describe('Create proposal endpoint (e2e)', () => {
       '401',
       '403',
       '404',
+      '413',
       '503',
     ]);
-    const schema = response.body.components.schemas.CreateProposalDto;
-    expect(schema.required.sort()).toEqual(['locationId', 'name']);
-    expect(Object.keys(schema.properties).sort()).toEqual(['locationId', 'name']);
+    const schema = operation.requestBody.content['application/json'].schema;
+    expect(schema.required).toBeUndefined();
+    expect(Object.keys(schema.properties)).toEqual(
+      expect.arrayContaining(['name', 'locationId', 'externalId', 'address', 'image'])
+    );
   });
 });

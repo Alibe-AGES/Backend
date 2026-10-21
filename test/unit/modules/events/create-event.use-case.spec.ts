@@ -2,6 +2,7 @@ import {
   CreateEventUseCase,
   EventGroupAccessDeniedError,
   EventGroupNotFoundError,
+  EventLocationNotFoundError,
   InvalidEventCreationError,
   type CreateEventInput,
 } from '../../../../src/modules/events/application/create-event.use-case';
@@ -53,7 +54,12 @@ describe('CreateEventUseCase', () => {
         ownerId: OWNER_ID,
         name: 'Jantar de aniversário',
         timeslot: new Date('2026-10-15T20:00:00.000Z'),
-        location: { description: 'Rua dos Andradas, 1234, Porto Alegre', manuallyCreated: true },
+        location: {
+          kind: 'new',
+          id: expect.any(String),
+          address: 'Rua dos Andradas, 1234, Porto Alegre',
+          image: null,
+        },
         image: null,
         budgetStart: '50.00',
         budgetEnd: '120.00',
@@ -97,7 +103,9 @@ describe('CreateEventUseCase', () => {
     'rejects a request without %s',
     async (field) => {
       await expect(useCase.execute({ ...validInput, [field]: undefined })).rejects.toThrow(
-        new InvalidEventCreationError('Nome, dia, horário e endereço são obrigatórios')
+        new InvalidEventCreationError(
+          'Nome, dia, horário e locationId ou endereço são obrigatórios'
+        )
       );
     }
   );
@@ -120,17 +128,52 @@ describe('CreateEventUseCase', () => {
     );
   });
 
-  it('stores the uploaded image under the new event id', async () => {
+  it('stores the uploaded image under the new location id', async () => {
     const { event } = await useCase.execute({
       ...validInput,
       image: { originalName: 'event.png', contentType: 'image/png', bytes: PNG_BYTES },
     });
 
-    expect(event.image).toMatch(new RegExp(`^events/${event.id}/images/[0-9a-f-]{36}\\.png$`, 'i'));
+    expect(event.image).toMatch(/^locations\/[0-9a-f-]{36}\/images\/[0-9a-f-]{36}\.png$/i);
     await expect(storage.findByKey(event.image!)).resolves.toEqual({
       bytes: PNG_BYTES,
       contentType: 'image/png',
     });
+  });
+
+  it('reuses a saved location and inherits its image and price range', async () => {
+    const locationId = '44444444-4444-4444-8444-444444444444';
+    events.setLocation({
+      id: locationId,
+      image: `locations/${locationId}/images/place.png`,
+      priceStart: '30.00',
+      priceEnd: '70.00',
+      description: 'Local do Google',
+      manuallyCreated: false,
+    });
+
+    const { event } = await useCase.execute({
+      ...validInput,
+      location: undefined,
+      locationId,
+      budgetStart: undefined,
+      budgetEnd: undefined,
+    });
+
+    expect(event.location).toMatchObject({ id: locationId, manuallyCreated: false });
+    expect(event.image).toBe(`locations/${locationId}/images/place.png`);
+    expect(event.budgetStart).toBe('30.00');
+    expect(event.budgetEnd).toBe('70.00');
+  });
+
+  it('rejects an unknown locationId', async () => {
+    await expect(
+      useCase.execute({
+        ...validInput,
+        location: undefined,
+        locationId: '44444444-4444-4444-8444-444444444444',
+      })
+    ).rejects.toBeInstanceOf(EventLocationNotFoundError);
   });
 
   it.each([

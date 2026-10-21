@@ -13,10 +13,7 @@ import { PlacesProviderUnavailableError } from '../../../../src/shared/places/pl
 
 describe('ProposalsController error handling', () => {
   const input = {
-    locationId: 'location-id',
-    name: 'Café',
-    date: '2026-10-17',
-    time: '15:00',
+    externalId: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
   };
   const execute = jest.fn();
   const controller = new ProposalsController({ execute } as unknown as CreateProposalUseCase);
@@ -27,7 +24,7 @@ describe('ProposalsController error handling', () => {
     'rejects a request without an authenticated user ID: %p',
     async (request) => {
       await expect(
-        controller.create('group-id', input, request as AuthenticatedRequest)
+        controller.create('group-id', input, undefined, request as AuthenticatedRequest)
       ).rejects.toBeInstanceOf(UnauthorizedException);
       expect(execute).not.toHaveBeenCalled();
     }
@@ -36,14 +33,18 @@ describe('ProposalsController error handling', () => {
   it('maps application validation errors to HTTP 400', async () => {
     execute.mockRejectedValue(new InvalidProposalCreationError('Invalid input'));
     await expect(
-      controller.create('group-id', input, { user: { id: 'user-id' } } as AuthenticatedRequest)
+      controller.create('group-id', input, undefined, {
+        user: { id: 'user-id' },
+      } as AuthenticatedRequest)
     ).rejects.toEqual(new BadRequestException('Invalid input'));
   });
 
   it('maps an unavailable places provider to HTTP 503', async () => {
     execute.mockRejectedValue(new PlacesProviderUnavailableError('down'));
     await expect(
-      controller.create('group-id', input, { user: { id: 'user-id' } } as AuthenticatedRequest)
+      controller.create('group-id', input, undefined, {
+        user: { id: 'user-id' },
+      } as AuthenticatedRequest)
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
@@ -51,7 +52,9 @@ describe('ProposalsController error handling', () => {
     const failure = new Error('Database unavailable');
     execute.mockRejectedValue(failure);
     await expect(
-      controller.create('group-id', input, { user: { id: 'user-id' } } as AuthenticatedRequest)
+      controller.create('group-id', input, undefined, {
+        user: { id: 'user-id' },
+      } as AuthenticatedRequest)
     ).rejects.toBe(failure);
   });
 });

@@ -265,9 +265,18 @@ model InviteLink {
 
 model Location {
   id              String   @id @default(uuid()) @db.Uuid
-  externalId      String?  @map("external_id")
+  externalId      String?  @unique @map("external_id")
+  name            String?
   description     String?
   address         String?
+  openingHours    String[] @default([]) @map("opening_hours")
+  rating          Float?
+  phoneNumber     String?  @map("phone_number")
+  website         String?
+  priceStart      Decimal? @map("price_start")
+  priceEnd        Decimal? @map("price_end")
+  priceCurrency   String?  @map("price_currency")
+  image           String?
   manuallyCreated Boolean? @map("manually_created")
 
   events          Event[]

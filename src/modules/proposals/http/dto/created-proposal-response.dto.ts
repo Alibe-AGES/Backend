@@ -5,11 +5,41 @@ export class ProposalLocationResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
+  @ApiProperty({ type: String, nullable: true })
+  externalId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Restaurante Penne' })
+  name!: string | null;
+
   @ApiProperty({ nullable: true })
   description!: string | null;
 
   @ApiProperty({ nullable: true })
   address!: string | null;
+
+  @ApiProperty({ type: [String], example: ['segunda-feira: 18:00–23:00'] })
+  openingHours!: string[];
+
+  @ApiProperty({ type: Number, nullable: true, example: 4.6 })
+  rating!: number | null;
+
+  @ApiProperty({ type: String, nullable: true, example: '+55 51 3333-4444' })
+  phoneNumber!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'https://example.com' })
+  website!: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    example: { start: '50.00', end: '70.00', currencyCode: 'BRL' },
+  })
+  priceRange!: { start: string | null; end: string | null; currencyCode: string | null } | null;
+
+  @ApiProperty({ type: String, nullable: true, example: '/api/locations/uuid/image' })
+  imageUrl!: string | null;
+
+  @ApiProperty({ type: Boolean, nullable: true })
+  manuallyCreated!: boolean | null;
 }
 
 export class CreatedProposalResponseDto {
@@ -22,8 +52,8 @@ export class CreatedProposalResponseDto {
   @ApiProperty({ format: 'uuid' })
   groupId!: string;
 
-  @ApiProperty({ example: 'Café de sábado' })
-  name!: string;
+  @ApiProperty({ type: String, nullable: true, example: 'Restaurante Penne' })
+  name!: string | null;
 
   @ApiProperty({ type: Date, format: 'date-time' })
   createdAt!: Date;

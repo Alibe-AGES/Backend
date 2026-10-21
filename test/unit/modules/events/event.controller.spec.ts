@@ -10,6 +10,7 @@ import {
   CreateEventUseCase,
   EventGroupAccessDeniedError,
   EventGroupNotFoundError,
+  EventLocationNotFoundError,
   InvalidEventCreationError,
 } from '../../../../src/modules/events/application/create-event.use-case';
 import { GetEventImageUseCase } from '../../../../src/modules/events/application/get-event-image.use-case';
@@ -130,6 +131,7 @@ describe('EventController', () => {
     it.each([
       [new InvalidEventCreationError('invalid'), BadRequestException],
       [new EventGroupNotFoundError('not found'), NotFoundException],
+      [new EventLocationNotFoundError('not found'), NotFoundException],
       [new EventGroupAccessDeniedError('denied'), ForbiddenException],
     ])('maps %p to the matching HTTP exception', async (error, exception) => {
       createUseCaseMock.execute.mockRejectedValue(error);

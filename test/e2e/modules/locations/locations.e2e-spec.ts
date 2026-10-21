@@ -271,8 +271,15 @@ describe('Locations endpoint (e2e)', () => {
     const location = {
       id: LOCATION_ID,
       externalId: PLACE_ID,
+      name: 'Bloom Café',
       description: 'Café com ambiente tranquilo',
       address: 'Rua Padre Chagas, 320',
+      openingHours: [],
+      rating: 4.5,
+      phoneNumber: null,
+      website: null,
+      priceRange: { start: null, end: null, currencyCode: null },
+      image: null,
       manuallyCreated: false,
     };
     findById.mockResolvedValue(location);
@@ -281,7 +288,10 @@ describe('Locations endpoint (e2e)', () => {
       .get(`/api/locations/${LOCATION_ID}`)
       .expect(200);
 
-    expect(response.body).toEqual(location);
+    const publicLocation = Object.fromEntries(
+      Object.entries(location).filter(([key]) => key !== 'image')
+    );
+    expect(response.body).toEqual({ ...publicLocation, imageUrl: null });
     expect(findById).toHaveBeenCalledWith(LOCATION_ID);
     expect(getPlaceById).not.toHaveBeenCalled();
   });

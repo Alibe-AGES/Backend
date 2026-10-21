@@ -56,8 +56,10 @@ describe('EventController (e2e)', () => {
       name: 'Jantar de aniversário',
       timeslot: new Date('2026-10-15T20:00:00.000Z'),
       location: {
-        description: 'Rua dos Andradas, 1234, Porto Alegre',
-        manuallyCreated: true,
+        kind: 'new',
+        id: '44444444-4444-4444-8444-444444444444',
+        address: 'Rua dos Andradas, 1234, Porto Alegre',
+        image: null,
       },
       image: 'events/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/image.png',
       budgetStart: '50.00',

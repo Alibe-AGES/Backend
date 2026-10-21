@@ -8,6 +8,7 @@ import {
   type CreateLocatedEventData,
   type EventDetails,
   type EventDetailsAccess,
+  type EventCreationLocation,
   type EventImageAccess,
   EventRepository,
   type UpdateEventData,
@@ -49,6 +50,21 @@ export class PrismaEventRepository extends EventRepository {
     return group ? group.users.length > 0 : null;
   }
 
+  async findLocationById(id: string): Promise<EventCreationLocation | null> {
+    const location = await this.prisma.location.findUnique({
+      where: { id },
+      select: { id: true, image: true, priceStart: true, priceEnd: true },
+    });
+    return location
+      ? {
+          id: location.id,
+          image: location.image,
+          priceStart: location.priceStart?.toFixed(2) ?? null,
+          priceEnd: location.priceEnd?.toFixed(2) ?? null,
+        }
+      : null;
+  }
+
   async findImageAccess(eventId: string, userId: string): Promise<EventImageAccess | null> {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
@@ -78,13 +94,22 @@ export class PrismaEventRepository extends EventRepository {
 
   async create(data: CreateEventData): Promise<CreatedEvent> {
     const { event, ownerResponse } = await this.prisma.$transaction(async (transaction) => {
-      const location = await transaction.location.create({
-        data: {
-          description: data.location.description,
-          manuallyCreated: data.location.manuallyCreated,
-        },
-        select: { id: true },
-      });
+      const location =
+        data.location.kind === 'existing'
+          ? await transaction.location.findUniqueOrThrow({
+              where: { id: data.location.id },
+              select: { id: true },
+            })
+          : await transaction.location.create({
+              data: {
+                id: data.location.id,
+                description: data.location.address,
+                address: data.location.address,
+                image: data.location.image,
+                manuallyCreated: true,
+              },
+              select: { id: true },
+            });
 
       const created = await this.createEventProposal(transaction, {
         id: data.id,
@@ -326,7 +351,11 @@ export class PrismaEventRepository extends EventRepository {
       budgetEnd: data.budgetEnd?.toString() ?? null,
       status: data.status,
       groupId: data.groupId,
-      location: data.location,
+      location: {
+        id: data.location.id,
+        description: data.location.description,
+        manuallyCreated: data.location.manuallyCreated,
+      },
       proposals: data.proposals,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,

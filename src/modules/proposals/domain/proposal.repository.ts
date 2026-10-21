@@ -1,24 +1,40 @@
 import type { ProposalAnswer } from './proposal-response.entity';
 
-/** Place from the catalog (Google Places), stored only when a proposal first uses it. */
-export interface CatalogLocation {
-  externalId: string;
-  description: string | null;
-  address: string | null;
+export interface LocationPriceRange {
+  start: string | null;
+  end: string | null;
+  currencyCode: string | null;
 }
 
-export interface StoredCatalogLocation {
+export interface NewSuggestionLocation {
   id: string;
+  externalId: string | null;
+  name: string | null;
   description: string | null;
   address: string | null;
+  openingHours: string[];
+  rating: number | null;
+  phoneNumber: string | null;
+  website: string | null;
+  priceRange: LocationPriceRange;
+  image: string | null;
+  manuallyCreated: boolean;
 }
+
+export interface StoredProposalLocation extends Omit<NewSuggestionLocation, 'manuallyCreated'> {
+  id: string;
+  manuallyCreated: boolean | null;
+}
+
+export type SuggestionLocation =
+  { kind: 'existing'; id: string } | { kind: 'new'; value: NewSuggestionLocation };
 
 export interface CreateSuggestionData {
   id: string;
   groupId: string;
   ownerId: string;
-  name: string;
-  location: CatalogLocation;
+  name: string | null;
+  location: SuggestionLocation;
   createdAt: Date;
 }
 
@@ -26,13 +42,31 @@ export interface CreatedSuggestion {
   id: string;
   type: 'suggestion';
   groupId: string;
-  name: string;
+  name: string | null;
   createdAt: Date;
   owner: { id: string; name: string; image: string | null };
-  location: StoredCatalogLocation;
+  location: StoredProposalLocation;
   myAnswer: ProposalAnswer;
   /** True quando o autor é o único membro do grupo e o próprio aceite completa o match. */
   matched: boolean;
+}
+
+export interface ProposalDetails {
+  id: string;
+  type: 'suggestion' | 'event';
+  groupId: string;
+  eventId: string | null;
+  name: string | null;
+  createdAt: Date;
+  matchedAt: Date | null;
+  owner: { id: string; name: string; image: string | null };
+  location: StoredProposalLocation | null;
+  myAnswer: ProposalAnswer | null;
+}
+
+export interface ProposalDetailsAccess {
+  proposal: ProposalDetails;
+  userIsMember: boolean;
 }
 
 export class ProposalLocationNotFoundError extends Error {}
@@ -42,7 +76,11 @@ export abstract class ProposalRepository {
   abstract findGroupMembership(groupId: string, userId: string): Promise<boolean | null>;
 
   /** Location do catálogo já salva por uma proposta anterior, buscada pelo Place ID. */
-  abstract findCatalogLocation(externalId: string): Promise<StoredCatalogLocation | null>;
+  abstract findCatalogLocation(externalId: string): Promise<StoredProposalLocation | null>;
+
+  abstract findLocationById(id: string): Promise<StoredProposalLocation | null>;
+
+  abstract findDetails(id: string, userId: string): Promise<ProposalDetailsAccess | null>;
 
   /**
    * Reutiliza ou cria a location do catálogo e cria a sugestão com o aceite do autor

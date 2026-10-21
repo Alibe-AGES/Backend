@@ -397,7 +397,12 @@ describe('PrismaEventRepository', () => {
         ownerId: 'owner-id',
         name: 'Event',
         timeslot: baseRecord.timeslot,
-        location: { description: 'Location', manuallyCreated: true },
+        location: {
+          kind: 'new',
+          id: baseRecord.location.id,
+          address: 'Location',
+          image: null,
+        },
         image: null,
         budgetStart: '50.00',
         budgetEnd: null,
@@ -413,7 +418,13 @@ describe('PrismaEventRepository', () => {
 
       expect($transaction).toHaveBeenCalledTimes(1);
       expect(transaction.location.create).toHaveBeenCalledWith({
-        data: { description: 'Location', manuallyCreated: true },
+        data: {
+          id: baseRecord.location.id,
+          description: 'Location',
+          address: 'Location',
+          image: null,
+          manuallyCreated: true,
+        },
         select: { id: true },
       });
       expect(transaction.event.create).toHaveBeenCalledWith({

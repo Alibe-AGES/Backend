@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  ForbiddenException,
   Get,
   Header,
   HttpStatus,
@@ -9,18 +10,23 @@ import {
   ParseUUIDPipe,
   Query,
   Redirect,
+  Request,
   ServiceUnavailableException,
+  StreamableFile,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCookieAuth,
   ApiFoundResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiProduces,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -31,6 +37,13 @@ import {
   PlacesProviderUnavailableError,
 } from '../../../shared/places/places-provider';
 import { FindLocationByIdUseCase } from '../application/find-location-by-id.use-case';
+import {
+  GetLocationImageUseCase,
+  LocationForImageNotFoundError,
+  LocationImageAccessDeniedError,
+  LocationImageNotFoundError,
+} from '../application/get-location-image.use-case';
+import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { GetLocationUseCase, LocationNotFoundError } from '../application/get-location.use-case';
 import {
   GetLocationPhotoUseCase,
@@ -64,7 +77,8 @@ export class LocationsController {
     private readonly searchCatalogLocations: SearchCatalogLocationsUseCase,
     private readonly getLocationPhoto: GetLocationPhotoUseCase,
     private readonly getLocation: GetLocationUseCase,
-    private readonly findLocationById: FindLocationByIdUseCase
+    private readonly findLocationById: FindLocationByIdUseCase,
+    private readonly getLocationImage: GetLocationImageUseCase
   ) {}
 
   /**
@@ -103,6 +117,42 @@ export class LocationsController {
   @ApiServiceUnavailableResponse({ description: 'Serviço de locais indisponível.' })
   list(@Query() query: ListLocationsQueryDto): Promise<LocationListResponseDto> {
     return this.toListResponse(this.listCatalogLocations.execute(query));
+  }
+
+  @Get(':locationId/image')
+  @Header('Cache-Control', 'private, max-age=300')
+  @ApiOperation({ summary: 'Obtém a imagem de um local visível ao usuário autenticado' })
+  @ApiParam({ name: 'locationId', format: 'uuid' })
+  @ApiProduces('image/png', 'image/jpeg', 'image/webp')
+  @ApiOkResponse({
+    description: 'Conteúdo binário da imagem.',
+    content: { 'image/*': { schema: { type: 'string', format: 'binary' } } },
+  })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do local.' })
+  @ApiNotFoundResponse({ description: 'Local ou imagem não encontrado.' })
+  async image(
+    @Param('locationId', new ParseUUIDPipe()) locationId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<StreamableFile> {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
+
+    try {
+      const stored = await this.getLocationImage.execute(locationId, userId);
+      return new StreamableFile(Buffer.from(stored.bytes), { type: stored.contentType });
+    } catch (error) {
+      if (
+        error instanceof LocationForImageNotFoundError ||
+        error instanceof LocationImageNotFoundError
+      ) {
+        throw new NotFoundException(error.message);
+      }
+      if (error instanceof LocationImageAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -270,7 +320,12 @@ export class LocationsController {
     @Param('locationId', new ParseUUIDPipe()) locationId: string
   ): Promise<StoredLocationResponseDto> {
     try {
-      return await this.findLocationById.execute(locationId);
+      const location = await this.findLocationById.execute(locationId);
+      const { image, ...response } = location;
+      return {
+        ...response,
+        imageUrl: image ? `/api/locations/${location.id}/image` : null,
+      };
     } catch (error) {
       if (error instanceof LocationNotFoundError) {
         throw new NotFoundException(error.message);

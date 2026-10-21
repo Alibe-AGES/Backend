@@ -22,11 +22,25 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
   const locationId = randomUUID();
   const externalId = `place-${randomUUID()}`;
   const newExternalIds: string[] = [];
+  const newLocation = (placeId: string) => ({
+    id: randomUUID(),
+    externalId: placeId,
+    name: 'Café',
+    description: 'Do Google',
+    address: 'Rua do Google',
+    openingHours: [],
+    rating: null,
+    phoneNumber: null,
+    website: null,
+    priceRange: { start: null, end: null, currencyCode: null },
+    image: null,
+    manuallyCreated: false,
+  });
   const data = (overrides: Partial<CreateSuggestionData> = {}): CreateSuggestionData => ({
     id: randomUUID(),
     groupId,
     ownerId,
-    location: { externalId, description: 'Do Google', address: 'Rua do Google' },
+    location: { kind: 'existing', id: locationId },
     name: 'Café',
     createdAt: new Date(),
     ...overrides,
@@ -105,8 +119,17 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
     expect(await proposals.findGroupMembership(groupId, ownerId)).toBe(true);
     expect(await proposals.findCatalogLocation(externalId)).toEqual({
       id: locationId,
+      externalId,
+      name: null,
       description: original.description,
       address: original.address,
+      openingHours: [],
+      rating: null,
+      phoneNumber: null,
+      website: null,
+      priceRange: { start: null, end: null, currencyCode: null },
+      image: null,
+      manuallyCreated: false,
     });
 
     const input = data();
@@ -144,7 +167,7 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
   it('stores a place on its first suggestion and reuses it on the next one', async () => {
     const placeId = `place-${randomUUID()}`;
     newExternalIds.push(placeId);
-    const location = { externalId: placeId, description: 'Do Google', address: 'Rua do Google' };
+    const location = { kind: 'new' as const, value: newLocation(placeId) };
 
     const first = await proposals.createSuggestion(data({ location }));
     const second = await proposals.createSuggestion(data({ location }));
@@ -156,7 +179,7 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
   it('rolls back a new place when the suggestion fails', async () => {
     const placeId = `place-${randomUUID()}`;
     newExternalIds.push(placeId);
-    const location = { externalId: placeId, description: null, address: null };
+    const location = { kind: 'new' as const, value: newLocation(placeId) };
 
     await expect(
       proposals.createSuggestion(data({ location, ownerId: randomUUID() }))
@@ -170,7 +193,7 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
     const placeId = `place-${randomUUID()}`;
     newExternalIds.push(placeId);
     return proposals.createSuggestion(
-      data({ location: { externalId: placeId, description: null, address: null }, ...overrides })
+      data({ location: { kind: 'new', value: newLocation(placeId) }, ...overrides })
     );
   };
   const matchNotificationCount = (locationId: string) =>
@@ -207,7 +230,12 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
   it('records one match notification per suggestion even when they share the location', async () => {
     const first = await createWithOwnPlace();
     const second = await proposals.createSuggestion(
-      data({ location: { externalId: newExternalIds.at(-1), description: null, address: null } })
+      data({
+        location: {
+          kind: 'existing',
+          id: first.location.id,
+        },
+      })
     );
     expect(second.location.id).toBe(first.location.id);
 
