@@ -8,10 +8,6 @@ export class ProposalResponsePresenter {
       type: proposal.type,
       groupId: proposal.groupId,
       name: proposal.name,
-      date: proposal.timeslot?.toISOString().slice(0, 10) ?? null,
-      time: proposal.timeslot?.toISOString().slice(11, 16) ?? null,
-      budgetStart: proposal.budgetStart,
-      budgetEnd: proposal.budgetEnd,
       createdAt: proposal.createdAt,
       owner: {
         id: proposal.owner.id,

@@ -23,8 +23,6 @@ const input = {
   userId: '11111111-1111-4111-8111-111111111111',
   locationId: PLACE_ID,
   name: '  Café de sábado  ',
-  date: '2026-10-17',
-  time: '15:00',
 };
 
 describe('CreateProposalUseCase', () => {
@@ -49,7 +47,7 @@ describe('CreateProposalUseCase', () => {
     proposals.createSuggestion.mockResolvedValue({ id: 'proposal-id' });
   });
 
-  it('trims the name, uses UTC, and creates only the suggestion for the authenticated owner', async () => {
+  it('trims the name and creates only the suggestion for the authenticated owner', async () => {
     await expect(useCase.execute(input)).resolves.toEqual({ id: 'proposal-id' });
     expect(proposals.findGroupMembership).toHaveBeenCalledWith(input.groupId, input.userId);
     expect(proposals.createSuggestion).toHaveBeenCalledWith({
@@ -58,30 +56,9 @@ describe('CreateProposalUseCase', () => {
       ownerId: input.userId,
       location: { externalId: PLACE_ID, description: 'Café tranquilo', address: 'Rua A' },
       name: 'Café de sábado',
-      timeslot: new Date('2026-10-17T15:00:00.000Z'),
-      budgetStart: null,
-      budgetEnd: null,
       createdAt: expect.any(Date),
     });
   });
-
-  it('creates a suggestion without day, time or budget', async () => {
-    await useCase.execute({ ...input, date: undefined, time: undefined });
-
-    expect(proposals.createSuggestion).toHaveBeenCalledWith(
-      expect.objectContaining({ timeslot: null, budgetStart: null, budgetEnd: null })
-    );
-  });
-
-  it.each([{ date: undefined }, { time: undefined }])(
-    'rejects a day or time sent alone: %p',
-    async (missing) => {
-      await expect(useCase.execute({ ...input, ...missing })).rejects.toBeInstanceOf(
-        InvalidProposalCreationError
-      );
-      expect(proposals.findGroupMembership).not.toHaveBeenCalled();
-    }
-  );
 
   it('looks a new place up on Google, using the name when there is no summary', async () => {
     places.getPlaceById.mockResolvedValue(buildPlace({ externalId: PLACE_ID, summary: null }));
@@ -109,13 +86,6 @@ describe('CreateProposalUseCase', () => {
       expect.objectContaining({
         location: { externalId: PLACE_ID, description: 'Salvo', address: 'Rua B' },
       })
-    );
-  });
-
-  it('preserves an independently supplied budget bound', async () => {
-    await useCase.execute({ ...input, budgetEnd: '60.123' });
-    expect(proposals.createSuggestion).toHaveBeenCalledWith(
-      expect.objectContaining({ budgetStart: null, budgetEnd: '60.123' })
     );
   });
 

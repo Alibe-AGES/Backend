@@ -18,10 +18,6 @@ export interface CreateProposalInput {
   /** Google Place ID returned by the locations feed and search. */
   locationId: string;
   name: string;
-  date?: string;
-  time?: string;
-  budgetStart?: string;
-  budgetEnd?: string;
 }
 
 export class InvalidProposalCreationError extends Error {}
@@ -38,9 +34,6 @@ export class CreateProposalUseCase {
     const name = input.name?.trim();
     if (!name || !input.locationId) {
       throw new InvalidProposalCreationError('Nome e localização são obrigatórios');
-    }
-    if (Boolean(input.date) !== Boolean(input.time)) {
-      throw new InvalidProposalCreationError('Dia e horário devem ser informados juntos');
     }
 
     const membership = await this.proposals.findGroupMembership(input.groupId, input.userId);
@@ -59,9 +52,6 @@ export class CreateProposalUseCase {
       ownerId: input.userId,
       location,
       name,
-      timeslot: input.date ? new Date(`${input.date}T${input.time}:00.000Z`) : null,
-      budgetStart: input.budgetStart ?? null,
-      budgetEnd: input.budgetEnd ?? null,
       createdAt: new Date(),
     });
   }

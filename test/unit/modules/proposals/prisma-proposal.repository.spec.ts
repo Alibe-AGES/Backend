@@ -1,4 +1,3 @@
-import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import type { CreateSuggestionData } from '../../../../src/modules/proposals/domain/proposal.repository';
 import { PrismaProposalRepository } from '../../../../src/modules/proposals/persistence/prisma-proposal.repository';
@@ -11,19 +10,12 @@ describe('PrismaProposalRepository', () => {
     ownerId: 'owner-id',
     location: catalogLocation,
     name: 'Café',
-    timeslot: new Date('2026-10-17T15:00:00.000Z'),
-    budgetStart: '0',
-    budgetEnd: '60.126',
     createdAt: new Date('2026-10-10T12:00:00.000Z'),
   };
   const location = { id: 'location-id', description: null, address: 'Rua A' };
   const select = { id: true, description: true, address: true };
 
-  function setup({
-    budgetStart = data.budgetStart,
-    budgetEnd = data.budgetEnd,
-    memberIds = ['owner-id', 'other-id'],
-  } = {}) {
+  function setup({ memberIds = ['owner-id', 'other-id'] } = {}) {
     const transaction = {
       location: {
         findFirst: jest.fn().mockResolvedValue(location),
@@ -34,9 +26,6 @@ describe('PrismaProposalRepository', () => {
           id: data.id,
           groupId: data.groupId,
           name: data.name,
-          timeslot: data.timeslot,
-          budgetStart: budgetStart === null ? null : new Prisma.Decimal(budgetStart),
-          budgetEnd: budgetEnd === null ? null : new Prisma.Decimal(budgetEnd),
           createdAt: data.createdAt,
           owner: { id: data.ownerId, name: 'Ana', profilePic: null },
         }),
@@ -45,6 +34,7 @@ describe('PrismaProposalRepository', () => {
           name: data.name,
           matchedAt: null,
           groupId: data.groupId,
+          locationId: location.id,
           group: { users: memberIds.map((userId) => ({ userId })) },
           responses: [{ userId: data.ownerId }],
         }),
@@ -93,60 +83,46 @@ describe('PrismaProposalRepository', () => {
     }
   );
 
-  it.each([
-    ['0', '60.126', '0.00', '60.13'],
-    [null, null, null, null],
-  ])(
-    'creates only the suggestion and the owner acceptance with budgets %p and %p',
-    async (budgetStart, budgetEnd, start, end) => {
-      const { repository, prisma, transaction } = setup({ budgetStart, budgetEnd });
-      await expect(
-        repository.createSuggestion({ ...data, budgetStart, budgetEnd })
-      ).resolves.toEqual({
-        id: data.id,
-        type: 'suggestion',
-        groupId: data.groupId,
-        name: data.name,
-        timeslot: data.timeslot,
-        budgetStart: start,
-        budgetEnd: end,
-        createdAt: data.createdAt,
-        owner: { id: data.ownerId, name: 'Ana', image: null },
-        location,
-        myAnswer: 'yes',
-        matched: false,
-      });
-      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(transaction.location.create).not.toHaveBeenCalled();
-      expect(transaction.proposal.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: {
-            id: data.id,
-            type: 'suggestion',
-            groupId: data.groupId,
-            ownerId: data.ownerId,
-            name: data.name,
-            locationId: location.id,
-            timeslot: data.timeslot,
-            budgetStart,
-            budgetEnd,
-            createdAt: data.createdAt,
-          },
-        })
-      );
-      expect(transaction.proposalResponse.create).toHaveBeenCalledWith({
+  it('creates only the suggestion and the owner acceptance', async () => {
+    const { repository, prisma, transaction } = setup();
+    await expect(repository.createSuggestion(data)).resolves.toEqual({
+      id: data.id,
+      type: 'suggestion',
+      groupId: data.groupId,
+      name: data.name,
+      createdAt: data.createdAt,
+      owner: { id: data.ownerId, name: 'Ana', image: null },
+      location,
+      myAnswer: 'yes',
+      matched: false,
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(transaction.location.create).not.toHaveBeenCalled();
+    expect(transaction.proposal.create).toHaveBeenCalledWith(
+      expect.objectContaining({
         data: {
-          proposalId: data.id,
-          userId: data.ownerId,
-          answer: 'yes',
+          id: data.id,
+          type: 'suggestion',
+          groupId: data.groupId,
+          ownerId: data.ownerId,
+          name: data.name,
+          locationId: location.id,
           createdAt: data.createdAt,
         },
-        select: { answer: true },
-      });
-      expect(transaction.event.create).not.toHaveBeenCalled();
-      expect(transaction.groupNotification.create).not.toHaveBeenCalled();
-    }
-  );
+      })
+    );
+    expect(transaction.proposalResponse.create).toHaveBeenCalledWith({
+      data: {
+        proposalId: data.id,
+        userId: data.ownerId,
+        answer: 'yes',
+        createdAt: data.createdAt,
+      },
+      select: { answer: true },
+    });
+    expect(transaction.event.create).not.toHaveBeenCalled();
+    expect(transaction.groupNotification.create).not.toHaveBeenCalled();
+  });
 
   it('stores the catalog location in the same transaction when it is used for the first time', async () => {
     const { repository, transaction } = setup();
@@ -171,7 +147,7 @@ describe('PrismaProposalRepository', () => {
 
     await expect(repository.createSuggestion(data)).resolves.toMatchObject({ matched: true });
     expect(transaction.groupNotification.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ type: 'match', proposalId: data.id }),
+      data: expect.objectContaining({ type: 'match', locationId: location.id }),
       select: { id: true },
     });
   });

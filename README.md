@@ -256,8 +256,8 @@ A criação do encontro também persiste, na mesma transação do PostgreSQL, um
 integrantes autorizados consultam os mesmos registros. O lembrete diário não é persistido no mural.
 Os tipos públicos do mural são `createdEvent` e `match`. O `match` é registrado quando todos os
 membros atuais do grupo aceitam uma sugestão (veja
-[Endpoints de resposta à proposta](#endpoints-de-resposta-à-proposta)); ele preenche `proposalId` e
-deixa `eventId` nulo, porque nenhum evento existe nesse momento.
+[Endpoints de resposta à proposta](#endpoints-de-resposta-à-proposta)); ele preenche `locationId` com o
+local da sugestão e deixa `eventId` nulo, porque nenhum evento existe nesse momento.
 
 As mensagens persistidas usam referências no formato `${user:<uuid>}`. Ao listar o mural, a API
 resolve todas as referências da página em uma única consulta e devolve os nomes dos usuários. O
@@ -282,7 +282,7 @@ GET /groups/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/notifications?page=1&limit=7
       "message": "Ana Souza criou o evento \"Cinema\" para o dia 18/10/2026.",
       "createdAt": "2026-10-18T18:00:00.000Z",
       "eventId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      "proposalId": null
+      "locationId": null
     }
   ],
   "pagination": {
@@ -913,26 +913,25 @@ POST /api/groups/:groupId/proposals
 ```
 
 Uma sugestão é uma `Proposal` do tipo `suggestion`: a ideia de um encontro, ainda sem evento.
-O evento só é criado depois, pelos endpoints de evento. A tabela `proposal` guarda o próprio
-`group_id`, `name`, `location_id`, `timeslot` e orçamento; `event_id` fica nulo nas sugestões.
-Propostas criadas junto com um evento (`POST /groups/:groupId/events`) continuam com o tipo `event`.
+O evento só é criado depois, pelos endpoints de evento; dia, horário e orçamento pertencem ao
+evento, não à sugestão. A tabela `proposal` guarda o próprio `group_id`, `name` e `location_id`;
+`event_id` fica nulo nas sugestões. Propostas criadas junto com um evento
+(`POST /groups/:groupId/events`) continuam com o tipo `event`.
 
-O body JSON estrito exige `locationId` (Place ID do Google, o `externalId` dos itens do feed e da
-pesquisa) e `name` (não vazio após `trim()`). `date` (`YYYY-MM-DD`) e `time` (`HH:mm`) são opcionais,
-mas devem ser enviados juntos. `budgetStart` e `budgetEnd` são strings decimais opcionais e
-independentes, seguindo a validação da criação de eventos; não aceitam `null` explícito. Campos
-extras, incluindo `ownerId` e `userId`, respondem `400`. O autor vem somente da sessão.
+O body JSON estrito aceita somente `locationId` (Place ID do Google, o `externalId` dos itens do
+feed e da pesquisa) e `name` (não vazio após `trim()`), ambos obrigatórios. Qualquer outro campo,
+incluindo `date`, `time`, `budgetStart`, `budgetEnd`, `ownerId` e `userId`, responde `400`. O autor
+vem somente da sessão.
 
 Uma transação cria a `Proposal` e a `ProposalResponse` do autor com resposta `yes`. Na mesma
 transação, a `Location` com esse `external_id` e `manually_created = false` é reutilizada ou, no
 primeiro uso do local, criada com nome ou resumo e endereço do Google. O Google só é consultado
-quando o local ainda não está salvo. Data e horário são interpretados em UTC.
+quando o local ainda não está salvo.
 
-A resposta `201` contém `id`, `type: "suggestion"`, `groupId`, `name`, `date`, `time`,
-`budgetStart`, `budgetEnd`, `createdAt`, `owner` (`id`, `name`, `image`), `location` (`id`,
-`description`, `address`), `myAnswer: "yes"` e `matched`. `date`, `time` e orçamentos são `null`
-quando omitidos; orçamentos usam duas casas decimais. `matched` só é `true` quando o autor é o único
-membro do grupo, porque o próprio aceite completa o match. A imagem do autor usa
+A resposta `201` contém `id`, `type: "suggestion"`, `groupId`, `name`, `createdAt`, `owner` (`id`,
+`name`, `image`), `location` (`id`, `description`, `address`), `myAnswer: "yes"` e `matched`.
+`matched` só é `true` quando o autor é o único membro do grupo, porque o próprio aceite completa o
+match. A imagem do autor usa
 `/users/:id/profile-picture` ou `null`. Grupo inexistente ou local que o Google não encontra
 respondem `404`, usuário fora do grupo `403`, ausência de autenticação `401` e Google indisponível `503`.
 
@@ -964,7 +963,8 @@ se aplica.
 **Match.** Uma sugestão dá match quando todos os membros atuais do grupo estão com resposta `yes`.
 A resposta que completa os aceites, seja pelo `POST` ou por um `PATCH` de `no` para `yes`, retorna
 `matched: true`; na mesma transação, a proposta recebe `matched_at` e o mural do grupo ganha uma
-notificação `match` com `proposalId`. Nas demais respostas a resposta é gravada normalmente e
+notificação `match` com o `locationId` da sugestão. Vários matches podem apontar para o mesmo local;
+quem garante um único match por sugestão é o `matched_at` junto com o lock da proposta. Nas demais respostas a resposta é gravada normalmente e
 `matched` é `false`. O match acontece uma única vez por sugestão: trocar a resposta depois não gera
 outro match. Propostas do tipo `event` nunca dão match. Cada resposta trava a linha da proposta
 (`SELECT ... FOR UPDATE`), então dois últimos aceites simultâneos registram exatamente um match.

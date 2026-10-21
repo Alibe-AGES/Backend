@@ -54,7 +54,7 @@ export class ProposalsController {
   @ApiOperation({
     summary: 'Sugere um local do catálogo do Google Places como encontro do grupo',
     description:
-      'Cria somente a sugestão (proposta do tipo `suggestion`) com o aceite do autor. Nenhum evento é criado; dia, horário e orçamento são opcionais.',
+      'Cria somente a sugestão (proposta do tipo `suggestion`) com o aceite do autor. Nenhum evento é criado; dia, horário e orçamento são definidos depois, na criação do evento.',
   })
   @ApiParam({ name: 'groupId', format: 'uuid' })
   @ApiBody({ type: CreateProposalDto })

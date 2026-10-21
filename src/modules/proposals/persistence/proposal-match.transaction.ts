@@ -25,6 +25,7 @@ export async function registerMatchIfComplete(
       name: true,
       matchedAt: true,
       groupId: true,
+      locationId: true,
       group: { select: { users: { select: { userId: true } } } },
       responses: { where: { answer: 'yes' }, select: { userId: true } },
     },
@@ -52,7 +53,7 @@ export async function registerMatchIfComplete(
       message: proposalMatchNotificationMessage(proposal.name),
       createdAt: matchedAt,
       groupId: proposal.groupId,
-      proposalId,
+      locationId: proposal.locationId,
     },
     select: { id: true },
   });

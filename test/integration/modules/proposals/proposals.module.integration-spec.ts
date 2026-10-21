@@ -16,6 +16,7 @@ const PROPOSAL_ID = '55555555-5555-4555-8555-555555555555';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OWNER_ID = '44444444-4444-4444-8444-444444444444';
 const PLACE_ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
+const LOCATION_ID = '88888888-8888-4888-8888-888888888888';
 
 describe('ProposalsModule integration', () => {
   let moduleFixture: TestingModule;
@@ -56,6 +57,7 @@ describe('ProposalsModule integration', () => {
       name: 'Café',
       matchedAt: null,
       groupId: GROUP_ID,
+      locationId: LOCATION_ID,
       group: { users: [{ userId: OWNER_ID }, { userId: USER_ID }] },
       responses: [{ userId: OWNER_ID }, { userId: USER_ID }],
     });
@@ -104,7 +106,7 @@ describe('ProposalsModule integration', () => {
 
     expect(result).toMatchObject({ proposalId: PROPOSAL_ID, answer: 'yes', matched: true });
     expect(transaction.groupNotification.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ type: 'match', proposalId: PROPOSAL_ID, groupId: GROUP_ID }),
+      data: expect.objectContaining({ type: 'match', locationId: LOCATION_ID, groupId: GROUP_ID }),
       select: { id: true },
     });
   });
@@ -127,9 +129,6 @@ describe('ProposalsModule integration', () => {
       type: 'suggestion',
       groupId: GROUP_ID,
       name: 'Café',
-      timeslot: null,
-      budgetStart: null,
-      budgetEnd: null,
       createdAt: new Date('2026-10-09T17:00:00.000Z'),
       owner: { id: USER_ID, name: 'Ana', image: null },
       location,
@@ -145,8 +144,6 @@ describe('ProposalsModule integration', () => {
       expect(result).toMatchObject({
         id: PROPOSAL_ID,
         type: 'suggestion',
-        date: null,
-        time: null,
         owner: { id: USER_ID, image: null },
         location,
         myAnswer: 'yes',
@@ -155,7 +152,6 @@ describe('ProposalsModule integration', () => {
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({
           ownerId: USER_ID,
-          timeslot: null,
           location: { externalId: PLACE_ID, description: null, address: null },
         })
       );

@@ -38,7 +38,7 @@ export class PrismaGroupNotificationRepository extends GroupNotificationReposito
           message: true,
           createdAt: true,
           eventId: true,
-          proposalId: true,
+          locationId: true,
         },
       }),
     ]);

@@ -15,8 +15,10 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
+  ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -61,6 +63,8 @@ const answerBody = {
 };
 
 @ApiTags('Proposal responses')
+@ApiCookieAuth('better-auth')
+@ApiBearerAuth('better-auth-bearer')
 @Controller('api')
 export class ProposalResponseController {
   constructor(

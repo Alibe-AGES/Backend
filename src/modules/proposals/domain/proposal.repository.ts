@@ -19,9 +19,6 @@ export interface CreateSuggestionData {
   ownerId: string;
   name: string;
   location: CatalogLocation;
-  timeslot: Date | null;
-  budgetStart: string | null;
-  budgetEnd: string | null;
   createdAt: Date;
 }
 
@@ -30,9 +27,6 @@ export interface CreatedSuggestion {
   type: 'suggestion';
   groupId: string;
   name: string;
-  timeslot: Date | null;
-  budgetStart: string | null;
-  budgetEnd: string | null;
   createdAt: Date;
   owner: { id: string; name: string; image: string | null };
   location: StoredCatalogLocation;

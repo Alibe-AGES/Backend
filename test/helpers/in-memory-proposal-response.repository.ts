@@ -23,6 +23,7 @@ interface StoredEvent {
 interface StoredProposal {
   type: ProposalType;
   memberIds: Set<string>;
+  locationId: string | null;
   matchedAt: Date | null;
 }
 
@@ -31,7 +32,7 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
   private readonly proposals = new Map<string, StoredProposal>();
   private readonly responses = new Map<string, ProposalResponse>();
   /** Notificações `match` registradas, na ordem em que ocorreram. */
-  readonly matchNotifications: Array<{ proposalId: string; createdAt: Date }> = [];
+  readonly matchNotifications: Array<{ locationId: string | null; createdAt: Date }> = [];
   private nextId = 1;
 
   findEventProposalContext(eventId: string, userId: string): Promise<EventProposalContext | null> {
@@ -93,15 +94,17 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
       this.proposals.set(proposalId, {
         type: 'event',
         memberIds: new Set(memberIds),
+        locationId: null,
         matchedAt: null,
       });
     }
   }
 
-  setSuggestion(proposalId: string, memberIds: string[]): void {
+  setSuggestion(proposalId: string, memberIds: string[], locationId: string): void {
     this.proposals.set(proposalId, {
       type: 'suggestion',
       memberIds: new Set(memberIds),
+      locationId,
       matchedAt: null,
     });
   }
@@ -133,7 +136,7 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
 
     if (matched) {
       proposal.matchedAt = matchedAt;
-      this.matchNotifications.push({ proposalId, createdAt: matchedAt });
+      this.matchNotifications.push({ locationId: proposal.locationId, createdAt: matchedAt });
     }
 
     return matched;

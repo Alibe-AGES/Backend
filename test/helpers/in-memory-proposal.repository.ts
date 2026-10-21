@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { Prisma } from '../../generated/prisma/client';
 import {
   type CreatedSuggestion,
   type CreateSuggestionData,
@@ -47,9 +46,6 @@ export class InMemoryProposalRepository extends ProposalRepository {
       type: 'suggestion',
       groupId: data.groupId,
       name: data.name,
-      timeslot: data.timeslot,
-      budgetStart: toMoney(data.budgetStart),
-      budgetEnd: toMoney(data.budgetEnd),
       createdAt: data.createdAt,
       owner: { id: data.ownerId, name: 'Ana Beatriz Silva', image: 'users/ana.jpg' },
       location,
@@ -59,8 +55,4 @@ export class InMemoryProposalRepository extends ProposalRepository {
     this.suggestions.set(suggestion.id, suggestion);
     return Promise.resolve(suggestion);
   }
-}
-
-function toMoney(value: string | null): string | null {
-  return value === null ? null : new Prisma.Decimal(value).toFixed(2);
 }

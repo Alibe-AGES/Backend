@@ -20,8 +20,6 @@ const PATH = `/api/groups/${GROUP_ID}/proposals`;
 const body = {
   locationId: PLACE_ID,
   name: '  Café de sábado  ',
-  date: '2026-10-17',
-  time: '15:00',
 };
 
 describe('Create proposal endpoint (e2e)', () => {
@@ -71,19 +69,12 @@ describe('Create proposal endpoint (e2e)', () => {
   });
 
   it('creates only the suggestion at the exact route with the session owner', async () => {
-    const response = await request(app.getHttpServer())
-      .post(PATH)
-      .send({ ...body, budgetStart: '30', budgetEnd: '60.126' })
-      .expect(201);
+    const response = await request(app.getHttpServer()).post(PATH).send(body).expect(201);
     expect(response.body).toEqual({
       id: expect.any(String),
       type: 'suggestion',
       groupId: GROUP_ID,
       name: 'Café de sábado',
-      date: '2026-10-17',
-      time: '15:00',
-      budgetStart: '30.00',
-      budgetEnd: '60.13',
       createdAt: expect.any(String),
       owner: { id: USER_ID, name: 'Ana Beatriz Silva', image: `/users/${USER_ID}/profile-picture` },
       location: {
@@ -103,21 +94,6 @@ describe('Create proposal endpoint (e2e)', () => {
     expect(getPlaceById).not.toHaveBeenCalled();
   });
 
-  it('creates a suggestion with only name and location', async () => {
-    const response = await request(app.getHttpServer())
-      .post(PATH)
-      .send({ locationId: PLACE_ID, name: 'Café' })
-      .expect(201);
-
-    expect(response.body).toMatchObject({
-      date: null,
-      time: null,
-      budgetStart: null,
-      budgetEnd: null,
-      matched: false,
-    });
-  });
-
   it('reports the match right away when the owner is the only group member', async () => {
     proposals.setGroupMembers(GROUP_ID, [USER_ID]);
 
@@ -126,15 +102,23 @@ describe('Create proposal endpoint (e2e)', () => {
     expect(response.body.matched).toBe(true);
   });
 
-  it.each([{ date: '2026-10-17' }, { time: '15:00' }])(
-    'rejects a day or time sent alone: %p',
-    async (partial) => {
+  it.each([
+    { date: '2026-10-17' },
+    { time: '15:00' },
+    { budgetStart: '30.00' },
+    { budgetEnd: '60.00' },
+  ])('rejects %p because day, time and budget belong to the event', async (field) => {
+    const create = jest.spyOn(proposals, 'createSuggestion');
+    try {
       await request(app.getHttpServer())
         .post(PATH)
-        .send({ locationId: PLACE_ID, name: 'Café', ...partial })
+        .send({ ...body, ...field })
         .expect(400);
+      expect(create).not.toHaveBeenCalled();
+    } finally {
+      create.mockRestore();
     }
-  );
+  });
 
   it('stores a place used for the first time with the data from Google Places', async () => {
     const newPlaceId = 'ChIJ-new-place';
@@ -156,52 +140,10 @@ describe('Create proposal endpoint (e2e)', () => {
     expect(await proposals.findCatalogLocation(newPlaceId)).toEqual(response.body.location);
   });
 
-  it('allows an independent budget bound and preserves null location fields', async () => {
+  it('preserves null location fields', async () => {
     proposals.setCatalogLocation(PLACE_ID, { id: LOCATION_ID, description: null, address: null });
-    const response = await request(app.getHttpServer())
-      .post(PATH)
-      .send({ ...body, budgetEnd: '-1.25' })
-      .expect(201);
-    expect(response.body).toMatchObject({ budgetStart: null, budgetEnd: '-1.25' });
-    expect(response.body.location).toEqual({ id: LOCATION_ID, description: null, address: null });
-  });
-
-  it('defaults both omitted budgets to null', async () => {
     const response = await request(app.getHttpServer()).post(PATH).send(body).expect(201);
-    expect(response.body).toMatchObject({ budgetStart: null, budgetEnd: null });
-  });
-
-  it('accepts budgets at the database integer limit and preserves two decimal places', async () => {
-    const integer = '9'.repeat(35);
-    const response = await request(app.getHttpServer())
-      .post(PATH)
-      .send({ ...body, budgetStart: `${integer}.12`, budgetEnd: `-000${integer}.12` })
-      .expect(201);
-    expect(response.body).toMatchObject({
-      budgetStart: `${integer}.12`,
-      budgetEnd: `-${integer}.12`,
-    });
-  });
-
-  it.each([
-    { budgetStart: '1' + '0'.repeat(35) },
-    { budgetEnd: '-1' + '0'.repeat(35) },
-    { budgetStart: '0001' + '0'.repeat(35) + '.01' },
-    { budgetEnd: '9'.repeat(36) + '.' + '9'.repeat(30) },
-  ])('rejects an overflowing budget before accessing persistence: %p', async (invalid) => {
-    const membership = jest.spyOn(proposals, 'findGroupMembership');
-    const create = jest.spyOn(proposals, 'createSuggestion');
-    try {
-      await request(app.getHttpServer())
-        .post(PATH)
-        .send({ ...body, ...invalid })
-        .expect(400);
-      expect(membership).not.toHaveBeenCalled();
-      expect(create).not.toHaveBeenCalled();
-    } finally {
-      membership.mockRestore();
-      create.mockRestore();
-    }
+    expect(response.body.location).toEqual({ id: LOCATION_ID, description: null, address: null });
   });
 
   it.each(['name', 'locationId'])('rejects missing %s', async (field) => {
@@ -215,17 +157,6 @@ describe('Create proposal endpoint (e2e)', () => {
     { name: '' },
     { name: '   ' },
     { locationId: 'places/../bad id' },
-    { date: '2026-02-30' },
-    { date: '17/10/2026' },
-    { time: '25:00' },
-    { time: '15:00:00' },
-    { time: '15:00Z' },
-    { budgetStart: null },
-    { budgetEnd: null },
-    { budgetStart: 30 },
-    { budgetEnd: '30,00' },
-    { budgetStart: '' },
-    { budgetEnd: '1.1234567890123456789012345678901' },
     { ownerId: USER_ID },
     { userId: USER_ID },
     { extra: true },
@@ -279,9 +210,8 @@ describe('Create proposal endpoint (e2e)', () => {
       '404',
       '503',
     ]);
-    expect(response.body.components.schemas.CreateProposalDto.required.sort()).toEqual([
-      'locationId',
-      'name',
-    ]);
+    const schema = response.body.components.schemas.CreateProposalDto;
+    expect(schema.required.sort()).toEqual(['locationId', 'name']);
+    expect(Object.keys(schema.properties).sort()).toEqual(['locationId', 'name']);
   });
 });

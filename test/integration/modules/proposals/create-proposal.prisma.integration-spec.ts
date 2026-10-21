@@ -28,9 +28,6 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
     ownerId,
     location: { externalId, description: 'Do Google', address: 'Rua do Google' },
     name: 'Café',
-    timeslot: new Date('2026-10-17T15:00:00.000Z'),
-    budgetStart: '30',
-    budgetEnd: '60.126',
     createdAt: new Date(),
     ...overrides,
   });
@@ -119,9 +116,6 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
       id: input.id,
       type: 'suggestion',
       groupId,
-      timeslot: input.timeslot,
-      budgetStart: '30.00',
-      budgetEnd: '60.13',
       owner: { id: ownerId, name: 'Ana', image: null },
       location: { id: locationId },
       myAnswer: 'yes',
@@ -145,16 +139,6 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
     expect(await prisma.location.findUniqueOrThrow({ where: { id: locationId } })).toEqual(
       original
     );
-  });
-
-  it('stores a suggestion without day, time or budget', async () => {
-    const input = data({ timeslot: null, budgetStart: null, budgetEnd: null });
-
-    await expect(proposals.createSuggestion(input)).resolves.toMatchObject({
-      timeslot: null,
-      budgetStart: null,
-      budgetEnd: null,
-    });
   });
 
   it('stores a place on its first suggestion and reuses it on the next one', async () => {
@@ -181,8 +165,20 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
     expect(await prisma.location.count({ where: { externalId: placeId } })).toBe(0);
   });
 
-  it('matches only when the last member accepts and records one match notification', async () => {
-    const { id } = await proposals.createSuggestion(data({ name: 'Bar de sexta' }));
+  // Each match test uses its own place, so the notification can be found by its location.
+  const createWithOwnPlace = (overrides: Partial<CreateSuggestionData> = {}) => {
+    const placeId = `place-${randomUUID()}`;
+    newExternalIds.push(placeId);
+    return proposals.createSuggestion(
+      data({ location: { externalId: placeId, description: null, address: null }, ...overrides })
+    );
+  };
+  const matchNotificationCount = (locationId: string) =>
+    prisma.groupNotification.count({ where: { type: 'match', locationId } });
+
+  it('matches only when the last member accepts and records the location in the notification', async () => {
+    const suggestion = await createWithOwnPlace({ name: 'Bar de sexta' });
+    const { id } = suggestion;
 
     await expect(accept(id, firstMemberId)).resolves.toMatchObject({ matched: false });
     const last = await accept(id, secondMemberId);
@@ -194,8 +190,8 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
     });
     expect(
       await prisma.groupNotification.findMany({
-        where: { proposalId: id },
-        select: { type: true, groupId: true, message: true, eventId: true },
+        where: { locationId: suggestion.location.id },
+        select: { type: true, groupId: true, message: true, eventId: true, locationId: true },
       })
     ).toEqual([
       {
@@ -203,12 +199,29 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
         groupId,
         message: 'Deu match! Todo o grupo aceitou a sugestão "Bar de sexta".',
         eventId: null,
+        locationId: suggestion.location.id,
       },
     ]);
   });
 
+  it('records one match notification per suggestion even when they share the location', async () => {
+    const first = await createWithOwnPlace();
+    const second = await proposals.createSuggestion(
+      data({ location: { externalId: newExternalIds.at(-1), description: null, address: null } })
+    );
+    expect(second.location.id).toBe(first.location.id);
+
+    for (const { id } of [first, second]) {
+      await accept(id, firstMemberId);
+      await expect(accept(id, secondMemberId)).resolves.toMatchObject({ matched: true });
+    }
+
+    expect(await matchNotificationCount(first.location.id)).toBe(2);
+  });
+
   it('matches when a refusal is changed to an acceptance, but only once', async () => {
-    const { id } = await proposals.createSuggestion(data());
+    const suggestion = await createWithOwnPlace();
+    const { id } = suggestion;
     await accept(id, firstMemberId);
     await responses.create({
       proposalId: id,
@@ -225,22 +238,23 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
       responses.updateAnswer(id, secondMemberId, 'yes', new Date())
     ).resolves.toMatchObject({ matched: false });
 
-    expect(await prisma.groupNotification.count({ where: { proposalId: id } })).toBe(1);
+    expect(await matchNotificationCount(suggestion.location.id)).toBe(1);
   });
 
   it('registers a single match when the last two members accept at the same time', async () => {
-    const { id } = await proposals.createSuggestion(data());
+    const suggestion = await createWithOwnPlace();
+    const { id } = suggestion;
 
     const results = await Promise.all([accept(id, firstMemberId), accept(id, secondMemberId)]);
 
     expect(results.filter(({ matched }) => matched)).toHaveLength(1);
-    expect(await prisma.groupNotification.count({ where: { proposalId: id } })).toBe(1);
+    expect(await matchNotificationCount(suggestion.location.id)).toBe(1);
   });
 
   it('matches right away when the owner is the only group member', async () => {
-    const result = await proposals.createSuggestion(data({ groupId: soloGroupId }));
+    const result = await createWithOwnPlace({ groupId: soloGroupId });
 
     expect(result.matched).toBe(true);
-    expect(await prisma.groupNotification.count({ where: { proposalId: result.id } })).toBe(1);
+    expect(await matchNotificationCount(result.location.id)).toBe(1);
   });
 });

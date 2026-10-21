@@ -11,6 +11,7 @@ import { InMemoryProposalResponseRepository } from '../../../helpers/in-memory-p
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const PROPOSAL_ID = '55555555-5555-4555-8555-555555555555';
 const SUGGESTION_ID = '77777777-7777-4777-8777-777777777777';
+const LOCATION_ID = '88888888-8888-4888-8888-888888888888';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OWNER_ID = '44444444-4444-4444-8444-444444444444';
 const OUTSIDER_ID = '99999999-9999-4999-8999-999999999999';
@@ -118,7 +119,7 @@ describe('Proposal responses endpoints (e2e)', () => {
 
   describe('suggestion responses', () => {
     beforeEach(async () => {
-      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID]);
+      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID], LOCATION_ID);
       await responses.create({
         proposalId: SUGGESTION_ID,
         userId: OWNER_ID,
@@ -142,12 +143,12 @@ describe('Proposal responses endpoints (e2e)', () => {
         matched: true,
       });
       expect(responses.matchNotifications).toEqual([
-        { proposalId: SUGGESTION_ID, createdAt: expect.any(Date) },
+        { locationId: LOCATION_ID, createdAt: expect.any(Date) },
       ]);
     });
 
     it('stores an acceptance without match while another member has not accepted', async () => {
-      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID, OUTSIDER_ID]);
+      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID, OUTSIDER_ID], LOCATION_ID);
 
       const response = await request(app.getHttpServer())
         .post(SUGGESTION_RESPONSES_PATH)
@@ -216,6 +217,14 @@ describe('Proposal responses endpoints (e2e)', () => {
         '403',
         '404',
       ]);
+      for (const operation of [
+        swagger.body.paths[base].post,
+        swagger.body.paths[`${base}/me`].patch,
+      ]) {
+        expect(operation.security).toEqual(
+          expect.arrayContaining([{ 'better-auth': [] }, { 'better-auth-bearer': [] }])
+        );
+      }
     }
     expect(swagger.body.components.schemas.ProposalResponseDto.required).toContain('matched');
   });

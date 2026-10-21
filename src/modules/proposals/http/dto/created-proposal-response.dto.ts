@@ -25,18 +25,6 @@ export class CreatedProposalResponseDto {
   @ApiProperty({ example: 'Café de sábado' })
   name!: string;
 
-  @ApiProperty({ format: 'date', nullable: true, example: '2026-10-17' })
-  date!: string | null;
-
-  @ApiProperty({ nullable: true, example: '15:00' })
-  time!: string | null;
-
-  @ApiProperty({ nullable: true, example: '30.00' })
-  budgetStart!: string | null;
-
-  @ApiProperty({ nullable: true, example: '60.00' })
-  budgetEnd!: string | null;
-
   @ApiProperty({ type: Date, format: 'date-time' })
   createdAt!: Date;
 

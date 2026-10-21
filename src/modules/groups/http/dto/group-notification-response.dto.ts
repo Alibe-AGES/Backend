@@ -20,9 +20,9 @@ export class GroupNotificationResponseDto {
   @ApiProperty({
     format: 'uuid',
     nullable: true,
-    description: 'Sugestão que deu match; preenchido nas notificações do tipo `match`.',
+    description: 'Local da sugestão que deu match; preenchido nas notificações do tipo `match`.',
   })
-  proposalId!: string | null;
+  locationId!: string | null;
 }
 
 export class GroupNotificationPaginationDto {
