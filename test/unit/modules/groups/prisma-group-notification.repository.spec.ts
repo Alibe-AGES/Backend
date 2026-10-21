@@ -13,6 +13,7 @@ describe('PrismaGroupNotificationRepository', () => {
         message: `\${user:${authorId}} criou o evento "Cinema" para o dia 18/10/2026.`,
         createdAt,
         eventId: 'event-id',
+        locationId: null,
       },
     ]);
     const findUsers = jest.fn().mockResolvedValue([{ id: authorId, name: 'Ana Souza' }]);
@@ -31,6 +32,7 @@ describe('PrismaGroupNotificationRepository', () => {
           message: 'Ana Souza criou o evento "Cinema" para o dia 18/10/2026.',
           createdAt,
           eventId: 'event-id',
+          locationId: null,
         },
       ],
       page: 2,
@@ -55,6 +57,7 @@ describe('PrismaGroupNotificationRepository', () => {
         message: true,
         createdAt: true,
         eventId: true,
+        locationId: true,
       },
     });
     expect(findUsers).toHaveBeenCalledWith({
@@ -72,7 +75,8 @@ describe('PrismaGroupNotificationRepository', () => {
         type: 'match',
         message: `\${user:${firstId}} e \${user:${secondId}} deram match.`,
         createdAt: new Date('2026-10-18T18:00:00.000Z'),
-        eventId: 'event-id',
+        eventId: null,
+        locationId: 'location-id',
       },
     ];
     const repository = new PrismaGroupNotificationRepository({

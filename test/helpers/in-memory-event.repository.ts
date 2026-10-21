@@ -1,12 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import { Event } from '../../src/modules/events/domain/event.entity';
-import { Prisma } from '../../generated/prisma/client';
 import {
-  type CreateCatalogEventData,
   type CreatedEvent,
   type CreateEventData,
-  type CreatedLocationProposal,
-  type ExistingEventLocation,
   type EventDetails,
   type EventDetailsAccess,
   type EventImageAccess,
@@ -18,56 +13,6 @@ export class InMemoryEventRepository extends EventRepository {
   private readonly events = new Map<string, Event>();
   private readonly locations = new Map<string, string>();
   private readonly groups = new Map<string, Set<string>>();
-  /** Catalog locations stored by proposals, keyed by Google Place ID. */
-  private readonly catalogLocations = new Map<string, ExistingEventLocation>();
-
-  setCatalogLocation(externalId: string, location: ExistingEventLocation): void {
-    this.catalogLocations.set(externalId, location);
-  }
-
-  findCatalogLocation(externalId: string): Promise<ExistingEventLocation | null> {
-    return Promise.resolve(this.catalogLocations.get(externalId) ?? null);
-  }
-
-  createWithCatalogLocation({
-    location: catalogLocation,
-    ...data
-  }: CreateCatalogEventData): Promise<CreatedLocationProposal> {
-    const location = this.catalogLocations.get(catalogLocation.externalId) ?? {
-      id: randomUUID(),
-      description: catalogLocation.description,
-      address: catalogLocation.address,
-    };
-    this.catalogLocations.set(catalogLocation.externalId, location);
-    const { event, ownerResponse } = this.persist({
-      ...data,
-      location: { description: location.description, manuallyCreated: false },
-    });
-    this.events.set(
-      event.id,
-      new Event({
-        ...event,
-        location: { ...location, manuallyCreated: false },
-      })
-    );
-    return Promise.resolve({
-      id: event.proposals[0].id,
-      createdAt: data.createdAt,
-      owner: { id: data.ownerId, name: 'Ana Beatriz Silva', image: 'users/ana.jpg' },
-      event: {
-        id: event.id,
-        name: event.name,
-        timeslot: event.timeslot,
-        budgetStart:
-          data.budgetStart === null ? null : new Prisma.Decimal(data.budgetStart).toFixed(2),
-        budgetEnd: data.budgetEnd === null ? null : new Prisma.Decimal(data.budgetEnd).toFixed(2),
-        status: data.status,
-        groupId: event.groupId,
-      },
-      location,
-      myAnswer: ownerResponse.answer,
-    });
-  }
 
   findById(id: string): Promise<Event | null> {
     return Promise.resolve(this.events.get(id) ?? null);

@@ -6,6 +6,7 @@ export interface GroupNotificationItem {
   message: string;
   createdAt: Date;
   eventId: string | null;
+  locationId: string | null;
 }
 
 // Mensagens persistidas podem conter `${user:<uuid>}`. O adaptador resolve esses marcadores antes

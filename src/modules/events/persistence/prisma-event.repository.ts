@@ -3,12 +3,9 @@ import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { Event } from '../domain/event.entity';
 import {
-  type CreateCatalogEventData,
   type CreatedEvent,
   type CreateEventData,
   type CreateLocatedEventData,
-  type CreatedLocationProposal,
-  type ExistingEventLocation,
   type EventDetails,
   type EventDetailsAccess,
   type EventImageAccess,
@@ -121,61 +118,6 @@ export class PrismaEventRepository extends EventRepository {
     return { event: this.toDomain(event), ownerResponse };
   }
 
-  findCatalogLocation(externalId: string): Promise<ExistingEventLocation | null> {
-    return this.prisma.location.findFirst({
-      where: { externalId, manuallyCreated: false },
-      select: { id: true, description: true, address: true },
-    });
-  }
-
-  createWithCatalogLocation({
-    location: catalogLocation,
-    ...data
-  }: CreateCatalogEventData): Promise<CreatedLocationProposal> {
-    return this.prisma.$transaction(async (transaction) => {
-      const select = { id: true, description: true, address: true };
-      const location =
-        (await transaction.location.findFirst({
-          where: { externalId: catalogLocation.externalId, manuallyCreated: false },
-          select,
-        })) ??
-        (await transaction.location.create({
-          data: { ...catalogLocation, manuallyCreated: false },
-          select,
-        }));
-
-      const { event, proposal, ownerResponse } = await this.createEventProposal(transaction, {
-        ...data,
-        locationId: location.id,
-      });
-      const record = await transaction.proposal.findUniqueOrThrow({
-        where: { id: proposal.id },
-        select: {
-          id: true,
-          createdAt: true,
-          owner: { select: { id: true, name: true, profilePic: true } },
-        },
-      });
-
-      return {
-        id: record.id,
-        createdAt: record.createdAt,
-        owner: { id: record.owner.id, name: record.owner.name, image: record.owner.profilePic },
-        event: {
-          id: event.id,
-          name: event.name,
-          timeslot: event.timeslot,
-          budgetStart: event.budgetStart?.toFixed(2) ?? null,
-          budgetEnd: event.budgetEnd?.toFixed(2) ?? null,
-          status: event.status,
-          groupId: event.groupId,
-        },
-        location,
-        myAnswer: ownerResponse.answer,
-      };
-    });
-  }
-
   private async createEventProposal(
     transaction: Prisma.TransactionClient,
     data: CreateLocatedEventData
@@ -197,7 +139,12 @@ export class PrismaEventRepository extends EventRepository {
     });
 
     const proposal = await transaction.proposal.create({
-      data: { eventId: data.id, ownerId: data.ownerId, createdAt: data.createdAt },
+      data: {
+        eventId: data.id,
+        groupId: data.groupId,
+        ownerId: data.ownerId,
+        createdAt: data.createdAt,
+      },
       select: { id: true },
     });
 
