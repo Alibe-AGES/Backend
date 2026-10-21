@@ -14,12 +14,9 @@ export class InMemoryGroupRepository extends GroupRepository {
   private readonly inviteLinks: GroupInviteLink[] = [];
   private readonly members = new Set<string>();
 
-  findByUserId(userId: string): Promise<Group[]> {
-    const groups = [...this.groups.values()].filter((group) =>
-      this.members.has(`${group.id}:${userId}`)
-    );
-
-    return Promise.resolve(groups);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  findByUserId(_userId: string): Promise<Group[]> {
+    throw new Error('Method not implemented.');
   }
 
   create(data: CreateGroupData): Promise<Group> {

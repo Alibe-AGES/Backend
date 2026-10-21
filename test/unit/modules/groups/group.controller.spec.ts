@@ -16,16 +16,14 @@ import {
   GroupNotFoundError,
   InvalidAvailabilityDateError,
 } from '../../../../src/modules/groups/application/get-availability-intervals.use-case';
-import { GetProposalByGroupUseCase } from '../../../../src/modules/proposals/application/get-proposals-by-group';
 
 describe('GroupsController', () => {
   let controller: GroupsController;
   let createGroupUseCaseMock: { execute: jest.Mock };
   let listGroupsUseCaseMock: { execute: jest.Mock };
-  let getAvailabilityIntervalsUseCaseMock: { execute: jest.Mock };
+  let getAvailabilityIntervalsUseCase: { execute: jest.Mock };
   let getGroupProfilePictureUseCaseMock: { execute: jest.Mock };
   let getGroupUseCaseMock: { execute: jest.Mock };
-  let getProposalsByGroupUseCaseMock: { execute: jest.Mock };
 
   const userId = '11111111-1111-4111-8111-111111111111';
   const authenticatedRequest = {
@@ -35,10 +33,9 @@ describe('GroupsController', () => {
   beforeEach(async () => {
     createGroupUseCaseMock = { execute: jest.fn() };
     listGroupsUseCaseMock = { execute: jest.fn() };
-    getAvailabilityIntervalsUseCaseMock = { execute: jest.fn() };
+    getAvailabilityIntervalsUseCase = { execute: jest.fn() };
     getGroupProfilePictureUseCaseMock = { execute: jest.fn() };
     getGroupUseCaseMock = { execute: jest.fn() };
-    getProposalsByGroupUseCaseMock = { execute: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GroupsController],
@@ -61,11 +58,7 @@ describe('GroupsController', () => {
         },
         {
           provide: GetAvailabilityIntervalsUseCase,
-          useValue: getAvailabilityIntervalsUseCaseMock,
-        },
-        {
-          provide: GetProposalByGroupUseCase,
-          useValue: getProposalsByGroupUseCaseMock,
+          useValue: getAvailabilityIntervalsUseCase,
         },
       ],
     }).compile();
@@ -171,7 +164,7 @@ describe('GroupsController', () => {
       const groupId = randomUUID();
       const dateParam = '2026-06-05';
 
-      getAvailabilityIntervalsUseCaseMock.execute.mockResolvedValue({
+      getAvailabilityIntervalsUseCase.execute.mockResolvedValue({
         date: dateParam,
         users: [
           {
@@ -212,7 +205,7 @@ describe('GroupsController', () => {
           },
         ],
       });
-      expect(getAvailabilityIntervalsUseCaseMock.execute).toHaveBeenCalledWith(
+      expect(getAvailabilityIntervalsUseCase.execute).toHaveBeenCalledWith(
         groupId,
         dateParam,
         userId
@@ -220,7 +213,7 @@ describe('GroupsController', () => {
     });
 
     it('Lança GroupNotFoundError para um id inexistente', async () => {
-      getAvailabilityIntervalsUseCaseMock.execute.mockRejectedValue(
+      getAvailabilityIntervalsUseCase.execute.mockRejectedValue(
         new GroupNotFoundError('Grupo não encontrado')
       );
 
@@ -236,7 +229,7 @@ describe('GroupsController', () => {
     it('Lança BadRequestException para um date em formato inválido', async () => {
       const invalidDateFormat = '2026/11/23';
 
-      getAvailabilityIntervalsUseCaseMock.execute.mockRejectedValue(
+      getAvailabilityIntervalsUseCase.execute.mockRejectedValue(
         new InvalidAvailabilityDateError('Formato inválido de data')
       );
 
@@ -247,47 +240,6 @@ describe('GroupsController', () => {
           authenticatedRequest
         )
       ).rejects.toThrow(BadRequestException);
-    });
-
-    it('Lança BadRequestException para um date em formato inválido', async () => {
-      const invalidDateFormat = '2026/11/23';
-
-      getAvailabilityIntervalsUseCaseMock.execute.mockRejectedValue(
-        new InvalidAvailabilityDateError('Formato inválido de data')
-      );
-
-      await expect(
-        controller.getAvailabilities(
-          '11111111-1111-4111-8111-111111111111',
-          invalidDateFormat,
-          authenticatedRequest
-        )
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should return proposals successfully when valid group and authenticated user are provided', async () => {
-      const GROUP_ID = '22222222-2222-4222-8222-222222222222';
-      const USER_ID = '11111111-1111-4111-8111-111111111111';
-
-      const mockAuthenticatedRequest: AuthenticatedRequest = {
-        user: {
-          id: USER_ID,
-        },
-      } as unknown as AuthenticatedRequest;
-
-      const mockProposals = [
-        {
-          id: '66666666-6666-4666-8666-666666666666',
-          createdAt: new Date(),
-        },
-      ];
-
-      getProposalsByGroupUseCaseMock.execute.mockResolvedValue(mockProposals as any);
-
-      const result = await controller.getProposals(GROUP_ID, mockAuthenticatedRequest);
-
-      expect(getProposalsByGroupUseCaseMock.execute).toHaveBeenCalledWith(GROUP_ID, USER_ID);
-      expect(result).toEqual(mockProposals);
     });
   });
 });

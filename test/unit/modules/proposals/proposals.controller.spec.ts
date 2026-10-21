@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ForbiddenException,
+  NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -8,6 +10,11 @@ import {
   CreateProposalUseCase,
   InvalidProposalCreationError,
 } from '../../../../src/modules/proposals/application/create-proposal.use-case';
+import {
+  ActiveProposalsAccessDeniedError,
+  ActiveProposalsGroupNotFoundError,
+  ListActiveProposalsUseCase,
+} from '../../../../src/modules/proposals/application/list-active-proposals.use-case';
 import { ProposalsController } from '../../../../src/modules/proposals/http/proposals.controller';
 import { PlacesProviderUnavailableError } from '../../../../src/shared/places/places-provider';
 
@@ -16,7 +23,11 @@ describe('ProposalsController error handling', () => {
     externalId: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
   };
   const execute = jest.fn();
-  const controller = new ProposalsController({ execute } as unknown as CreateProposalUseCase);
+  const listActive = jest.fn();
+  const controller = new ProposalsController(
+    { execute } as unknown as CreateProposalUseCase,
+    { execute: listActive } as unknown as ListActiveProposalsUseCase
+  );
 
   beforeEach(() => jest.resetAllMocks());
 
@@ -56,5 +67,33 @@ describe('ProposalsController error handling', () => {
         user: { id: 'user-id' },
       } as AuthenticatedRequest)
     ).rejects.toBe(failure);
+  });
+
+  describe('listActive', () => {
+    const request = { user: { id: 'user-id' } } as AuthenticatedRequest;
+
+    it.each([{}, { user: {} }])(
+      'rejects a request without an authenticated user ID: %p',
+      async (req) => {
+        await expect(
+          controller.listActive('group-id', req as AuthenticatedRequest)
+        ).rejects.toBeInstanceOf(UnauthorizedException);
+        expect(listActive).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      [new ActiveProposalsGroupNotFoundError('Grupo não encontrado'), NotFoundException],
+      [new ActiveProposalsAccessDeniedError('Fora do grupo'), ForbiddenException],
+    ])('maps %p to the matching HTTP error', async (failure, httpError) => {
+      listActive.mockRejectedValue(failure);
+      await expect(controller.listActive('group-id', request)).rejects.toBeInstanceOf(httpError);
+    });
+
+    it('propagates unexpected failures', async () => {
+      const failure = new Error('Database unavailable');
+      listActive.mockRejectedValue(failure);
+      await expect(controller.listActive('group-id', request)).rejects.toBe(failure);
+    });
   });
 });
