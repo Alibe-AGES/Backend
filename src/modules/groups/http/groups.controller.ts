@@ -49,11 +49,13 @@ import { GroupDetailsResponseDto } from './dto/group-details-response.dto';
 import { GroupListItemResponseDto } from './dto/group-list-item-response.dto';
 import { GroupResponsePresenter } from './presenters/group-response.presenter';
 import { ListGroupsUseCase } from '../application/list-groups.use-case';
+import { GetAvailabilitiesQueryDto } from './dto/get-availabilities-query.dto';
 import { AvailabilitiesResponseDto } from './dto/get-availabilities-response.dto';
 import {
   GetAvailabilityIntervalsUseCase,
   GroupNotFoundError as AvailabilityGroupNotFoundError,
   InvalidAvailabilityDateError,
+  AvailabilityAccessDeniedError,
 } from '../application/get-availability-intervals.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
@@ -230,19 +232,32 @@ export class GroupsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Obtém os intervalos de disponibilidades para um dia específico' })
   @ApiParam({ name: 'groupId', format: 'uuid' })
-  @ApiQuery({ name: 'date' })
+  @ApiQuery({ name: 'date', required: true, type: String, format: 'date', example: '2026-09-05' })
   @ApiOkResponse({
     description: 'Intervalos encontrados.',
     type: AvailabilitiesResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'groupId deve ser um UUID válido.' })
+  @ApiBadRequestResponse({
+    description: 'groupId ou date inválido; date deve ser uma data única YYYY-MM-DD.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo.' })
+  @ApiNotFoundResponse({ description: 'Grupo não encontrado.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
   async getAvailabilities(
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
-    @Query('date') date: string,
+    @Query() { date }: GetAvailabilitiesQueryDto,
     @Request() request: AuthenticatedRequest
   ): Promise<AvailabilitiesResponseDto> {
-    const userId = request.user.id;
+    const userId = request.user?.id;
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    // Express may keep bracket notation as literal keys instead of nested objects.
+    if (Object.keys(request.query ?? {}).some((key) => key.startsWith('date['))) {
+      throw new BadRequestException('date deve ser uma data única YYYY-MM-DD');
+    }
 
     try {
       const availabilities = await this.getAvailabilityIntervalsUseCase.execute(
@@ -257,6 +272,7 @@ export class GroupsController {
           id: user.id,
           name: user.name,
           image: user.profilePic ? `/users/${user.id}/profile-picture` : null,
+          isCurrentUser: user.id === userId,
           availableAllDay: user.availableAllDay,
           intervals: user.intervals,
         })),
@@ -268,6 +284,10 @@ export class GroupsController {
 
       if (error instanceof AvailabilityGroupNotFoundError) {
         throw new NotFoundException(error.message);
+      }
+
+      if (error instanceof AvailabilityAccessDeniedError) {
+        throw new ForbiddenException(error.message);
       }
 
       throw error;

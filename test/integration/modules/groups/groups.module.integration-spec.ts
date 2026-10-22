@@ -308,7 +308,8 @@ describe('GroupsModule integration', () => {
       const groupId = randomUUID();
       const dateParam = '2026-06-05';
 
-      findUnique.mockResolvedValue({
+      findUnique.mockResolvedValueOnce({ users: [{ userId: authenticatedRequest.user.id }] });
+      findUnique.mockResolvedValueOnce({
         id: groupId,
         users: [
           {
@@ -344,7 +345,7 @@ describe('GroupsModule integration', () => {
       });
 
       await expect(
-        controller.getAvailabilities(groupId, dateParam, authenticatedRequest)
+        controller.getAvailabilities(groupId, { date: dateParam }, authenticatedRequest)
       ).resolves.toEqual({
         date: dateParam,
         users: [
@@ -352,6 +353,7 @@ describe('GroupsModule integration', () => {
             id: '11111111-1111-4111-8111-111111111111',
             name: 'Ana Beatriz Silva',
             image: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
+            isCurrentUser: true,
             availableAllDay: false,
             intervals: [],
           },
@@ -359,6 +361,7 @@ describe('GroupsModule integration', () => {
             id: '22222222-2222-4222-8222-222222222222',
             name: 'Bruno Henrique Souza',
             image: null,
+            isCurrentUser: false,
             availableAllDay: true,
             intervals: [],
           },
@@ -366,6 +369,7 @@ describe('GroupsModule integration', () => {
             id: '33333333-3333-4333-8333-333333333333',
             name: 'Camila Oliveira',
             image: null,
+            isCurrentUser: false,
             availableAllDay: false,
             intervals: [['14:00', '20:00']],
           },
@@ -379,7 +383,7 @@ describe('GroupsModule integration', () => {
       await expect(
         controller.getAvailabilities(
           '11111111-1111-4111-8111-111111111111',
-          '2026-05-06',
+          { date: '2026-05-06' },
           authenticatedRequest
         )
       ).rejects.toThrow();
@@ -390,7 +394,7 @@ describe('GroupsModule integration', () => {
       const id = randomUUID();
 
       await expect(
-        controller.getAvailabilities(id, '01/12/2026', authenticatedRequest)
+        controller.getAvailabilities(id, { date: '01/12/2026' }, authenticatedRequest)
       ).rejects.toThrow();
     });
   });
