@@ -17,7 +17,7 @@ export interface CatalogSearchInput extends PlaceFilters {
   page: number;
   limit: number;
   maxDistanceKm?: number;
-  type?: string;
+  type?: string | string[];
 }
 
 export interface CatalogSearchArea {
@@ -72,6 +72,7 @@ export class CatalogLocationsPageService {
     const filtered = places.filter(
       (place) =>
         matchesPlaceFilters(place, input) &&
+        matchesTypes(place, input.type) &&
         (input.maxDistanceKm === undefined ||
           !place.location ||
           distanceInMeters(center, place.location) <= radiusMeters)
@@ -88,4 +89,10 @@ export class CatalogLocationsPageService {
       total: filtered.length,
     };
   }
+}
+
+function matchesTypes(place: Place, types?: string | string[]): boolean {
+  if (types === undefined) return true;
+  const includedTypes = Array.isArray(types) ? types : [types];
+  return includedTypes.some((type) => place.types.includes(type) || place.primaryType === type);
 }

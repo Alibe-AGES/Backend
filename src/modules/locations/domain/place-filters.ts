@@ -11,9 +11,9 @@ export type GroupSize = (typeof GROUP_SIZES)[number];
 export interface PlaceFilters {
   budgetMin?: number;
   budgetMax?: number;
-  period?: DayPeriod;
-  environment?: PlaceEnvironment;
-  groupSize?: GroupSize;
+  period?: DayPeriod | DayPeriod[];
+  environment?: PlaceEnvironment | PlaceEnvironment[];
+  groupSize?: GroupSize | GroupSize[];
 }
 
 const MINUTES_IN_DAY = 24 * 60;
@@ -50,10 +50,16 @@ const OUTDOOR_PLACE_TYPES = new Set([
 export function matchesPlaceFilters(place: Place, filters: PlaceFilters): boolean {
   return (
     matchesBudget(place, filters.budgetMin, filters.budgetMax) &&
-    matchesPeriod(place, filters.period) &&
-    matchesEnvironment(place, filters.environment) &&
-    matchesGroupSize(place, filters.groupSize)
+    matchesAnyFilter(filters.period, (period) => matchesPeriod(place, period)) &&
+    matchesAnyFilter(filters.environment, (environment) =>
+      matchesEnvironment(place, environment)
+    ) &&
+    matchesAnyFilter(filters.groupSize, (groupSize) => matchesGroupSize(place, groupSize))
   );
+}
+
+function matchesAnyFilter<T>(value: T | T[] | undefined, matches: (item: T) => boolean): boolean {
+  return value === undefined || (Array.isArray(value) ? value.some(matches) : matches(value));
 }
 
 export function distanceInMeters(from: GeoPoint, to: GeoPoint): number {
@@ -80,7 +86,7 @@ function matchesBudget(place: Place, budgetMin?: number, budgetMax?: number): bo
   return placeStart <= (budgetMax ?? Number.POSITIVE_INFINITY) && placeEnd >= (budgetMin ?? 0);
 }
 
-function matchesPeriod(place: Place, period?: DayPeriod): boolean {
+function matchesPeriod(place: Place, period: DayPeriod): boolean {
   if (!period || !place.openingHours?.periods.length) {
     return true;
   }
@@ -120,11 +126,7 @@ function toMinutesOfWeek({ open, close }: PlaceOpeningPeriod): [number, number] 
   return [opensAt, closesAt];
 }
 
-function matchesEnvironment(place: Place, environment?: PlaceEnvironment): boolean {
-  if (!environment) {
-    return true;
-  }
-
+function matchesEnvironment(place: Place, environment: PlaceEnvironment): boolean {
   const isOutdoorPlace = place.types.some((type) => OUTDOOR_PLACE_TYPES.has(type));
 
   if (environment === 'outdoor') {
@@ -134,7 +136,7 @@ function matchesEnvironment(place: Place, environment?: PlaceEnvironment): boole
   return !isOutdoorPlace;
 }
 
-function matchesGroupSize(place: Place, groupSize?: GroupSize): boolean {
+function matchesGroupSize(place: Place, groupSize: GroupSize): boolean {
   if (groupSize === 'large') {
     return place.goodForGroups === true;
   }

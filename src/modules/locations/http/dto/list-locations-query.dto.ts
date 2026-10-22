@@ -10,13 +10,12 @@ export const listLocationsQuerySchema = z.object({
   maxDistanceKm: z.coerce.number().positive().max(50).optional(),
   budgetMin: z.coerce.number().min(0).optional(),
   budgetMax: z.coerce.number().min(0).optional(),
-  period: z.enum(DAY_PERIODS).optional(),
-  environment: z.enum(PLACE_ENVIRONMENTS).optional(),
-  groupSize: z.enum(GROUP_SIZES).optional(),
-  type: z
-    .string()
-    .regex(/^[a-z_]+$/)
+  period: z.union([z.enum(DAY_PERIODS), z.array(z.enum(DAY_PERIODS))]).optional(),
+  environment: z
+    .union([z.enum(PLACE_ENVIRONMENTS), z.array(z.enum(PLACE_ENVIRONMENTS))])
     .optional(),
+  groupSize: z.union([z.enum(GROUP_SIZES), z.array(z.enum(GROUP_SIZES))]).optional(),
+  type: z.union([z.string().regex(/^[a-z_]+$/), z.array(z.string().regex(/^[a-z_]+$/))]).optional(),
 });
 
 export class ListLocationsQueryDto extends createZodDto(listLocationsQuerySchema) {}

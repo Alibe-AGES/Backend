@@ -22,7 +22,12 @@ export class SearchCatalogLocationsUseCase {
       this.places.searchText({
         ...area,
         textQuery: input.text,
-        includedType: input.type,
+        includedType:
+          typeof input.type === 'string'
+            ? input.type
+            : input.type?.length === 1
+              ? input.type[0]
+              : undefined,
       })
     );
   }

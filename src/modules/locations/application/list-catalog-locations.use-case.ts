@@ -19,7 +19,11 @@ export class ListCatalogLocationsUseCase {
     return this.catalogPage.build(input, (area) =>
       this.places.searchNearby({
         ...area,
-        includedTypes: input.type ? [input.type] : undefined,
+        includedTypes: input.type
+          ? Array.isArray(input.type)
+            ? input.type
+            : [input.type]
+          : undefined,
       })
     );
   }

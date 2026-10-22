@@ -202,7 +202,7 @@ describe('GooglePlacesService', () => {
     ).resolves.toEqual([]);
     expect(
       JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
-    ).not.toHaveProperty('includedType');
+    ).not.toHaveProperty('includedTypes');
 
     await expect(
       new GooglePlacesService(null).searchText({ textQuery: 'bar', center, radiusMeters: 5000 })

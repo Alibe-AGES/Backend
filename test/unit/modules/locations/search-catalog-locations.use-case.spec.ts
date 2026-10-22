@@ -43,7 +43,7 @@ describe('SearchCatalogLocationsUseCase', () => {
       textQuery: 'pizza vegana',
       center: coordinates,
       radiusMeters: 50_000,
-      includedType: 'restaurant',
+      includedTypes: ['restaurant'],
       includePriceRange: true,
     });
     expect(places.searchNearby).not.toHaveBeenCalled();

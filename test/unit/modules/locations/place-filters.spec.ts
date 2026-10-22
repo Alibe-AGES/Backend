@@ -47,6 +47,11 @@ describe('place filters', () => {
       expect(matchesPlaceFilters(lunchOnly, { period: 'night' })).toBe(false);
     });
 
+    it('matches any selected period', () => {
+      expect(matchesPlaceFilters(lunchOnly, { period: ['night', 'morning'] })).toBe(true);
+      expect(matchesPlaceFilters(lunchOnly, { period: ['night'] })).toBe(false);
+    });
+
     it('handles periods that cross midnight at the end of the week', () => {
       const saturdayNight = buildPlace({
         openingHours: {
@@ -80,6 +85,10 @@ describe('place filters', () => {
       expect(matchesPlaceFilters(park, { environment: 'outdoor' })).toBe(true);
       expect(matchesPlaceFilters(terrace, { environment: 'outdoor' })).toBe(true);
       expect(matchesPlaceFilters(buildPlace(), { environment: 'outdoor' })).toBe(false);
+    });
+
+    it('matches any selected environment', () => {
+      expect(matchesPlaceFilters(buildPlace(), { environment: ['outdoor', 'indoor'] })).toBe(true);
     });
 
     it('excludes outdoor-only places from indoor results', () => {

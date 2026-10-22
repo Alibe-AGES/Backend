@@ -124,7 +124,7 @@ describe('Locations endpoint (e2e)', () => {
         textQuery: 'pizza vegana',
         center: { latitude: -30.0277, longitude: -51.2287 },
         radiusMeters: 50_000,
-        includedType: 'restaurant',
+        includedTypes: ['restaurant'],
       })
     );
     expect(searchNearby).not.toHaveBeenCalled();
