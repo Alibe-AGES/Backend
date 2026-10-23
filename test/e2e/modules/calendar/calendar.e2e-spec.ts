@@ -188,6 +188,7 @@ describe('Calendar endpoint (e2e)', () => {
         'date',
         'proposalIds',
         'proposalEventIds',
+        'suggestionIds',
         'scheduledEventIds',
       ].sort()
     );

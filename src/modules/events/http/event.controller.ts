@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ConflictException,
   ForbiddenException,
   Get,
   Header,
@@ -58,7 +59,11 @@ import {
   UpdateEventUseCase,
 } from '../application/update-event.use-case';
 import { Event } from '../domain/event.entity';
-import type { CreatedEvent, EventDetails } from '../domain/event.repository';
+import {
+  MatchedSuggestionNotConvertibleError,
+  type CreatedEvent,
+  type EventDetails,
+} from '../domain/event.repository';
 import { CreateEventDto } from './dto/create-event.dto';
 import { CreatedEventResponseDto, EventResponseDto } from './dto/event-response.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -103,6 +108,11 @@ export class EventController {
           format: 'uuid',
           nullable: true,
           description: 'Location salva que será reutilizada no evento.',
+        },
+        matchedSuggestionId: {
+          type: 'string',
+          format: 'uuid',
+          description: 'Sugestão com match que está sendo convertida neste evento.',
         },
         image: { type: 'string', format: 'binary' },
         budgetStart: { type: 'string', example: '50.00' },
@@ -154,6 +164,9 @@ export class EventController {
 
       if (error instanceof EventGroupAccessDeniedError) {
         throw new ForbiddenException(error.message);
+      }
+      if (error instanceof MatchedSuggestionNotConvertibleError) {
+        throw new ConflictException(error.message);
       }
 
       throw error;

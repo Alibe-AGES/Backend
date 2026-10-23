@@ -462,6 +462,68 @@ describe('PrismaEventRepository', () => {
       expect(result.event).toMatchObject({ id: eventId, budgetStart: '50.00' });
       expect(result.ownerResponse).toEqual(ownerResponse);
     });
+
+    it('deletes the matched suggestion and its responses in the event transaction', async () => {
+      const suggestionId = '77777777-7777-4777-8777-777777777777';
+      const ownerResponse = {
+        id: '88888888-8888-4888-8888-888888888888',
+        userId: 'owner-id',
+        answer: 'yes',
+      };
+      const transaction = {
+        proposal: {
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
+            id: suggestionId,
+            groupId: baseRecord.groupId,
+            locationId: baseRecord.location.id,
+            matchedAt: createdAt,
+            eventId: null,
+          }),
+          create: jest.fn().mockResolvedValue({ id: baseRecord.proposals[0].id }),
+          delete: jest.fn(),
+        },
+        proposalResponse: {
+          create: jest.fn().mockResolvedValue(ownerResponse),
+          deleteMany: jest.fn(),
+        },
+        location: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: baseRecord.location.id }) },
+        event: {
+          create: jest.fn().mockResolvedValue({ id: eventId }),
+          findUniqueOrThrow: jest.fn().mockResolvedValue(baseRecord),
+        },
+        groupNotification: { create: jest.fn().mockResolvedValue({ id: 'notification-id' }) },
+      };
+      const $transaction = jest.fn((callback: (tx: typeof transaction) => unknown) =>
+        callback(transaction)
+      );
+      const repository = new PrismaEventRepository({ $transaction } as unknown as PrismaService);
+
+      await repository.create({
+        id: eventId,
+        groupId: baseRecord.groupId,
+        ownerId: 'owner-id',
+        name: 'Bloom Café',
+        timeslot,
+        location: { kind: 'existing', id: baseRecord.location.id },
+        image: baseRecord.image,
+        budgetStart: '50.00',
+        budgetEnd: null,
+        status: 'pending',
+        ownerAnswer: 'yes',
+        matchedSuggestionId: suggestionId,
+        createdAt,
+        notification: { type: 'createdEvent', message: 'Event created', createdAt },
+      });
+
+      expect(transaction.proposalResponse.deleteMany).toHaveBeenCalledWith({
+        where: { proposalId: suggestionId },
+      });
+      expect(transaction.proposal.delete).toHaveBeenCalledWith({ where: { id: suggestionId } });
+      expect(transaction.proposal.delete.mock.invocationCallOrder[0]).toBeGreaterThan(
+        transaction.proposalResponse.deleteMany.mock.invocationCallOrder[0]
+      );
+      expect($transaction).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('findGroupMembership', () => {

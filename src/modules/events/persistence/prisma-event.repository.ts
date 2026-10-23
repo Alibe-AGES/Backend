@@ -11,6 +11,7 @@ import {
   type EventCreationLocation,
   type EventImageAccess,
   EventRepository,
+  MatchedSuggestionNotConvertibleError,
   type UpdateEventData,
 } from '../domain/event.repository';
 
@@ -94,6 +95,23 @@ export class PrismaEventRepository extends EventRepository {
 
   async create(data: CreateEventData): Promise<CreatedEvent> {
     const { event, ownerResponse } = await this.prisma.$transaction(async (transaction) => {
+      if (data.matchedSuggestionId) {
+        const suggestion = await transaction.proposal.findUniqueOrThrow({
+          where: { id: data.matchedSuggestionId },
+          select: { id: true, groupId: true, locationId: true, matchedAt: true, eventId: true },
+        });
+        if (
+          !suggestion.matchedAt ||
+          suggestion.eventId ||
+          suggestion.groupId !== data.groupId ||
+          suggestion.locationId !== (data.location.kind === 'existing' ? data.location.id : null)
+        ) {
+          throw new MatchedSuggestionNotConvertibleError(
+            'A sugestão com match não corresponde ao evento solicitado'
+          );
+        }
+      }
+
       const location =
         data.location.kind === 'existing'
           ? await transaction.location.findUniqueOrThrow({
@@ -125,6 +143,13 @@ export class PrismaEventRepository extends EventRepository {
         ownerAnswer: data.ownerAnswer,
         createdAt: data.createdAt,
       });
+
+      if (data.matchedSuggestionId) {
+        await transaction.proposalResponse.deleteMany({
+          where: { proposalId: data.matchedSuggestionId },
+        });
+        await transaction.proposal.delete({ where: { id: data.matchedSuggestionId } });
+      }
 
       await transaction.groupNotification.create({
         data: {

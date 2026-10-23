@@ -14,6 +14,7 @@ export interface CreateEventInput {
   time?: string;
   location?: string;
   locationId?: string | null;
+  matchedSuggestionId?: string;
   image?: {
     originalName: string;
     contentType: string;
@@ -39,31 +40,7 @@ export class CreateEventUseCase {
   ) {}
 
   async execute(input: CreateEventInput): Promise<CreatedEvent> {
-    const name = input.name?.trim();
-    const location = input.location?.trim();
-
-    if (!name || !input.date || !input.time || (!input.locationId && !location)) {
-      throw new InvalidEventCreationError(
-        'Nome, dia, horário e locationId ou endereço são obrigatórios'
-      );
-    }
-    if (input.locationId && location) {
-      throw new InvalidEventCreationError('Informe locationId ou endereço, não ambos');
-    }
-    if (input.locationId && input.image) {
-      throw new InvalidEventCreationError(
-        'A imagem do evento é herdada da localização quando locationId é informado'
-      );
-    }
-
-    if (input.image && !input.image.contentType.startsWith('image/')) {
-      throw new InvalidEventCreationError('Somente imagens são aceitas');
-    }
-
-    const extension = input.image ? safeExtension(input.image.originalName) : '';
-    if (input.image && !extension) {
-      throw new InvalidEventCreationError('Extensão inválida para imagem');
-    }
+    const { name, location, extension } = this.validateInput(input);
 
     const userIsMember = await this.events.findGroupMembership(input.groupId, input.userId);
 
@@ -97,7 +74,7 @@ export class CreateEventUseCase {
 
     // O push continua usando notificationMessage. Somente o mural persiste a referência do autor,
     // que será resolvida pelo GET e também poderá ser repetida para vários usuários no match.
-    const muralNotificationMessage = `${groupNotificationUserReference(input.userId)} criou o evento \"${name}\" ${scheduleText}.`;
+    const muralNotificationMessage = `${groupNotificationUserReference(input.userId)} criou o evento "${name}" ${scheduleText}.`;
 
     if (input.image && !savedLocation) {
       imageKey = `locations/${newLocationId}/images/${randomUUID()}${extension}`;
@@ -114,6 +91,7 @@ export class CreateEventUseCase {
         id: eventId,
         groupId: input.groupId,
         ownerId: input.userId,
+        matchedSuggestionId: input.matchedSuggestionId,
         name,
         timeslot: new Date(`${input.date}T${input.time}:00.000Z`),
         location: savedLocation
@@ -132,26 +110,7 @@ export class CreateEventUseCase {
         },
       });
 
-      try {
-        await this.groupNotifications.sendToGroup(
-          input.groupId,
-          {
-            title: 'Novo encontro no grupo',
-            body: notificationMessage,
-            data: {
-              type: 'new_event',
-              eventId: created.event.id,
-              groupId: input.groupId,
-            },
-          },
-          input.userId
-        );
-      } catch (error) {
-        this.logger.error(
-          `Evento ${created.event.id} criado, mas os destinatários da notificação não puderam ser consultados`,
-          error instanceof Error ? error.stack : undefined
-        );
-      }
+      await this.notifyGroup(input, created.event.id, notificationMessage);
 
       return created;
     } catch (error) {
@@ -161,6 +120,68 @@ export class CreateEventUseCase {
       throw error;
     }
   }
+
+  private validateInput(input: CreateEventInput): {
+    name: string;
+    location: string | undefined;
+    extension: string;
+  } {
+    const name = input.name?.trim();
+    const location = input.location?.trim();
+    const locationChoices = [input.locationId, location].filter(Boolean).length;
+
+    if (!name || !input.date || !input.time || locationChoices === 0) {
+      throw new InvalidEventCreationError(
+        'Nome, dia, horário e locationId ou endereço são obrigatórios'
+      );
+    }
+    if (locationChoices > 1) {
+      throw new InvalidEventCreationError('Informe locationId ou endereço, não ambos');
+    }
+    if (input.locationId && input.image) {
+      throw new InvalidEventCreationError(
+        'A imagem do evento é herdada da localização quando locationId é informado'
+      );
+    }
+    if (input.matchedSuggestionId && !input.locationId) {
+      throw new InvalidEventCreationError(
+        'matchedSuggestionId exige a localização salva da sugestão'
+      );
+    }
+    if (input.image && !input.image.contentType.startsWith('image/')) {
+      throw new InvalidEventCreationError('Somente imagens são aceitas');
+    }
+
+    const extension = input.image ? safeExtension(input.image.originalName) : '';
+    if (input.image && !extension) {
+      throw new InvalidEventCreationError('Extensão inválida para imagem');
+    }
+    return { name, location, extension };
+  }
+
+  private async notifyGroup(
+    input: CreateEventInput,
+    eventId: string,
+    notificationMessage: string
+  ): Promise<void> {
+    try {
+      await this.groupNotifications.sendToGroup(
+        input.groupId,
+        {
+          title: 'Novo encontro no grupo',
+          body: notificationMessage,
+          data: { type: 'new_event', eventId, groupId: input.groupId },
+        },
+        input.userId
+      );
+    } catch (error) {
+      this.logger.error(
+        `Evento ${eventId} criado, mas os destinatários da notificação não puderam ser consultados`,
+        error instanceof Error ? error.stack : undefined
+      );
+    }
+  }
+
 }
 
 function formatDate(date: string): string {

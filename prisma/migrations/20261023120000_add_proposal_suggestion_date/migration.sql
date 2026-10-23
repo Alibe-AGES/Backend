@@ -1,0 +1,1 @@
+ALTER TABLE "proposal" ADD COLUMN "suggestion_date" DATE;

@@ -67,6 +67,7 @@ describe('CalendarModule integration', () => {
         scheduledEventIds: [],
         proposalIds: ['proposal-id'],
         proposalEventIds: [{ proposalId: 'proposal-id', eventId: 'event-id' }],
+        suggestionIds: [],
         availableUserIds: [userId],
         completedEventIds: [],
         allUsersAvailable: true,

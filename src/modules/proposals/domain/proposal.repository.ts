@@ -34,6 +34,7 @@ export interface CreateSuggestionData {
   groupId: string;
   ownerId: string;
   name: string | null;
+  suggestionDate: Date;
   location: SuggestionLocation;
   createdAt: Date;
 }
@@ -43,6 +44,7 @@ export interface CreatedSuggestion {
   type: 'suggestion';
   groupId: string;
   name: string | null;
+  suggestionDate: Date;
   createdAt: Date;
   owner: { id: string; name: string; image: string | null };
   location: StoredProposalLocation;
@@ -57,6 +59,7 @@ export interface ProposalDetails {
   groupId: string;
   eventId: string | null;
   name: string | null;
+  suggestionDate: Date | null;
   createdAt: Date;
   matchedAt: Date | null;
   owner: { id: string; name: string; image: string | null };
@@ -80,6 +83,7 @@ export interface ActiveSuggestion {
   type: 'suggestion';
   groupId: string;
   name: string | null;
+  suggestionDate: Date;
   createdAt: Date;
   owner: { id: string; name: string; image: string | null };
   location: StoredProposalLocation | null;

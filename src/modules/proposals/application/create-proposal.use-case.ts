@@ -21,8 +21,14 @@ export interface CreateProposalInput {
   locationId?: string;
   externalId?: string;
   name?: string;
+  date: string;
   description?: string;
   address?: string;
+  phoneNumber?: string;
+  website?: string;
+  openingHours?: string[];
+  priceStart?: number;
+  priceEnd?: number;
   image?: {
     originalName: string;
     contentType: string;
@@ -42,17 +48,7 @@ export class CreateProposalUseCase {
   ) {}
 
   async execute(input: CreateProposalInput): Promise<CreatedSuggestion> {
-    if (input.locationId && input.externalId) {
-      throw new InvalidProposalCreationError('Informe locationId ou externalId, não ambos');
-    }
-    if (input.image && !input.image.contentType.startsWith('image/')) {
-      throw new InvalidProposalCreationError('Somente imagens são aceitas');
-    }
-
-    const extension = input.image ? safeExtension(input.image.originalName) : '';
-    if (input.image && !extension) {
-      throw new InvalidProposalCreationError('Extensão inválida para imagem');
-    }
+    const extension = this.validateInput(input);
 
     const membership = await this.proposals.findGroupMembership(input.groupId, input.userId);
     if (membership === null) {
@@ -84,13 +80,40 @@ export class CreateProposalUseCase {
         ownerId: input.userId,
         location: resolved.location,
         name: resolved.proposalName,
+        suggestionDate: new Date(`${input.date}T00:00:00.000Z`),
         createdAt,
       });
     } catch (error) {
-      if (input.image && resolved.location.kind === 'new') {
-        await this.storage.delete(imageKey as string).catch(() => undefined);
-      }
+      await this.removeImageIfCreationFailed(input.image, resolved.location, imageKey);
       throw error;
+    }
+  }
+
+  private validateInput(input: CreateProposalInput): string {
+    if (!input.date || !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+      throw new InvalidProposalCreationError('A data da sugestão é obrigatória');
+    }
+    if (input.locationId && input.externalId) {
+      throw new InvalidProposalCreationError('Informe locationId ou externalId, não ambos');
+    }
+    if (input.image && !input.image.contentType.startsWith('image/')) {
+      throw new InvalidProposalCreationError('Somente imagens são aceitas');
+    }
+
+    const extension = input.image ? safeExtension(input.image.originalName) : '';
+    if (input.image && !extension) {
+      throw new InvalidProposalCreationError('Extensão inválida para imagem');
+    }
+    return extension;
+  }
+
+  private async removeImageIfCreationFailed(
+    image: CreateProposalInput['image'],
+    location: SuggestionLocation,
+    imageKey: string | null
+  ): Promise<void> {
+    if (image && location.kind === 'new' && imageKey) {
+      await this.storage.delete(imageKey).catch(() => undefined);
     }
   }
 
@@ -159,11 +182,15 @@ export class CreateProposalUseCase {
       name: input.name?.trim() || null,
       description: input.description?.trim() || null,
       address: input.address?.trim() || null,
-      openingHours: [],
+      openingHours: input.openingHours ?? [],
       rating: null,
-      phoneNumber: null,
-      website: null,
-      priceRange: { start: null, end: null, currencyCode: null },
+      phoneNumber: input.phoneNumber?.trim() || null,
+      website: input.website?.trim() || null,
+      priceRange: {
+        start: input.priceStart?.toFixed(2) ?? null,
+        end: input.priceEnd?.toFixed(2) ?? null,
+        currencyCode: input.priceStart !== undefined || input.priceEnd !== undefined ? 'BRL' : null,
+      },
       image: imageKey,
       manuallyCreated: true,
     };

@@ -26,6 +26,9 @@ export class ActiveProposalResponseDto {
   @ApiProperty({ type: String, nullable: true, example: 'Restaurante Penne' })
   name!: string | null;
 
+  @ApiProperty({ type: String, format: 'date', nullable: true })
+  date!: string | null;
+
   @ApiProperty({ type: Date, format: 'date-time' })
   createdAt!: Date;
 

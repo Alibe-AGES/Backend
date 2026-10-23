@@ -7,6 +7,7 @@ describe('PrismaProposalRepository', () => {
     id: 'location-id',
     externalId: 'place-1',
     name: 'Café',
+    suggestionDate: new Date('2026-10-23T00:00:00.000Z'),
     description: 'Café',
     address: 'Rua A',
     openingHours: [],
@@ -39,6 +40,7 @@ describe('PrismaProposalRepository', () => {
     ownerId: 'owner-id',
     location: { kind: 'existing', id: location.id },
     name: 'Café',
+    suggestionDate: new Date('2026-10-10T00:00:00.000Z'),
     createdAt: new Date('2026-10-10T12:00:00.000Z'),
   };
   const storedLocation = {
@@ -135,6 +137,7 @@ describe('PrismaProposalRepository', () => {
       type: 'suggestion',
       groupId: data.groupId,
       name: data.name,
+      date: '2026-10-10',
       createdAt: data.createdAt,
       owner: { id: data.ownerId, name: 'Ana', image: null },
       location: storedLocation,
@@ -151,6 +154,7 @@ describe('PrismaProposalRepository', () => {
           groupId: data.groupId,
           ownerId: data.ownerId,
           name: data.name,
+          suggestionDate: data.suggestionDate,
           locationId: location.id,
           createdAt: data.createdAt,
         },

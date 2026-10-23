@@ -72,6 +72,16 @@ export class InMemoryEventRepository extends EventRepository {
           description: data.location.kind === 'new' ? data.location.address : null,
           manuallyCreated: true,
         };
+    if (data.location.kind === 'new') {
+      this.creationLocations.set(data.location.id, {
+        id: data.location.id,
+        description: data.location.address,
+        manuallyCreated: true,
+        image: data.location.image,
+        priceStart: null,
+        priceEnd: null,
+      });
+    }
     const event = new Event({
       id: data.id,
       name: data.name,

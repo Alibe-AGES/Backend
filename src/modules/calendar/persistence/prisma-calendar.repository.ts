@@ -39,6 +39,15 @@ export class PrismaCalendarRepository extends CalendarRepository {
             },
           },
         },
+        proposals: {
+          where: {
+            type: 'suggestion',
+            matchedAt: null,
+            suggestionDate: { gte: input.periodStart, lt: input.periodEnd },
+          },
+          orderBy: { suggestionDate: 'asc' },
+          select: { id: true, suggestionDate: true },
+        },
         availabilities: {
           where: {
             date: {
@@ -73,6 +82,9 @@ export class PrismaCalendarRepository extends CalendarRepository {
               },
             ]
           : []
+      ),
+      suggestions: group.proposals.flatMap((proposal) =>
+        proposal.suggestionDate ? [{ id: proposal.id, date: proposal.suggestionDate }] : []
       ),
       availabilities: group.availabilities.map((availability) => ({
         userId: availability.userId,

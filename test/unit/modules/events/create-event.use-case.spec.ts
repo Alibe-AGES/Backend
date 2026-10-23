@@ -166,6 +166,37 @@ describe('CreateEventUseCase', () => {
     expect(event.budgetEnd).toBe('70.00');
   });
 
+  it('passes a matched suggestion ID with its saved location when creating the event', async () => {
+    const locationId = '44444444-4444-4444-8444-444444444444';
+    const matchedSuggestionId = '77777777-7777-4777-8777-777777777777';
+    events.setLocation({
+      id: locationId,
+      image: null,
+      priceStart: '30.00',
+      priceEnd: '70.00',
+      description: 'Bloom Café',
+      manuallyCreated: false,
+    });
+    const createSpy = jest.spyOn(events, 'create');
+
+    await useCase.execute({
+      ...validInput,
+      location: undefined,
+      locationId,
+      matchedSuggestionId,
+    });
+
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ matchedSuggestionId, location: { kind: 'existing', id: locationId } })
+    );
+  });
+
+  it('requires a saved location ID when converting a matched suggestion', async () => {
+    await expect(
+      useCase.execute({ ...validInput, matchedSuggestionId: '77777777-7777-4777-8777-777777777777' })
+    ).rejects.toBeInstanceOf(InvalidEventCreationError);
+  });
+
   it('rejects an unknown locationId', async () => {
     await expect(
       useCase.execute({

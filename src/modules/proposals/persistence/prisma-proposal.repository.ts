@@ -70,6 +70,7 @@ export class PrismaProposalRepository extends ProposalRepository {
         groupId: true,
         eventId: true,
         name: true,
+        suggestionDate: true,
         createdAt: true,
         matchedAt: true,
         owner: { select: { id: true, name: true, profilePic: true } },
@@ -97,6 +98,7 @@ export class PrismaProposalRepository extends ProposalRepository {
         groupId: proposal.groupId,
         eventId: proposal.eventId,
         name: proposal.name,
+        suggestionDate: proposal.suggestionDate,
         createdAt: proposal.createdAt,
         matchedAt: proposal.matchedAt,
         owner: {
@@ -119,6 +121,7 @@ export class PrismaProposalRepository extends ProposalRepository {
         id: true,
         groupId: true,
         name: true,
+        suggestionDate: true,
         createdAt: true,
         owner: { select: { id: true, name: true, profilePic: true } },
         location: { select: locationSelect },
@@ -135,6 +138,7 @@ export class PrismaProposalRepository extends ProposalRepository {
         type: 'suggestion',
         groupId: suggestion.groupId,
         name: suggestion.name,
+        suggestionDate: suggestion.suggestionDate,
         createdAt: suggestion.createdAt,
         owner: {
           id: suggestion.owner.id,
@@ -167,6 +171,7 @@ export class PrismaProposalRepository extends ProposalRepository {
           groupId: data.groupId,
           ownerId: data.ownerId,
           name: data.name,
+          suggestionDate: data.suggestionDate,
           locationId: location.id,
           createdAt: data.createdAt,
         },
@@ -196,6 +201,7 @@ export class PrismaProposalRepository extends ProposalRepository {
         type: 'suggestion',
         groupId: proposal.groupId,
         name: data.name,
+        suggestionDate: data.suggestionDate,
         createdAt: proposal.createdAt,
         owner: {
           id: proposal.owner.id,

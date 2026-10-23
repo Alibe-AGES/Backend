@@ -5,6 +5,8 @@ import {
   type ProposalAnswer,
 } from './event.entity';
 
+export class MatchedSuggestionNotConvertibleError extends Error {}
+
 export interface EventDetails {
   id: string;
   name: string | null;
@@ -60,6 +62,7 @@ export interface CreateEventData {
   id: string;
   groupId: string;
   ownerId: string;
+  matchedSuggestionId?: string;
   name: string;
   timeslot: Date;
   location:
@@ -80,6 +83,8 @@ export interface CreateEventData {
 
 export interface EventCreationLocation {
   id: string;
+  description?: string | null;
+  manuallyCreated?: boolean | null;
   image: string | null;
   priceStart: string | null;
   priceEnd: string | null;
