@@ -8,7 +8,6 @@ const createProposalSchema = z
     locationId: z.uuid().optional(),
     externalId: z.string().regex(PLACE_ID_PATTERN).optional(),
     name: z.string().trim().min(1).optional(),
-    date: z.iso.date(),
     description: z.string().trim().min(1).optional(),
     address: z.string().trim().min(1).optional(),
     phoneNumber: z.string().trim().min(1).optional(),
@@ -46,9 +45,6 @@ export class CreateProposalDto extends createZodDto(createProposalSchema) {
     description: 'Nome opcional do local manual. Desnecessário com locationId ou externalId.',
   })
   name?: string;
-
-  @ApiProperty({ format: 'date', example: '2026-10-23' })
-  date!: string;
 
   @ApiProperty({ required: false, example: 'Restaurante italiano com área externa.' })
   description?: string;

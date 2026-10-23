@@ -37,14 +37,6 @@ export class CalendarDayResponseDto {
     type: String,
     format: 'uuid',
     isArray: true,
-    description: 'IDs das sugestões de local não correspondidas neste dia.',
-  })
-  suggestionIds!: string[];
-
-  @ApiProperty({
-    type: String,
-    format: 'uuid',
-    isArray: true,
     description: 'IDs dos usuários disponíveis no dia.',
   })
   availableUserIds!: string[];

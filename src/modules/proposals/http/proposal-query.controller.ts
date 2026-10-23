@@ -71,7 +71,6 @@ export class ProposalQueryController {
       groupId: proposal.groupId,
       eventId: proposal.eventId,
       name: proposal.name,
-      date: proposal.suggestionDate?.toISOString().slice(0, 10) ?? null,
       createdAt: proposal.createdAt,
       matchedAt: proposal.matchedAt,
       matched: proposal.matchedAt !== null,

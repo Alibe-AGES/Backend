@@ -38,7 +38,6 @@ const newestSuggestion: ActiveSuggestion = {
   type: 'suggestion',
   groupId: GROUP_ID,
   name: 'Restaurante Penne',
-  suggestionDate: new Date('2026-10-12T00:00:00.000Z'),
   createdAt: new Date('2026-10-12T12:00:00.000Z'),
   owner: { id: OWNER_ID, name: 'Daniel Martins', image: 'users/daniel.jpg' },
   location,
@@ -49,7 +48,6 @@ const olderSuggestion: ActiveSuggestion = {
   ...newestSuggestion,
   id: '66666666-6666-4666-8666-666666666666',
   name: null,
-  suggestionDate: new Date('2026-10-10T00:00:00.000Z'),
   createdAt: new Date('2026-10-10T12:00:00.000Z'),
   owner: { id: OWNER_ID, name: 'Daniel Martins', image: null },
   location: null,
@@ -103,7 +101,6 @@ describe('List active proposals endpoint (e2e)', () => {
         type: 'suggestion',
         groupId: GROUP_ID,
         name: 'Restaurante Penne',
-        date: '2026-10-12',
         createdAt: '2026-10-12T12:00:00.000Z',
         owner: {
           id: OWNER_ID,
@@ -116,7 +113,6 @@ describe('List active proposals endpoint (e2e)', () => {
       expect.objectContaining({
         id: olderSuggestion.id,
         name: null,
-        date: '2026-10-10',
         owner: { id: OWNER_ID, name: 'Daniel Martins', image: null },
         location: null,
       }),

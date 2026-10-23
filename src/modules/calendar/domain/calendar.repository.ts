@@ -12,16 +12,10 @@ export interface CalendarAvailabilityData {
   date: Date;
 }
 
-export interface CalendarSuggestionData {
-  id: string;
-  date: Date;
-}
-
 export interface GroupCalendarData {
   userIsMember: boolean;
   memberIds: string[];
   events: CalendarEventData[];
-  suggestions?: CalendarSuggestionData[];
   availabilities: CalendarAvailabilityData[];
 }
 

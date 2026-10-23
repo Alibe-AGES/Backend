@@ -112,7 +112,7 @@ describe('Locations endpoint (e2e)', () => {
   });
 
   it('searches catalog locations by free text', async () => {
-    searchText.mockResolvedValue([buildPlace()]);
+    searchText.mockResolvedValue([buildPlace({ primaryType: 'restaurant' })]);
 
     const response = await request(app.getHttpServer())
       .get('/api/locations/search')
@@ -124,7 +124,7 @@ describe('Locations endpoint (e2e)', () => {
         textQuery: 'pizza vegana',
         center: { latitude: -30.0277, longitude: -51.2287 },
         radiusMeters: 50_000,
-        includedTypes: ['restaurant'],
+        includedType: 'restaurant',
       })
     );
     expect(searchNearby).not.toHaveBeenCalled();

@@ -10,7 +10,6 @@ describe('ProposalResponsePresenter', () => {
     type: 'suggestion',
     groupId: 'group-id',
     name: 'Café',
-    suggestionDate: new Date('2026-10-23T00:00:00.000Z'),
     createdAt: new Date('2026-10-09T17:00:00.000Z'),
     owner: { id: 'owner-id', name: 'Ana', image: 'private-storage-key' },
     location: {
@@ -37,7 +36,6 @@ describe('ProposalResponsePresenter', () => {
       type: 'suggestion',
       groupId: 'group-id',
       name: 'Café',
-      date: '2026-10-23',
       createdAt: proposal.createdAt,
       owner: { id: 'owner-id', name: 'Ana', image: '/users/owner-id/profile-picture' },
       location: {
@@ -74,7 +72,6 @@ describe('ProposalResponsePresenter', () => {
       type: 'suggestion',
       groupId: 'group-id',
       name: 'Café',
-      suggestionDate: new Date('2026-10-23T00:00:00.000Z'),
       createdAt: new Date('2026-10-09T17:00:00.000Z'),
       owner: { id: 'owner-id', name: 'Ana', image: 'private-storage-key' },
       location: { ...proposal.location, image: 'locations/location-id/images/photo.jpg' },
@@ -87,7 +84,6 @@ describe('ProposalResponsePresenter', () => {
         type: 'suggestion',
         groupId: 'group-id',
         name: 'Café',
-        date: '2026-10-23',
         createdAt: active.createdAt,
         owner: { id: 'owner-id', name: 'Ana', image: '/users/owner-id/profile-picture' },
         location: expect.objectContaining({

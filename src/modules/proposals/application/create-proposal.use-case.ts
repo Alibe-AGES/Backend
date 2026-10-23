@@ -21,7 +21,6 @@ export interface CreateProposalInput {
   locationId?: string;
   externalId?: string;
   name?: string;
-  date: string;
   description?: string;
   address?: string;
   phoneNumber?: string;
@@ -80,7 +79,6 @@ export class CreateProposalUseCase {
         ownerId: input.userId,
         location: resolved.location,
         name: resolved.proposalName,
-        suggestionDate: new Date(`${input.date}T00:00:00.000Z`),
         createdAt,
       });
     } catch (error) {
@@ -90,9 +88,6 @@ export class CreateProposalUseCase {
   }
 
   private validateInput(input: CreateProposalInput): string {
-    if (!input.date || !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
-      throw new InvalidProposalCreationError('A data da sugestão é obrigatória');
-    }
     if (input.locationId && input.externalId) {
       throw new InvalidProposalCreationError('Informe locationId ou externalId, não ambos');
     }

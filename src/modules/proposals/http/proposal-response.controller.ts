@@ -115,7 +115,7 @@ export class ProposalResponseController {
   @ApiOperation({
     summary: 'Cria a resposta do usuário autenticado para uma sugestão',
     description:
-      'Quando esta resposta completa o aceite de todos os membros atuais do grupo, retorna `matched: true` e registra uma notificação `match` no grupo.',
+      'Quando esta resposta completa o match, retorna `matched: true`. Use `proposalId` em GET /api/proposals/{proposalId} para obter a localização e preencher a criação do evento.',
   })
   @ApiParam({ name: 'proposalId', format: 'uuid' })
   @ApiBody(answerBody)
@@ -137,7 +137,7 @@ export class ProposalResponseController {
   @ApiOperation({
     summary: 'Altera a resposta do usuário autenticado para uma sugestão',
     description:
-      'Trocar para `yes` pode completar o match; nesse caso retorna `matched: true` e registra uma notificação `match` no grupo.',
+      'Trocar para `yes` pode completar o match; nesse caso retorna `matched: true`. Use `proposalId` em GET /api/proposals/{proposalId} para obter a localização e preencher a criação do evento.',
   })
   @ApiParam({ name: 'proposalId', format: 'uuid' })
   @ApiBody(answerBody)

@@ -19,7 +19,6 @@ const input = {
   groupId: '33333333-3333-4333-8333-333333333333',
   userId: '11111111-1111-4111-8111-111111111111',
   externalId: PLACE_ID,
-  date: '2026-10-23',
 };
 const storedLocation = {
   id: '22222222-2222-4222-8222-222222222222',
@@ -102,7 +101,6 @@ describe('CreateProposalUseCase', () => {
         },
       },
       name: 'Bloom Café',
-      suggestionDate: new Date('2026-10-23T00:00:00.000Z'),
       createdAt: expect.any(Date),
     });
   });
@@ -177,7 +175,7 @@ describe('CreateProposalUseCase', () => {
 
   it('creates a manual location even when every descriptive field is omitted', async () => {
     await expect(
-      useCase.execute({ groupId: input.groupId, userId: input.userId, date: input.date })
+      useCase.execute({ groupId: input.groupId, userId: input.userId })
     ).resolves.toEqual({ id: 'proposal-id' });
     expect(proposals.createSuggestion).toHaveBeenCalledWith(
       expect.objectContaining({

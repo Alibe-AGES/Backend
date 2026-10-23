@@ -91,7 +91,11 @@ export class EventController {
   @Post('groups/:groupId/events')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } }))
-  @ApiOperation({ summary: 'Cria um evento no grupo com a proposta do usuário autenticado' })
+  @ApiOperation({
+    summary: 'Cria um evento no grupo com a proposta do usuário autenticado',
+    description:
+      'Para converter um match, envie matchedSuggestionId e o locationId obtido nos detalhes da proposta. A data e o horário são definidos apenas no evento.',
+  })
   @ApiParam({ name: 'groupId', format: 'uuid' })
   @ApiConsumes('multipart/form-data', 'application/json')
   @ApiBody({

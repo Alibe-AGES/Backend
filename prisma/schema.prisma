@@ -210,7 +210,6 @@ model Proposal {
   ownerId    String           @map("owner_id") @db.Uuid
   name       String?
   locationId String?          @map("location_id") @db.Uuid
-  suggestionDate DateTime?    @map("suggestion_date") @db.Date
   matchedAt  DateTime?        @map("matched_at")
   createdAt  DateTime         @map("created_at")
 

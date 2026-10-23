@@ -55,9 +55,6 @@ export class CreatedProposalResponseDto {
   @ApiProperty({ type: String, nullable: true, example: 'Restaurante Penne' })
   name!: string | null;
 
-  @ApiProperty({ type: String, format: 'date', example: '2026-10-23' })
-  date!: string;
-
   @ApiProperty({ type: Date, format: 'date-time' })
   createdAt!: Date;
 

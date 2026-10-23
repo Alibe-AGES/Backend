@@ -13,7 +13,6 @@ export interface GroupCalendarDay {
   scheduledEventIds: string[];
   proposalIds: string[];
   proposalEventIds: { proposalId: string; eventId: string }[];
-  suggestionIds: string[];
   availableUserIds: string[];
   completedEventIds: string[];
   allUsersAvailable: boolean;
@@ -23,7 +22,6 @@ interface MutableCalendarDay {
   scheduledEventIds: Set<string>;
   proposalIds: Set<string>;
   proposalEventIds: Map<string, string>;
-  suggestionIds: Set<string>;
   availableUserIds: Set<string>;
   completedEventIds: Set<string>;
 }
@@ -99,10 +97,6 @@ export class GetGroupCalendarUseCase {
       this.getOrCreateDay(days, date).availableUserIds.add(availability.userId);
     }
 
-    for (const suggestion of calendar.suggestions ?? []) {
-      this.getOrCreateDay(days, this.dateOnly(suggestion.date)).suggestionIds.add(suggestion.id);
-    }
-
     return [...days.entries()]
       .sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate))
       .map(([date, day]) => {
@@ -121,9 +115,6 @@ export class GetGroupCalendarUseCase {
           proposalEventIds: [...day.proposalEventIds.entries()]
             .sort(([firstId], [secondId]) => firstId.localeCompare(secondId))
             .map(([proposalId, eventId]) => ({ proposalId, eventId })),
-          suggestionIds: [...day.suggestionIds].sort((firstId, secondId) =>
-            firstId.localeCompare(secondId)
-          ),
           availableUserIds,
           completedEventIds: [...day.completedEventIds].sort((firstId, secondId) =>
             firstId.localeCompare(secondId)
@@ -146,7 +137,6 @@ export class GetGroupCalendarUseCase {
       scheduledEventIds: new Set<string>(),
       proposalIds: new Set<string>(),
       proposalEventIds: new Map<string, string>(),
-      suggestionIds: new Set<string>(),
       availableUserIds: new Set<string>(),
       completedEventIds: new Set<string>(),
     };

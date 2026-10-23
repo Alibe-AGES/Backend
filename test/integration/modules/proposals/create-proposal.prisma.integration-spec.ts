@@ -42,7 +42,6 @@ describeDatabase('Proposal suggestions and matches with PostgreSQL', () => {
     ownerId,
     location: { kind: 'existing', id: locationId },
     name: 'Café',
-    suggestionDate: new Date('2026-10-23T00:00:00.000Z'),
     createdAt: new Date(),
     ...overrides,
   });

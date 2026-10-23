@@ -18,9 +18,6 @@ export class ProposalDetailsResponseDto {
   @ApiProperty({ type: String, nullable: true })
   name!: string | null;
 
-  @ApiProperty({ type: String, format: 'date', nullable: true })
-  date!: string | null;
-
   @ApiProperty({ type: Date, format: 'date-time' })
   createdAt!: Date;
 

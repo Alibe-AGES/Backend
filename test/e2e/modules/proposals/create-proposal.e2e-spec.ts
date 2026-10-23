@@ -19,7 +19,6 @@ const UNKNOWN_ID = '77777777-7777-4777-8777-777777777777';
 const PATH = `/api/groups/${GROUP_ID}/proposals`;
 const body = {
   externalId: PLACE_ID,
-  date: '2026-10-23',
 };
 const storedLocation = (overrides: Record<string, unknown> = {}) => ({
   id: LOCATION_ID,
@@ -86,7 +85,6 @@ describe('Create proposal endpoint (e2e)', () => {
       type: 'suggestion',
       groupId: GROUP_ID,
       name: 'Bloom Café',
-      date: '2026-10-23',
       createdAt: expect.any(String),
       owner: { id: USER_ID, name: 'Ana Beatriz Silva', image: `/users/${USER_ID}/profile-picture` },
       location: {
@@ -134,7 +132,6 @@ describe('Create proposal endpoint (e2e)', () => {
       groupId: GROUP_ID,
       eventId: null,
       name: 'Bloom Café',
-      date: '2026-10-23',
       createdAt: created.body.createdAt,
       matchedAt: null,
       matched: false,
