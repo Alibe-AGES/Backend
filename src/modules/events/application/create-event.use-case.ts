@@ -181,7 +181,6 @@ export class CreateEventUseCase {
       );
     }
   }
-
 }
 
 function formatDate(date: string): string {

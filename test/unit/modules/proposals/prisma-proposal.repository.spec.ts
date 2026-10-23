@@ -137,7 +137,7 @@ describe('PrismaProposalRepository', () => {
       type: 'suggestion',
       groupId: data.groupId,
       name: data.name,
-      date: '2026-10-10',
+      suggestionDate: data.suggestionDate,
       createdAt: data.createdAt,
       owner: { id: data.ownerId, name: 'Ana', image: null },
       location: storedLocation,

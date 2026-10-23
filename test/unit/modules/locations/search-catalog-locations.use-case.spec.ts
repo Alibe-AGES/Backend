@@ -29,7 +29,9 @@ describe('SearchCatalogLocationsUseCase', () => {
   });
 
   it('searches by text biased around the user', async () => {
-    places.searchText.mockResolvedValue([buildPlace({ externalId: 'a' })]);
+    places.searchText.mockResolvedValue([
+      buildPlace({ externalId: 'a', primaryType: 'restaurant' }),
+    ]);
 
     const result = await useCase.execute({
       ...coordinates,
@@ -43,7 +45,7 @@ describe('SearchCatalogLocationsUseCase', () => {
       textQuery: 'pizza vegana',
       center: coordinates,
       radiusMeters: 50_000,
-      includedTypes: ['restaurant'],
+      includedType: 'restaurant',
       includePriceRange: true,
     });
     expect(places.searchNearby).not.toHaveBeenCalled();

@@ -187,13 +187,19 @@ describe('CreateEventUseCase', () => {
     });
 
     expect(createSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ matchedSuggestionId, location: { kind: 'existing', id: locationId } })
+      expect.objectContaining({
+        matchedSuggestionId,
+        location: { kind: 'existing', id: locationId },
+      })
     );
   });
 
   it('requires a saved location ID when converting a matched suggestion', async () => {
     await expect(
-      useCase.execute({ ...validInput, matchedSuggestionId: '77777777-7777-4777-8777-777777777777' })
+      useCase.execute({
+        ...validInput,
+        matchedSuggestionId: '77777777-7777-4777-8777-777777777777',
+      })
     ).rejects.toBeInstanceOf(InvalidEventCreationError);
   });
 

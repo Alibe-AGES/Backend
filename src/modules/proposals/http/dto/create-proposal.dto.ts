@@ -50,7 +50,6 @@ export class CreateProposalDto extends createZodDto(createProposalSchema) {
   @ApiProperty({ format: 'date', example: '2026-10-23' })
   date!: string;
 
-
   @ApiProperty({ required: false, example: 'Restaurante italiano com área externa.' })
   description?: string;
 

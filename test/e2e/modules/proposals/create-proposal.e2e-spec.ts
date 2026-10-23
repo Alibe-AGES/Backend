@@ -161,22 +161,21 @@ describe('Create proposal endpoint (e2e)', () => {
     expect(response.body.matched).toBe(true);
   });
 
-  it.each([
-    { time: '15:00' },
-    { budgetStart: '30.00' },
-    { budgetEnd: '60.00' },
-  ])('rejects %p because day, time and budget belong to the event', async (field) => {
-    const create = jest.spyOn(proposals, 'createSuggestion');
-    try {
-      await request(app.getHttpServer())
-        .post(PATH)
-        .send({ ...body, ...field })
-        .expect(400);
-      expect(create).not.toHaveBeenCalled();
-    } finally {
-      create.mockRestore();
+  it.each([{ time: '15:00' }, { budgetStart: '30.00' }, { budgetEnd: '60.00' }])(
+    'rejects %p because day, time and budget belong to the event',
+    async (field) => {
+      const create = jest.spyOn(proposals, 'createSuggestion');
+      try {
+        await request(app.getHttpServer())
+          .post(PATH)
+          .send({ ...body, ...field })
+          .expect(400);
+        expect(create).not.toHaveBeenCalled();
+      } finally {
+        create.mockRestore();
+      }
     }
-  });
+  );
 
   it('stores a place used for the first time with the data from Google Places', async () => {
     const newPlaceId = 'ChIJ-new-place';

@@ -17,9 +17,9 @@ describe('CreateProposalDto', () => {
         date: '2026-10-23',
       }).success
     ).toBe(true);
-    expect(
-      CreateProposalDto.schema.safeParse({ name: 'Manual', date: '2026-10-23' }).success
-    ).toBe(true);
+    expect(CreateProposalDto.schema.safeParse({ name: 'Manual', date: '2026-10-23' }).success).toBe(
+      true
+    );
   });
 
   it('rejects ambiguous selectors and accepts an empty manual location', () => {
@@ -36,11 +36,10 @@ describe('CreateProposalDto', () => {
     expect(CreateProposalDto.schema.safeParse({ externalId: body.externalId }).success).toBe(false);
   });
 
-  it.each([
-    { time: '15:00' },
-    { budgetStart: '30.00' },
-    { budgetEnd: '60.00' },
-  ])('rejects %p because day, time and budget belong to the event', (field) => {
-    expect(CreateProposalDto.schema.safeParse({ ...body, ...field }).success).toBe(false);
-  });
+  it.each([{ time: '15:00' }, { budgetStart: '30.00' }, { budgetEnd: '60.00' }])(
+    'rejects %p because day, time and budget belong to the event',
+    (field) => {
+      expect(CreateProposalDto.schema.safeParse({ ...body, ...field }).success).toBe(false);
+    }
+  );
 });

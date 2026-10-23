@@ -486,7 +486,9 @@ describe('PrismaEventRepository', () => {
           create: jest.fn().mockResolvedValue(ownerResponse),
           deleteMany: jest.fn(),
         },
-        location: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: baseRecord.location.id }) },
+        location: {
+          findUniqueOrThrow: jest.fn().mockResolvedValue({ id: baseRecord.location.id }),
+        },
         event: {
           create: jest.fn().mockResolvedValue({ id: eventId }),
           findUniqueOrThrow: jest.fn().mockResolvedValue(baseRecord),

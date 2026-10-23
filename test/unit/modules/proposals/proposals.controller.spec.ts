@@ -21,6 +21,7 @@ import { PlacesProviderUnavailableError } from '../../../../src/shared/places/pl
 describe('ProposalsController error handling', () => {
   const input = {
     externalId: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
+    date: '2026-10-23',
   };
   const execute = jest.fn();
   const listActive = jest.fn();

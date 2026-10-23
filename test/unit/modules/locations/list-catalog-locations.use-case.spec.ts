@@ -32,10 +32,16 @@ describe('ListCatalogLocationsUseCase', () => {
 
   it('searches around the user, filters and paginates without persisting the page', async () => {
     places.searchNearby.mockResolvedValue([
-      buildPlace({ externalId: 'a', goodForGroups: true }),
-      buildPlace({ externalId: 'b', goodForGroups: false }),
-      buildPlace({ externalId: 'c', goodForGroups: true, summary: null, location: null }),
-      buildPlace({ externalId: 'd', goodForGroups: true }),
+      buildPlace({ externalId: 'a', goodForGroups: true, primaryType: 'restaurant' }),
+      buildPlace({ externalId: 'b', goodForGroups: false, primaryType: 'restaurant' }),
+      buildPlace({
+        externalId: 'c',
+        goodForGroups: true,
+        summary: null,
+        location: null,
+        primaryType: 'restaurant',
+      }),
+      buildPlace({ externalId: 'd', goodForGroups: true, primaryType: 'restaurant' }),
     ]);
 
     const result = await useCase.execute({
