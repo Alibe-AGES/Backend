@@ -8,6 +8,7 @@ import {
   type EventImageAccess,
   EventRepository,
   type UpdateEventData,
+  EventMemories,
 } from '../../src/modules/events/domain/event.repository';
 
 export class InMemoryEventRepository extends EventRepository {
@@ -15,9 +16,10 @@ export class InMemoryEventRepository extends EventRepository {
   private readonly locations = new Map<string, string>();
   private readonly groups = new Map<string, Set<string>>();
   private readonly creationLocations = new Map<
-    string,
-    EventCreationLocation & { description: string | null; manuallyCreated: boolean | null }
+  string,
+  EventCreationLocation & { description: string | null; manuallyCreated: boolean | null }
   >();
+  private readonly memories = new Map<string, Array<{ id: string; picture: string; eventId: string }>>();
 
   findById(id: string): Promise<Event | null> {
     return Promise.resolve(this.events.get(id) ?? null);
@@ -204,6 +206,26 @@ export class InMemoryEventRepository extends EventRepository {
     return Promise.resolve({
       event: eventDetails,
       userIsMember: this.groups.get(event.groupId)?.has(userId) ?? false,
+    });
+  }
+
+  setMemories(eventId: string, eventMemories: Array<{ id: string; picture: string; eventId: string }>): void {
+    this.memories.set(eventId, eventMemories);
+  }
+
+  findMemories(eventId: string, userId: string): Promise<EventMemories | null> {
+    const event = this.events.get(eventId);
+
+    if (!event) {
+      return Promise.resolve(null);
+    }
+
+    const eventMemories = this.memories.get(eventId) ?? [];
+    const userIsMember = this.groups.get(event.groupId)?.has(userId) ?? false;
+
+    return Promise.resolve({
+      memories: eventMemories,
+      userIsMember,
     });
   }
 }

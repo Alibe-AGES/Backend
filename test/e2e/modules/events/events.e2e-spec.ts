@@ -13,6 +13,7 @@ import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const OWNER_ID = '11111111-1111-4111-8111-111111111111';
+const GROUP_ID = '33333333-3333-4333-8333-333333333333';
 const ORIGINAL_IMAGE_KEY = `events/${EVENT_ID}/images/original.jpg`;
 const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -53,6 +54,7 @@ describe('Events endpoint (e2e)', () => {
   beforeEach(() => {
     process.env.MOCK_AUTH_ENABLED = 'true';
     process.env.MOCK_AUTH_USER_ID = OWNER_ID;
+    
     events.set(
       new Event({
         id: EVENT_ID,
@@ -62,7 +64,7 @@ describe('Events endpoint (e2e)', () => {
         budgetStart: '50.00',
         budgetEnd: '120.00',
         status: 'pending',
-        groupId: '33333333-3333-4333-8333-333333333333',
+        groupId: GROUP_ID,
         location: {
           id: '44444444-4444-4444-8444-444444444444',
           description: 'Casa da Ana',
@@ -73,6 +75,7 @@ describe('Events endpoint (e2e)', () => {
         updatedAt: new Date('2026-09-22T18:30:00.000Z'),
       })
     );
+    events.setGroupMembers(GROUP_ID, [OWNER_ID]);
   });
 
   it('updates an event owned by the authenticated user and returns the updated shape', async () => {
@@ -179,6 +182,39 @@ describe('Events endpoint (e2e)', () => {
       .patch(`/api/events/${EVENT_ID}`)
       .send({ name: 'Sem autenticação' })
       .expect(401);
+  });
+
+  describe('GET /api/events/:eventId/memories', () => {
+    it('returns event memories when user belongs to the group', async () => {
+      const memory = {
+        id: '77777777-7777-4777-8777-777777777777',
+        picture: 'events/memory.jpg',
+        eventId: EVENT_ID,
+      };
+      events.setMemories(EVENT_ID, [memory]);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/events/${EVENT_ID}/memories`)
+        .expect(200);
+
+      expect(response.body).toEqual([memory]);
+    });
+
+    it('rejects requests for non-existent events', async () => {
+      await request(app.getHttpServer())
+        .get('/api/events/00000000-0000-4000-8000-000000000000/memories')
+        .expect(404);
+    });
+
+    it('rejects users who do not belong to the event group', async () => {
+      const notAllowedUser = '99999999-9999-4999-8999-999999999999';
+     previousMockAuthUserId = notAllowedUser;
+      events.setGroupMembers(GROUP_ID, [OWNER_ID]);
+
+      await request(app.getHttpServer())
+        .get(`/api/events/${EVENT_ID}/memories`)
+        .expect(403);
+    });
   });
 
   it('documents the image as a binary multipart field in Swagger', async () => {

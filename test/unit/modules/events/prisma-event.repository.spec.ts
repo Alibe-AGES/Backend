@@ -482,4 +482,71 @@ describe('PrismaEventRepository', () => {
       );
     });
   });
+
+  describe('findMemories', () => {
+    const memoryRow = {
+      id: '77777777-7777-4777-8777-777777777777',
+      picture: `events/${eventId}/memories/memory-1.jpg`,
+      eventId,
+    };
+
+    it('returns memories and true membership for a member user', async () => {
+      const userId = authenticatedRequest.user.id;
+      const findUnique = jest.fn().mockResolvedValue({
+        id: eventId,
+        group: { users: [{ userId }] },
+        memories: [memoryRow],
+      });
+      const prisma = { event: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      await expect(repository.findMemories(eventId, userId)).resolves.toEqual({
+        memories: [memoryRow],
+        userIsMember: true,
+      });
+
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id: eventId },
+        include: {
+          group: {
+            select: {
+              users: {
+                where: { userId },
+                select: { userId: true },
+                take: 1,
+              },
+            },
+          },
+          memories: true,
+        },
+      });
+    });
+
+    it('returns memories and false membership for a user outside the group', async () => {
+      const findUnique = jest.fn().mockResolvedValue({
+        id: eventId,
+        group: { users: [] },
+        memories: [memoryRow],
+      });
+      const prisma = { event: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      const result = await repository.findMemories(eventId, 'outside-user');
+
+      expect(result).toEqual({
+        memories: [memoryRow],
+        userIsMember: false,
+      });
+    });
+
+    it('returns null when the event does not exist', async () => {
+      const findUnique = jest.fn().mockResolvedValue(null);
+      const prisma = { event: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      await expect(
+        repository.findMemories('550e8400-e29b-41d4-a716-446655440000', authenticatedRequest.user.id)
+      ).resolves.toBeNull();
+    });
+  });
 });
