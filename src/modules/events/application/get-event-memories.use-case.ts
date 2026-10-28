@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { EventRepository } from '../domain/event.repository';
 import { EventMemoriesResponseDto } from '../http/dto/event-memories.dto';
+import { EventNotFoundError } from './get-event.use-case';
 
-export class EventNotFoundError extends Error {}
 export class EventMemoriesAccessDeniedError extends Error {}
 
 @Injectable()

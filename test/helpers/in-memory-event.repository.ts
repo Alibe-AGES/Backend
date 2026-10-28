@@ -16,10 +16,13 @@ export class InMemoryEventRepository extends EventRepository {
   private readonly locations = new Map<string, string>();
   private readonly groups = new Map<string, Set<string>>();
   private readonly creationLocations = new Map<
-  string,
-  EventCreationLocation & { description: string | null; manuallyCreated: boolean | null }
+    string,
+    EventCreationLocation & { description: string | null; manuallyCreated: boolean | null }
   >();
-  private readonly memories = new Map<string, Array<{ id: string; picture: string; eventId: string }>>();
+  private readonly memories = new Map<
+    string,
+    Array<{ id: string; picture: string; eventId: string }>
+  >();
 
   findById(id: string): Promise<Event | null> {
     return Promise.resolve(this.events.get(id) ?? null);
@@ -209,8 +212,17 @@ export class InMemoryEventRepository extends EventRepository {
     });
   }
 
-  setMemories(eventId: string, eventMemories: Array<{ id: string; picture: string; eventId: string }>): void {
+  setMemories(
+    eventId: string,
+    eventMemories: Array<{ id: string; picture: string; eventId: string }>
+  ): void {
     this.memories.set(eventId, eventMemories);
+  }
+
+  addGroupMember(groupId: string, userId: string): void {
+    const members = this.groups.get(groupId) ?? new Set<string>();
+    members.add(userId);
+    this.groups.set(groupId, members);
   }
 
   findMemories(eventId: string, userId: string): Promise<EventMemories | null> {
@@ -221,7 +233,7 @@ export class InMemoryEventRepository extends EventRepository {
     }
 
     const eventMemories = this.memories.get(eventId) ?? [];
-    const userIsMember = this.groups.get(event.groupId)?.has(userId) ?? false;
+    const userIsMember = this.groups.get(event.groupId)?.has(userId);
 
     return Promise.resolve({
       memories: eventMemories,

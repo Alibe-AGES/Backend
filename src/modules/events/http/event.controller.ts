@@ -69,7 +69,10 @@ import {
   GetEventUseCase,
 } from '../application/get-event.use-case';
 import { EventMemoriesResponseDto } from './dto/event-memories.dto';
-import { GetEventMemoriesUseCase } from '../application/get-event-memories.use-case';
+import {
+  EventMemoriesAccessDeniedError,
+  GetEventMemoriesUseCase,
+} from '../application/get-event-memories.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -427,7 +430,7 @@ export class EventController {
         throw new NotFoundException(error.message);
       }
 
-      if (error instanceof EventDetailsAccessDeniedError) {
+      if (error instanceof EventMemoriesAccessDeniedError) {
         throw new ForbiddenException(error.message);
       }
 

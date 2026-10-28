@@ -1,9 +1,9 @@
 import {
   EventMemoriesAccessDeniedError,
-  EventNotFoundError,
   GetEventMemoriesUseCase,
 } from '../../../../src/modules/events/application/get-event-memories.use-case';
 import { Event } from '../../../../src/modules/events/domain/event.entity';
+import { EventNotFoundError } from '../../../../src/modules/events/application/get-event.use-case';
 import { InMemoryEventRepository } from '../../../helpers/in-memory-event.repository';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
@@ -40,7 +40,7 @@ describe('GetEventMemoriesUseCase', () => {
   beforeEach(() => {
     events = new InMemoryEventRepository();
     events.set(createEvent());
-    
+    events.addGroupMember(GROUP_ID, MEMBER_USER_ID);
     useCase = new GetEventMemoriesUseCase(events);
   });
 
@@ -56,6 +56,7 @@ describe('GetEventMemoriesUseCase', () => {
       picture: `events/${EVENT_ID}/memories/memory-1.jpg`,
       eventId: EVENT_ID,
     };
+    events.setMemories(EVENT_ID, [memory]);
 
     const result = await useCase.execute(EVENT_ID, MEMBER_USER_ID);
 
@@ -70,8 +71,8 @@ describe('GetEventMemoriesUseCase', () => {
   });
 
   it('denies access to a user who does not belong to the event group', async () => {
-    await expect(
-      useCase.execute(EVENT_ID, NON_MEMBER_USER_ID)
-    ).rejects.toBeInstanceOf(EventMemoriesAccessDeniedError);
+    await expect(useCase.execute(EVENT_ID, NON_MEMBER_USER_ID)).rejects.toBeInstanceOf(
+      EventMemoriesAccessDeniedError
+    );
   });
 });

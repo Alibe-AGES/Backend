@@ -54,7 +54,6 @@ describe('Events endpoint (e2e)', () => {
   beforeEach(() => {
     process.env.MOCK_AUTH_ENABLED = 'true';
     process.env.MOCK_AUTH_USER_ID = OWNER_ID;
-    
     events.set(
       new Event({
         id: EVENT_ID,
@@ -207,13 +206,9 @@ describe('Events endpoint (e2e)', () => {
     });
 
     it('rejects users who do not belong to the event group', async () => {
-      const notAllowedUser = '99999999-9999-4999-8999-999999999999';
-     previousMockAuthUserId = notAllowedUser;
-      events.setGroupMembers(GROUP_ID, [OWNER_ID]);
+      process.env.MOCK_AUTH_USER_ID = '99999999-9999-4999-8999-999999999999';
 
-      await request(app.getHttpServer())
-        .get(`/api/events/${EVENT_ID}/memories`)
-        .expect(403);
+      await request(app.getHttpServer()).get(`/api/events/${EVENT_ID}/memories`).expect(403);
     });
   });
 

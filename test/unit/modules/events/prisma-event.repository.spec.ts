@@ -545,7 +545,10 @@ describe('PrismaEventRepository', () => {
       const repository = new PrismaEventRepository(prisma);
 
       await expect(
-        repository.findMemories('550e8400-e29b-41d4-a716-446655440000', authenticatedRequest.user.id)
+        repository.findMemories(
+          '550e8400-e29b-41d4-a716-446655440000',
+          authenticatedRequest.user.id
+        )
       ).resolves.toBeNull();
     });
   });
