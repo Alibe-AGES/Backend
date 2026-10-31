@@ -12,6 +12,7 @@ import {
   type EventImageAccess,
   EventRepository,
   type UpdateEventData,
+  EventMemories,
 } from '../domain/event.repository';
 
 const eventInclude = {
@@ -360,5 +361,34 @@ export class PrismaEventRepository extends EventRepository {
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     });
+  }
+
+  async findMemories(eventId: string, userId: string): Promise<EventMemories | null> {
+    const event = await this.prisma.event.findUnique({
+      where: {
+        id: eventId,
+      },
+      include: {
+        group: {
+          select: {
+            users: {
+              where: { userId },
+              select: { userId: true },
+              take: 1,
+            },
+          },
+        },
+        memories: true,
+      },
+    });
+
+    if (!event) {
+      return null;
+    }
+
+    return {
+      memories: event.memories,
+      userIsMember: event.group.users.length > 0,
+    };
   }
 }

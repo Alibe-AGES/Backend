@@ -28,12 +28,14 @@ import { Event } from '../../../../src/modules/events/domain/event.entity';
 import { CreateEventDto } from '../../../../src/modules/events/http/dto/create-event.dto';
 import { UpdateEventDto } from '../../../../src/modules/events/http/dto/update-event.dto';
 import { EventController } from '../../../../src/modules/events/http/event.controller';
+import { GetEventMemoriesUseCase } from '../../../../src/modules/events/application/get-event-memories.use-case';
 
 describe('EventController', () => {
   let controller: EventController;
   let updateUseCaseMock: { execute: jest.Mock };
   let createUseCaseMock: { execute: jest.Mock };
   let getEventUseCaseMock: { execute: jest.Mock };
+  let getMemoriesUseCaseMock: { execute: jest.Mock };
 
   const eventId = '22222222-2222-4222-8222-222222222222';
   const userId = '11111111-1111-4111-8111-111111111111';
@@ -53,6 +55,7 @@ describe('EventController', () => {
         { provide: CreateEventUseCase, useValue: createUseCaseMock },
         { provide: GetEventUseCase, useValue: getEventUseCaseMock },
         { provide: GetEventImageUseCase, useValue: { execute: jest.fn() } },
+        { provide: GetEventMemoriesUseCase, useValue: getMemoriesUseCaseMock },
       ],
     }).compile();
 

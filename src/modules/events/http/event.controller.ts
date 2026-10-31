@@ -68,6 +68,11 @@ import {
   EventNotFoundError as GetEventNotFoundError,
   GetEventUseCase,
 } from '../application/get-event.use-case';
+import { EventMemoriesResponseDto } from './dto/event-memories.dto';
+import {
+  EventMemoriesAccessDeniedError,
+  GetEventMemoriesUseCase,
+} from '../application/get-event-memories.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -80,7 +85,8 @@ export class EventController {
     private readonly getEventUseCase: GetEventUseCase,
     private readonly getEventImageUseCase: GetEventImageUseCase,
     private readonly updateEventUseCase: UpdateEventUseCase,
-    private readonly createEventUseCase: CreateEventUseCase
+    private readonly createEventUseCase: CreateEventUseCase,
+    private readonly getMemoriesUseCase: GetEventMemoriesUseCase
   ) {}
 
   @Post('groups/:groupId/events')
@@ -395,5 +401,40 @@ export class EventController {
       createdAt: event.createdAt,
       updatedAt: event.updatedAt,
     };
+  }
+
+  @Get('api/events/:eventId/memories')
+  @ApiOperation({ summary: 'Consulta todas as memórias de um evento' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
+  @ApiOkResponse({ type: EventMemoriesResponseDto })
+  @ApiBadRequestResponse({ description: 'Identificador do evento inválido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar o evento.' })
+  async getMemories(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<EventMemoriesResponseDto[]> {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    try {
+      const memories = await this.getMemoriesUseCase.execute(eventId, userId);
+      return memories;
+    } catch (error) {
+      if (error instanceof GetEventNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      if (error instanceof EventMemoriesAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+
+      throw error;
+    }
   }
 }
