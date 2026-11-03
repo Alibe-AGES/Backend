@@ -13,6 +13,8 @@ import {
   EventRepository,
   type UpdateEventData,
   EventMemories,
+  EventMemoryDetails,
+  CreateMemoryData,
 } from '../domain/event.repository';
 
 const eventInclude = {
@@ -340,6 +342,26 @@ export class PrismaEventRepository extends EventRepository {
       event: details,
       userIsMember: event.group.users.length > 0,
     };
+  }
+  
+  async createMemory(data: CreateMemoryData): Promise<EventMemoryDetails | null> {
+    const memory = await this.prisma.memory.create({
+      data: {
+        id: data.id,
+        eventId: data.eventId,
+        picture: data.pictureUrl, 
+      },
+    });
+    
+    if(memory == null){
+      return null;
+    }
+
+    return {
+      id: memory.id,
+      picture: memory.picture,  
+      eventId: memory.eventId
+    }; 
   }
 
   private toDomain(data: EventRecord): Event {

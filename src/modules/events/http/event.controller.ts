@@ -73,6 +73,8 @@ import {
   EventMemoriesAccessDeniedError,
   GetEventMemoriesUseCase,
 } from '../application/get-event-memories.use-case';
+import { CreateMemoryDto } from './dto/create-memory.dto';
+import { CreateMemoryUseCase } from '../application/create-memory.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -86,7 +88,8 @@ export class EventController {
     private readonly getEventImageUseCase: GetEventImageUseCase,
     private readonly updateEventUseCase: UpdateEventUseCase,
     private readonly createEventUseCase: CreateEventUseCase,
-    private readonly getMemoriesUseCase: GetEventMemoriesUseCase
+    private readonly getMemoriesUseCase: GetEventMemoriesUseCase,
+    private readonly createMemoryUseCase: CreateMemoryUseCase
   ) {}
 
   @Post('groups/:groupId/events')
@@ -311,6 +314,72 @@ export class EventController {
       }
 
       if (error instanceof EventDetailsAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  
+  @Post('api/events/:eventId/memories')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } }))
+  @ApiOperation({ summary: 'Cria uma memória relacionada a um evento existente' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
+  @ApiConsumes('multipart/form-data', 'application/json')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['image'],
+      properties: {
+        image: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiCreatedResponse({ type: CreateMemoryDto })
+  @ApiBadRequestResponse({
+    description: 'Uma imagem é obrigatória',
+  })
+  @ApiPayloadTooLargeResponse({ description: 'A imagem ultrapassa o limite de 5 MB.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence a este grupo.' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado.' })
+  async createMemory(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @UploadedFile() image: Express.Multer.File | undefined,
+    @Request() request: AuthenticatedRequest
+  ): Promise<CreateMemoryDto> {
+    if(image == null){
+      throw new BadRequestException('É necessária uma imagem para essa operação.');
+    }
+    const userId = request.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    try {
+      const created = await this.createMemoryUseCase.execute({
+        eventId,
+        image: image && {
+          originalName: image.originalname,
+          contentType: image.mimetype,
+          bytes: image.buffer,
+        },
+      }, userId);
+
+      return created;
+    } catch (error) {
+      if (error instanceof InvalidEventCreationError) {
+        throw new BadRequestException(error.message);
+      }
+
+      if (error instanceof EventGroupNotFoundError || error instanceof EventLocationNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      if (error instanceof EventGroupAccessDeniedError) {
         throw new ForbiddenException(error.message);
       }
 
