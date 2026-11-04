@@ -6,7 +6,7 @@ const createMemorySchema = z
   .object({
     id: z.string(),
     eventId: z.string(),
-    picture: z.string()
+    picture: z.string(),
   })
   .strict();
 

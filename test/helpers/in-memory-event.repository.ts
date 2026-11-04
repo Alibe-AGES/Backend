@@ -254,7 +254,7 @@ export class InMemoryEventRepository extends EventRepository {
     const memoryRecord = {
       id: data.id,
       eventId: data.eventId,
-      picture: data.pictureUrl, 
+      picture: data.pictureUrl,
     };
 
     const existingMemories = this.memories.get(data.eventId) ?? [];
@@ -266,7 +266,7 @@ export class InMemoryEventRepository extends EventRepository {
       eventId: data.eventId,
     });
   }
-  
+
   findMemories(eventId: string, userId: string): Promise<EventMemories | null> {
     const event = this.events.get(eventId);
 

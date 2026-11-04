@@ -52,7 +52,7 @@ export class CreateMemoryUseCase {
 
     const memoryId = randomUUID();
     const imageKey = `api/events/${input.eventId}/memories/${memoryId}/image`;
-    
+
     await this.storage.save({
       key: imageKey,
       bytes: input.image.bytes,
@@ -63,7 +63,7 @@ export class CreateMemoryUseCase {
       const created = await this.events.createMemory({
         id: memoryId,
         eventId: input.eventId,
-        pictureUrl: imageKey
+        pictureUrl: imageKey,
       });
 
       return created;

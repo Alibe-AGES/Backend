@@ -72,9 +72,7 @@ describe('Event memories endpoint (e2e)', () => {
   });
 
   it('rejects a request when the image file is missing', async () => {
-    await request(app.getHttpServer())
-      .post(`/api/events/${EVENT_ID}/memories`)
-      .expect(400);
+    await request(app.getHttpServer()).post(`/api/events/${EVENT_ID}/memories`).expect(400);
   });
 
   it('denies a user who does not belong to the event group', async () => {

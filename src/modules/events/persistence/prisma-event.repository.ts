@@ -343,25 +343,25 @@ export class PrismaEventRepository extends EventRepository {
       userIsMember: event.group.users.length > 0,
     };
   }
-  
+
   async createMemory(data: CreateMemoryData): Promise<EventMemoryDetails | null> {
     const memory = await this.prisma.memory.create({
       data: {
         id: data.id,
         eventId: data.eventId,
-        picture: data.pictureUrl, 
+        picture: data.pictureUrl,
       },
     });
-    
-    if(memory == null){
+
+    if (memory == null) {
       return null;
     }
 
     return {
       id: memory.id,
-      picture: memory.picture,  
-      eventId: memory.eventId
-    }; 
+      picture: memory.picture,
+      eventId: memory.eventId,
+    };
   }
 
   private toDomain(data: EventRecord): Event {

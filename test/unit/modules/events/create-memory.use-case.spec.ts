@@ -3,7 +3,10 @@ import {
   InvalidMemoryCreationError,
 } from '../../../../src/modules/events/application/create-memory.use-case';
 import { Event } from '../../../../src/modules/events/domain/event.entity';
-import { EventDetailsAccessDeniedError, GetEventUseCase } from '../../../../src/modules/events/application/get-event.use-case';
+import {
+  EventDetailsAccessDeniedError,
+  GetEventUseCase,
+} from '../../../../src/modules/events/application/get-event.use-case';
 import { InMemoryEventRepository } from '../../../helpers/in-memory-event.repository';
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
 
@@ -22,9 +25,9 @@ describe('CreateMemoryUseCase', () => {
   beforeEach(() => {
     events = new InMemoryEventRepository();
     storage = new InMemoryObjectStorage();
-    
+
     events.setGroupMembers(GROUP_ID, [USER_ID]);
-    
+
     events.set(
       new Event({
         id: EVENT_ID,

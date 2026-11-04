@@ -321,7 +321,6 @@ export class EventController {
     }
   }
 
-  
   @Post('api/events/:eventId/memories')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } }))
@@ -350,7 +349,7 @@ export class EventController {
     @UploadedFile() image: Express.Multer.File | undefined,
     @Request() request: AuthenticatedRequest
   ): Promise<CreateMemoryDto> {
-    if(image == null){
+    if (image == null) {
       throw new BadRequestException('É necessária uma imagem para essa operação.');
     }
     const userId = request.user?.id;
@@ -360,14 +359,17 @@ export class EventController {
     }
 
     try {
-      const created = await this.createMemoryUseCase.execute({
-        eventId,
-        image: image && {
-          originalName: image.originalname,
-          contentType: image.mimetype,
-          bytes: image.buffer,
+      const created = await this.createMemoryUseCase.execute(
+        {
+          eventId,
+          image: image && {
+            originalName: image.originalname,
+            contentType: image.mimetype,
+            bytes: image.buffer,
+          },
         },
-      }, userId);
+        userId
+      );
 
       return created;
     } catch (error) {

@@ -29,7 +29,10 @@ import { CreateEventDto } from '../../../../src/modules/events/http/dto/create-e
 import { UpdateEventDto } from '../../../../src/modules/events/http/dto/update-event.dto';
 import { EventController } from '../../../../src/modules/events/http/event.controller';
 import { GetEventMemoriesUseCase } from '../../../../src/modules/events/application/get-event-memories.use-case';
-import { CreateMemoryUseCase, InvalidMemoryCreationError } from '../../../../src/modules/events/application/create-memory.use-case'; // Ajuste o caminho se necessário
+import {
+  CreateMemoryUseCase,
+  InvalidMemoryCreationError,
+} from '../../../../src/modules/events/application/create-memory.use-case'; // Ajuste o caminho se necessário
 
 describe('EventController', () => {
   let controller: EventController;
@@ -57,7 +60,7 @@ describe('EventController', () => {
       providers: [
         { provide: UpdateEventUseCase, useValue: updateUseCaseMock },
         { provide: CreateEventUseCase, useValue: createUseCaseMock },
-        { provide: CreateMemoryUseCase, useValue: createMemoryUseCaseMock }, 
+        { provide: CreateMemoryUseCase, useValue: createMemoryUseCaseMock },
         { provide: GetEventUseCase, useValue: getEventUseCaseMock },
         { provide: GetEventImageUseCase, useValue: { execute: jest.fn() } },
         { provide: GetEventMemoriesUseCase, useValue: getMemoriesUseCaseMock },
