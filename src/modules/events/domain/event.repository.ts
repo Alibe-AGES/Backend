@@ -81,7 +81,7 @@ export interface CreateEventData {
 export interface CreateMemoryData {
   id: string;
   eventId: string;
-  pictureUrl: string;
+  picture: string;
 }
 
 export interface EventCreationLocation {

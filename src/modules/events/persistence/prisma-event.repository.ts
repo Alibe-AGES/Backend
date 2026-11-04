@@ -349,7 +349,7 @@ export class PrismaEventRepository extends EventRepository {
       data: {
         id: data.id,
         eventId: data.eventId,
-        picture: data.pictureUrl,
+        picture: data.picture,
       },
     });
 

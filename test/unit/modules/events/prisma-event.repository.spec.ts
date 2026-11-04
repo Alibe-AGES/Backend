@@ -557,13 +557,13 @@ describe('PrismaEventRepository', () => {
     const memoryData = {
       id: '77777777-7777-4777-8777-777777777777',
       eventId,
-      pictureUrl: `events/${eventId}/memories/memory-1.jpg`,
+      picture: `events/${eventId}/memories/memory-1.jpg`,
     };
 
     const dbMemoryRow = {
       id: memoryData.id,
       eventId: memoryData.eventId,
-      picture: memoryData.pictureUrl,
+      picture: memoryData.picture,
     };
 
     it('successfully creates and maps a memory record', async () => {
@@ -579,12 +579,12 @@ describe('PrismaEventRepository', () => {
         data: {
           id: memoryData.id,
           eventId: memoryData.eventId,
-          picture: memoryData.pictureUrl,
+          picture: memoryData.picture,
         },
       });
       expect(result).toEqual({
         id: memoryData.id,
-        picture: memoryData.pictureUrl,
+        picture: memoryData.picture,
         eventId: memoryData.eventId,
       });
     });

@@ -74,7 +74,7 @@ import {
   GetEventMemoriesUseCase,
 } from '../application/get-event-memories.use-case';
 import { CreateMemoryDto } from './dto/create-memory.dto';
-import { CreateMemoryUseCase } from '../application/create-memory.use-case';
+import { CreateMemoryUseCase, InvalidMemoryCreationError } from '../application/create-memory.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -373,18 +373,15 @@ export class EventController {
 
       return created;
     } catch (error) {
-      if (error instanceof InvalidEventCreationError) {
+      if (error instanceof InvalidMemoryCreationError) {
         throw new BadRequestException(error.message);
       }
-
-      if (error instanceof EventGroupNotFoundError || error instanceof EventLocationNotFoundError) {
+      if (error instanceof GetEventNotFoundError) {
         throw new NotFoundException(error.message);
       }
-
-      if (error instanceof EventGroupAccessDeniedError) {
+      if (error instanceof EventDetailsAccessDeniedError) {
         throw new ForbiddenException(error.message);
       }
-
       throw error;
     }
   }

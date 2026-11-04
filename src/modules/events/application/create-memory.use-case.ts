@@ -63,7 +63,7 @@ export class CreateMemoryUseCase {
       const created = await this.events.createMemory({
         id: memoryId,
         eventId: input.eventId,
-        pictureUrl: imageKey,
+        picture: imageKey,
       });
 
       return created;

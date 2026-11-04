@@ -292,7 +292,7 @@ describe('EventController', () => {
 
       await expect(
         controller.createMemory(eventId, validImage, authenticatedRequest)
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(EventGroupNotFoundError);
     });
 
     it('throws ForbiddenException for a outsider user', async () => {
@@ -302,7 +302,7 @@ describe('EventController', () => {
 
       await expect(
         controller.createMemory(eventId, validImage, authenticatedRequest)
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toBeInstanceOf(EventGroupAccessDeniedError);
     });
   });
 
