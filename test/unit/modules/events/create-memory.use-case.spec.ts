@@ -3,10 +3,7 @@ import {
   InvalidMemoryCreationError,
 } from '../../../../src/modules/events/application/create-memory.use-case';
 import { Event } from '../../../../src/modules/events/domain/event.entity';
-import {
-  EventGroupAccessDeniedError,
-} from '../../../../src/modules/events/application/create-event.use-case';
-import { GetEventUseCase } from '../../../../src/modules/events/application/get-event.use-case';
+import { EventDetailsAccessDeniedError, GetEventUseCase } from '../../../../src/modules/events/application/get-event.use-case';
 import { InMemoryEventRepository } from '../../../helpers/in-memory-event.repository';
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
 
@@ -60,10 +57,10 @@ describe('CreateMemoryUseCase', () => {
     expect(result).toMatchObject({
       id: expect.any(String),
       eventId: EVENT_ID,
-      pictureUrl: expect.stringMatching(/^api\/events\/.*\/memories\/.*\/image$/),
+      picture: expect.stringMatching(/^api\/events\/.*\/memories\/.*\/image$/),
     });
 
-    await expect(storage.findByKey(result.pictureUrl)).resolves.toEqual({
+    await expect(storage.findByKey(result.picture)).resolves.toEqual({
       bytes: PNG_BYTES,
       contentType: 'image/png',
     });
@@ -76,7 +73,7 @@ describe('CreateMemoryUseCase', () => {
     };
 
     await expect(useCase.execute(input, OTHER_USER_ID)).rejects.toBeInstanceOf(
-      EventGroupAccessDeniedError
+      EventDetailsAccessDeniedError
     );
   });
 

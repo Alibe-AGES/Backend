@@ -3,8 +3,8 @@ import { ObjectStorage } from '../../../shared/storage/object-storage';
 import { EventRepository } from '../domain/event.repository';
 import { CreateMemoryDto } from '../http/dto/create-memory.dto';
 import { safeExtension } from '../../../../src/shared/utils';
-import { EventGroupNotFoundError, EventGroupAccessDeniedError } from './create-event.use-case';
-import { GetEventUseCase } from './get-event.use-case';
+import { EventGroupNotFoundError } from './create-event.use-case';
+import { EventDetailsAccessDeniedError, GetEventUseCase } from './get-event.use-case';
 import { randomUUID } from 'crypto';
 
 export interface CreateMemoryInput {
@@ -47,7 +47,7 @@ export class CreateMemoryUseCase {
     }
 
     if (!userIsMember) {
-      throw new EventGroupAccessDeniedError('O usuário não pertence a este grupo');
+      throw new EventDetailsAccessDeniedError('O usuário não pertence a este grupo');
     }
 
     const memoryId = randomUUID();

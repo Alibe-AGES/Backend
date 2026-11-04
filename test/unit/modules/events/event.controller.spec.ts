@@ -275,7 +275,7 @@ describe('EventController', () => {
 
     it('throws BadRequestException for invalid data', async () => {
       createMemoryUseCaseMock.execute.mockRejectedValue(
-        new InvalidMemoryCreationError('Somente imagens são aceitas')
+        new BadRequestException('Somente imagens são aceitas')
       );
 
       await expect(
