@@ -15,12 +15,14 @@ const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const GROUP_ID = '33333333-3333-4333-8333-333333333333';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_USER_ID = '99999999-9999-4999-8999-999999999999';
+const UNKNOWN_EVENT_ID = '00000000-0000-4000-8000-000000000000';
 const IMAGE_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 describe('Event memories endpoint (e2e)', () => {
   let app: INestApplication;
   let events: InMemoryEventRepository;
   let storage: ObjectStorage;
+  let saveSpy: jest.SpyInstance;
   const previousMockAuthEnabled = process.env.MOCK_AUTH_ENABLED;
   const previousMockAuthUserId = process.env.MOCK_AUTH_USER_ID;
 
@@ -45,11 +47,17 @@ describe('Event memories endpoint (e2e)', () => {
     await app.init();
   });
 
-  beforeEach(async () => {
+  beforeEach(() => {
     process.env.MOCK_AUTH_ENABLED = 'true';
     process.env.MOCK_AUTH_USER_ID = USER_ID;
     events.set(createEvent());
     events.setGroupMembers(GROUP_ID, [USER_ID]);
+    saveSpy = jest.spyOn(storage, 'save');
+  });
+
+  afterEach(() => {
+    saveSpy.mockRestore();
+    jest.restoreAllMocks();
   });
 
   afterAll(async () => {
@@ -58,7 +66,7 @@ describe('Event memories endpoint (e2e)', () => {
     await app.close();
   });
 
-  it('successfully creates a memory when valid image and member context are provided', async () => {
+  it('creates a memory, stores the image in object storage and persists the memory', async () => {
     const response = await request(app.getHttpServer())
       .post(`/api/events/${EVENT_ID}/memories`)
       .attach('image', IMAGE_BYTES, { filename: 'memory.png', contentType: 'image/png' })
@@ -69,10 +77,35 @@ describe('Event memories endpoint (e2e)', () => {
       eventId: EVENT_ID,
       picture: expect.stringMatching(new RegExp(`^api/events/${EVENT_ID}/memories/.+/image$`)),
     });
+
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+    await expect(storage.findByKey(response.body.picture)).resolves.toEqual({
+      bytes: IMAGE_BYTES,
+      contentType: 'image/png',
+    });
+
+    const stored = await events.findMemories(EVENT_ID, USER_ID);
+    expect(stored?.memories).toEqual([
+      expect.objectContaining({ id: response.body.id, eventId: EVENT_ID }),
+    ]);
   });
 
   it('rejects a request when the image file is missing', async () => {
     await request(app.getHttpServer()).post(`/api/events/${EVENT_ID}/memories`).expect(400);
+
+    expect(saveSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a file that is not an image', async () => {
+    await request(app.getHttpServer())
+      .post(`/api/events/${EVENT_ID}/memories`)
+      .attach('image', Buffer.from('not-an-image'), {
+        filename: 'memory.txt',
+        contentType: 'text/plain',
+      })
+      .expect(400);
+
+    expect(saveSpy).not.toHaveBeenCalled();
   });
 
   it('denies a user who does not belong to the event group', async () => {
@@ -82,15 +115,17 @@ describe('Event memories endpoint (e2e)', () => {
       .post(`/api/events/${EVENT_ID}/memories`)
       .attach('image', IMAGE_BYTES, { filename: 'memory.png', contentType: 'image/png' })
       .expect(403);
+
+    expect(saveSpy).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the target event does not exist', async () => {
-    const unknownEventId = '99999999-9999-4999-8999-999999999999';
-
     await request(app.getHttpServer())
-      .post(`/api/events/${unknownEventId}/memories`)
+      .post(`/api/events/${UNKNOWN_EVENT_ID}/memories`)
       .attach('image', IMAGE_BYTES, { filename: 'memory.png', contentType: 'image/png' })
       .expect(404);
+
+    expect(saveSpy).not.toHaveBeenCalled();
   });
 
   it('rejects a request without an authenticated user', async () => {
@@ -100,6 +135,21 @@ describe('Event memories endpoint (e2e)', () => {
       .post(`/api/events/${EVENT_ID}/memories`)
       .attach('image', IMAGE_BYTES, { filename: 'memory.png', contentType: 'image/png' })
       .expect(401);
+
+    expect(saveSpy).not.toHaveBeenCalled();
+  });
+
+  it('removes the stored image when persisting the memory fails', async () => {
+    jest.spyOn(events, 'createMemory').mockRejectedValueOnce(new Error('db failure'));
+
+    await request(app.getHttpServer())
+      .post(`/api/events/${EVENT_ID}/memories`)
+      .attach('image', IMAGE_BYTES, { filename: 'memory.png', contentType: 'image/png' })
+      .expect(500);
+
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+    const savedKey = saveSpy.mock.calls[0][0].key as string;
+    await expect(storage.findByKey(savedKey)).resolves.toBeFalsy();
   });
 });
 

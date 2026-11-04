@@ -74,7 +74,10 @@ import {
   GetEventMemoriesUseCase,
 } from '../application/get-event-memories.use-case';
 import { CreateMemoryDto } from './dto/create-memory.dto';
-import { CreateMemoryUseCase, InvalidMemoryCreationError } from '../application/create-memory.use-case';
+import {
+  CreateMemoryUseCase,
+  InvalidMemoryCreationError,
+} from '../application/create-memory.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
