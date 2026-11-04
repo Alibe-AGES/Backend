@@ -30,9 +30,8 @@ import { UpdateEventDto } from '../../../../src/modules/events/http/dto/update-e
 import { EventController } from '../../../../src/modules/events/http/event.controller';
 import { GetEventMemoriesUseCase } from '../../../../src/modules/events/application/get-event-memories.use-case';
 import {
-  CreateMemoryUseCase,
-  InvalidMemoryCreationError,
-} from '../../../../src/modules/events/application/create-memory.use-case'; // Ajuste o caminho se necessário
+  CreateMemoryUseCase
+} from '../../../../src/modules/events/application/create-memory.use-case';
 
 describe('EventController', () => {
   let controller: EventController;

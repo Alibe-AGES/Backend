@@ -1,6 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { decimalSchema } from './update-event.dto';
 
 const createMemorySchema = z
   .object({
