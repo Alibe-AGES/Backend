@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ObjectStorage } from '../../../shared/storage/object-storage';
 import { EventRepository } from '../domain/event.repository';
 import { CreateMemoryDto } from '../http/dto/create-memory.dto';
-import { safeExtension } from 'src/shared/utils';
-import { InvalidEventCreationError, EventGroupNotFoundError, EventGroupAccessDeniedError } from './create-event.use-case';
+import { safeExtension } from '../../../../src/shared/utils';
+import { EventGroupNotFoundError, EventGroupAccessDeniedError } from './create-event.use-case';
 import { GetEventUseCase } from './get-event.use-case';
 import { randomUUID } from 'crypto';
 
@@ -32,12 +32,12 @@ export class CreateMemoryUseCase {
     const event = await this.getEventUseCase.execute(input.eventId, userId);
 
     if (input.image && !input.image.contentType.startsWith('image/')) {
-      throw new InvalidEventCreationError('Somente imagens são aceitas');
+      throw new InvalidMemoryCreationError('Somente imagens são aceitas');
     }
 
     const extension = input.image ? safeExtension(input.image.originalName) : '';
     if (input.image && !extension) {
-      throw new InvalidEventCreationError('Extensão inválida para imagem');
+      throw new InvalidMemoryCreationError('Extensão inválida para imagem');
     }
 
     const userIsMember = await this.events.findGroupMembership((await event).groupId, userId);

@@ -19,6 +19,7 @@ import { GroupsModule } from '../groups/groups.module';
 import { DistributedTaskLock } from '../../shared/scheduling/distributed-task-lock';
 import { PrismaDistributedTaskLock } from '../../infrastructure/scheduling/prisma-distributed-task-lock';
 import { GetEventMemoriesUseCase } from './application/get-event-memories.use-case';
+import { CreateMemoryUseCase } from './application/create-memory.use-case';
 
 @Module({
   imports: [PrismaModule, StorageModule, MessagingModule, GroupsModule],
@@ -28,6 +29,7 @@ import { GetEventMemoriesUseCase } from './application/get-event-memories.use-ca
     GetEventUseCase,
     GetEventImageUseCase,
     CreateEventUseCase,
+    CreateMemoryUseCase,
     UpdateEventUseCase,
     GroupPushNotificationService,
     SendAttendanceRemindersUseCase,

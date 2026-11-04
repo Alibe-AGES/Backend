@@ -552,4 +552,54 @@ describe('PrismaEventRepository', () => {
       ).resolves.toBeNull();
     });
   });
+
+  describe('createMemory', () => {
+    const memoryData = {
+      id: '77777777-7777-4777-8777-777777777777',
+      eventId,
+      pictureUrl: `events/${eventId}/memories/memory-1.jpg`,
+    };
+
+    const dbMemoryRow = {
+      id: memoryData.id,
+      eventId: memoryData.eventId,
+      picture: memoryData.pictureUrl,
+    };
+
+    it('successfully creates and maps a memory record', async () => {
+      const memoryCreate = jest.fn().mockResolvedValue(dbMemoryRow);
+      const prisma = {
+        memory: { create: memoryCreate },
+      } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      const result = await repository.createMemory(memoryData);
+
+      expect(memoryCreate).toHaveBeenCalledWith({
+        data: {
+          id: memoryData.id,
+          eventId: memoryData.eventId,
+          picture: memoryData.pictureUrl,
+        },
+      });
+      expect(result).toEqual({
+        id: memoryData.id,
+        picture: memoryData.pictureUrl,
+        eventId: memoryData.eventId,
+      });
+    });
+
+    it('returns null if the memory creation returns null', async () => {
+      const memoryCreate = jest.fn().mockResolvedValue(null);
+      const prisma = {
+        memory: { create: memoryCreate },
+      } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      const result = await repository.createMemory(memoryData);
+
+      expect(memoryCreate).toHaveBeenCalledTimes(1);
+      expect(result).toBeNull();
+    });
+  });
 });

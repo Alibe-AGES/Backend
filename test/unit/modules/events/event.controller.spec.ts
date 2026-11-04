@@ -29,11 +29,13 @@ import { CreateEventDto } from '../../../../src/modules/events/http/dto/create-e
 import { UpdateEventDto } from '../../../../src/modules/events/http/dto/update-event.dto';
 import { EventController } from '../../../../src/modules/events/http/event.controller';
 import { GetEventMemoriesUseCase } from '../../../../src/modules/events/application/get-event-memories.use-case';
+import { CreateMemoryUseCase, InvalidMemoryCreationError } from '../../../../src/modules/events/application/create-memory.use-case'; // Ajuste o caminho se necessário
 
 describe('EventController', () => {
   let controller: EventController;
   let updateUseCaseMock: { execute: jest.Mock };
   let createUseCaseMock: { execute: jest.Mock };
+  let createMemoryUseCaseMock: { execute: jest.Mock };
   let getEventUseCaseMock: { execute: jest.Mock };
   let getMemoriesUseCaseMock: { execute: jest.Mock };
 
@@ -46,13 +48,16 @@ describe('EventController', () => {
   beforeEach(async () => {
     updateUseCaseMock = { execute: jest.fn() };
     createUseCaseMock = { execute: jest.fn() };
+    createMemoryUseCaseMock = { execute: jest.fn() };
     getEventUseCaseMock = { execute: jest.fn() };
+    getMemoriesUseCaseMock = { execute: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EventController],
       providers: [
         { provide: UpdateEventUseCase, useValue: updateUseCaseMock },
         { provide: CreateEventUseCase, useValue: createUseCaseMock },
+        { provide: CreateMemoryUseCase, useValue: createMemoryUseCaseMock }, 
         { provide: GetEventUseCase, useValue: getEventUseCaseMock },
         { provide: GetEventImageUseCase, useValue: { execute: jest.fn() } },
         { provide: GetEventMemoriesUseCase, useValue: getMemoriesUseCaseMock },
@@ -222,6 +227,80 @@ describe('EventController', () => {
           authenticatedRequest
         )
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('createMemory', () => {
+    const validImage = {
+      originalname: 'memory.jpg',
+      mimetype: 'image/jpeg',
+      buffer: Buffer.from([0xff, 0xd8, 0xff]),
+    } as Express.Multer.File;
+
+    it('successfully creates a memory', async () => {
+      const expectedMemoryDto = { id: 'memory-uuid', eventId, pictureUrl: 'some-url' };
+      createMemoryUseCaseMock.execute.mockResolvedValue(expectedMemoryDto);
+
+      const result = await controller.createMemory(eventId, validImage, authenticatedRequest);
+
+      expect(createMemoryUseCaseMock.execute).toHaveBeenCalledWith(
+        {
+          eventId,
+          image: {
+            originalName: 'memory.jpg',
+            contentType: 'image/jpeg',
+            bytes: validImage.buffer,
+          },
+        },
+        userId
+      );
+      expect(result).toEqual(expectedMemoryDto);
+    });
+
+    it('rejects a request when the image is missing (null)', async () => {
+      await expect(
+        controller.createMemory(eventId, undefined, authenticatedRequest)
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(createMemoryUseCaseMock.execute).not.toHaveBeenCalled();
+    });
+
+    it('rejects a request without an authenticated user', async () => {
+      await expect(
+        controller.createMemory(eventId, validImage, {} as AuthenticatedRequest)
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(createMemoryUseCaseMock.execute).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException for invalid data', async () => {
+      createMemoryUseCaseMock.execute.mockRejectedValue(
+        new InvalidMemoryCreationError('Somente imagens são aceitas')
+      );
+
+      await expect(
+        controller.createMemory(eventId, validImage, authenticatedRequest)
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws NotFoundException when groupId is wrong', async () => {
+      createMemoryUseCaseMock.execute.mockRejectedValue(
+        new EventGroupNotFoundError('Grupo não encontrado')
+      );
+
+      await expect(
+        controller.createMemory(eventId, validImage, authenticatedRequest)
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws ForbiddenException for a outsider user', async () => {
+      createMemoryUseCaseMock.execute.mockRejectedValue(
+        new EventGroupAccessDeniedError('Acesso negado')
+      );
+
+      await expect(
+        controller.createMemory(eventId, validImage, authenticatedRequest)
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 

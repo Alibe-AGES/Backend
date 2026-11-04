@@ -9,6 +9,8 @@ import {
   EventRepository,
   type UpdateEventData,
   EventMemories,
+  CreateMemoryData,
+  EventMemoryDetails,
 } from '../../src/modules/events/domain/event.repository';
 
 export class InMemoryEventRepository extends EventRepository {
@@ -225,6 +227,23 @@ export class InMemoryEventRepository extends EventRepository {
     this.groups.set(groupId, members);
   }
 
+  createMemory(data: CreateMemoryData): Promise<EventMemoryDetails | null> {
+    const memoryRecord = {
+      id: data.id,
+      eventId: data.eventId,
+      picture: data.pictureUrl, 
+    };
+
+    const existingMemories = this.memories.get(data.eventId) ?? [];
+    this.memories.set(data.eventId, [...existingMemories, memoryRecord]);
+
+    return Promise.resolve({
+      id: data.id,
+      picture: data.pictureUrl,
+      eventId: data.eventId,
+    });
+  }
+  
   findMemories(eventId: string, userId: string): Promise<EventMemories | null> {
     const event = this.events.get(eventId);
 
