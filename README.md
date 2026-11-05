@@ -19,6 +19,10 @@ A ALI-112 ainda não está nesta base. O método compartilhado `GroupRepository.
 
 Os testes de PostgreSQL são opcionais via `TEST_DATABASE_URL`, limitado a banco local cujo nome termina com `_test`, com migrations previamente aplicadas. A suíte de ownership cobre permissões, troca de owner, grupo vazio, concorrência, rollback e a migration de grupos existentes. Ela não deve usar o banco de desenvolvimento.
 
+## Sair de um grupo
+
+`PUT /api/groups/:groupId/leave` remove somente o vínculo do usuário autenticado com o grupo, sem body na requisição. Retorna `201` sem corpo em caso de sucesso; `400` para UUID inválido ou vínculo inexistente (incluindo grupo inexistente e saída repetida); `401` sem autenticação; `500` para falhas inesperadas. O grupo e os demais dados são preservados, inclusive quando o último membro sai.
+
 API do projeto Alibe construída com NestJS, TypeScript, Prisma e PostgreSQL.
 
 O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID, mantendo as convenções e o sistema de injeção de dependências do NestJS. O objetivo é separar regras de negócio, casos de uso, entrada HTTP e persistência sem transformar cada funcionalidade em um conjunto desnecessário de camadas.

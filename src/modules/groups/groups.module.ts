@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { UpdateGroupUseCase } from './application/update-group.use-case';
 import { RemoveGroupMemberUseCase } from './application/remove-group-member.use-case';
+import { LeaveGroupUseCase } from './application/leave-group.use-case';
+import { GroupMembershipController } from './http/group-membership.controller';
 import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
 import { StorageModule } from '../../infrastructure/storage/storage.module';
 import { GetGroupProfilePictureUseCase } from './application/get-group-profile-picture.use-case';
@@ -23,10 +25,16 @@ import { MarkGroupNotificationReadUseCase } from './application/mark-group-notif
 
 @Module({
   imports: [PrismaModule, StorageModule],
-  controllers: [GroupsController, GroupInvitesController, GroupNotificationsController],
+  controllers: [
+    GroupsController,
+    GroupInvitesController,
+    GroupNotificationsController,
+    GroupMembershipController,
+  ],
   providers: [
     UpdateGroupUseCase,
     RemoveGroupMemberUseCase,
+    LeaveGroupUseCase,
     CreateGroupUseCase,
     GetAvailabilityIntervalsUseCase,
     GetGroupUseCase,
