@@ -204,7 +204,6 @@ export class GroupsController {
   ): Promise<GroupListItemResponseDto> {
     // Disponível para vincular o criador como participante do grupo.
     const userId = request.user?.id;
-    void userId;
 
     try {
       const group = await this.createGroupUseCase.execute({

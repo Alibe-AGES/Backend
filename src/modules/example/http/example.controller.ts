@@ -75,9 +75,6 @@ export class ExampleController {
     @UploadedFile() image: Express.Multer.File | undefined,
     @Request() request: AuthenticatedRequest
   ): Promise<ExampleResponseDto> {
-    const userId = request.user?.id;
-    void userId;
-
     if (!image) {
       throw new BadRequestException('Image file is required');
     }
@@ -111,9 +108,6 @@ export class ExampleController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Request() request: AuthenticatedRequest
   ): Promise<ExampleResponseDto> {
-    const userId = request.user?.id;
-    void userId;
-
     try {
       return this.toResponse(await this.getExampleUseCase.execute(id));
     } catch (error) {
@@ -139,9 +133,6 @@ export class ExampleController {
     @Res() response: Response,
     @Request() request: AuthenticatedRequest
   ): Promise<void> {
-    const userId = request.user?.id;
-    void userId;
-
     try {
       const image = await this.getExampleImageUseCase.execute(id);
       response.setHeader('Content-Type', image.contentType);

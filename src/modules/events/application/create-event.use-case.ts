@@ -39,75 +39,25 @@ export class CreateEventUseCase {
   ) {}
 
   async execute(input: CreateEventInput): Promise<CreatedEvent> {
-    const name = input.name?.trim();
+    this.validateEventInput(input);
+
+    const name = input.name!.trim();
     const location = input.location?.trim();
 
-    if (!name || !input.date || !input.time || (!input.locationId && !location)) {
-      throw new InvalidEventCreationError(
-        'Nome, dia, horário e locationId ou endereço são obrigatórios'
-      );
-    }
-    if (input.locationId && location) {
-      throw new InvalidEventCreationError('Informe locationId ou endereço, não ambos');
-    }
-    if (input.locationId && input.image) {
-      throw new InvalidEventCreationError(
-        'A imagem do evento é herdada da localização quando locationId é informado'
-      );
-    }
-
-    if (input.image && !input.image.contentType.startsWith('image/')) {
-      throw new InvalidEventCreationError('Somente imagens são aceitas');
-    }
-
-    const extension = input.image ? safeExtension(input.image.originalName) : '';
-    if (input.image && !extension) {
-      throw new InvalidEventCreationError('Extensão inválida para imagem');
-    }
-
-    const userIsMember = await this.events.findGroupMembership(input.groupId, input.userId);
-
-    if (userIsMember === null) {
-      throw new EventGroupNotFoundError('Grupo não encontrado');
-    }
-
-    if (!userIsMember) {
-      throw new EventGroupAccessDeniedError('O usuário não pertence a este grupo');
-    }
+    await this.validateGroupMembership(input.groupId, input.userId);
+    const savedLocation = await this.validateAndFetchLocation(input.locationId);
 
     const eventId = randomUUID();
     const newLocationId = randomUUID();
-    const savedLocation = input.locationId
-      ? await this.events.findLocationById(input.locationId)
-      : null;
-    if (input.locationId && !savedLocation) {
-      throw new EventLocationNotFoundError('Localização não encontrada');
-    }
+    const imageKey = await this.resolveAndSaveImage(input, savedLocation, newLocationId);
 
-    let imageKey: string | null = savedLocation?.image ?? null;
     const createdAt = new Date();
-
-    const hasTime = input.time !== null && input.time !== undefined && input.time.trim() !== '';
-
-    const scheduleText = hasTime
-      ? `para o dia ${formatDate(input.date)} às ${input.time}`
-      : `para o dia ${formatDate(input.date)}`;
-
-    const notificationMessage = `O evento "${name}" foi criado ${scheduleText}.`;
-
-    // O push continua usando notificationMessage. Somente o mural persiste a referência do autor,
-    // que será resolvida pelo GET e também poderá ser repetida para vários usuários no match.
-    const muralNotificationMessage = `${groupNotificationUserReference(input.userId)} criou o evento \"${name}\" ${scheduleText}.`;
-
-    if (input.image && !savedLocation) {
-      imageKey = `locations/${newLocationId}/images/${randomUUID()}${extension}`;
-
-      await this.storage.save({
-        key: imageKey,
-        bytes: input.image.bytes,
-        contentType: input.image.contentType,
-      });
-    }
+    const { notificationMessage, muralNotificationMessage } = this.buildNotificationMessages(
+      name,
+      input.date,
+      input.time,
+      input.userId
+    );
 
     try {
       const created = await this.events.create({
@@ -132,26 +82,12 @@ export class CreateEventUseCase {
         },
       });
 
-      try {
-        await this.groupNotifications.sendToGroup(
-          input.groupId,
-          {
-            title: 'Novo encontro no grupo',
-            body: notificationMessage,
-            data: {
-              type: 'new_event',
-              eventId: created.event.id,
-              groupId: input.groupId,
-            },
-          },
-          input.userId
-        );
-      } catch (error) {
-        this.logger.error(
-          `Evento ${created.event.id} criado, mas os destinatários da notificação não puderam ser consultados`,
-          error instanceof Error ? error.stack : undefined
-        );
-      }
+      await this.sendGroupNotificationSafely(
+        input.groupId,
+        input.userId,
+        notificationMessage,
+        created.event.id
+      );
 
       return created;
     } catch (error) {
@@ -159,6 +95,118 @@ export class CreateEventUseCase {
         await this.storage.delete(imageKey).catch(() => undefined);
       }
       throw error;
+    }
+  }
+
+  // Métodos auxiliares privados para baixar a Complexidade Cognitiva:
+
+  private validateEventInput(input: CreateEventInput): void {
+    const name = input.name?.trim();
+    const location = input.location?.trim();
+
+    if (!name || !input.date || !input.time || (!input.locationId && !location)) {
+      throw new InvalidEventCreationError(
+        'Nome, dia, horário e locationId ou endereço são obrigatórios'
+      );
+    }
+    if (input.locationId && location) {
+      throw new InvalidEventCreationError('Informe locationId ou endereço, não ambos');
+    }
+    if (input.locationId && input.image) {
+      throw new InvalidEventCreationError(
+        'A imagem do evento é herdada da localização quando locationId é informado'
+      );
+    }
+    if (input.image && !input.image.contentType.startsWith('image/')) {
+      throw new InvalidEventCreationError('Somente imagens são aceitas');
+    }
+
+    const extension = input.image ? safeExtension(input.image.originalName) : '';
+    if (input.image && !extension) {
+      throw new InvalidEventCreationError('Extensão inválida para imagem');
+    }
+  }
+
+  private async validateGroupMembership(groupId: string, userId: string): Promise<void> {
+    const userIsMember = await this.events.findGroupMembership(groupId, userId);
+
+    if (userIsMember === null) {
+      throw new EventGroupNotFoundError('Grupo não encontrado');
+    }
+    if (!userIsMember) {
+      throw new EventGroupAccessDeniedError('O usuário não pertence a este grupo');
+    }
+  }
+
+  private async validateAndFetchLocation(locationId?: string) {
+    if (!locationId) return null;
+
+    const savedLocation = await this.events.findLocationById(locationId);
+    if (!savedLocation) {
+      throw new EventLocationNotFoundError('Localização não encontrada');
+    }
+    return savedLocation;
+  }
+
+  private async resolveAndSaveImage(
+    input: CreateEventInput,
+    savedLocation: { image?: string | null } | null,
+    newLocationId: string
+  ): Promise<string | null> {
+    let imageKey: string | null = savedLocation?.image ?? null;
+
+    if (input.image && !savedLocation) {
+      const extension = safeExtension(input.image.originalName);
+      imageKey = `locations/${newLocationId}/images/${randomUUID()}${extension}`;
+
+      await this.storage.save({
+        key: imageKey,
+        bytes: input.image.bytes,
+        contentType: input.image.contentType,
+      });
+    }
+
+    return imageKey;
+  }
+
+  private buildNotificationMessages(name: string, date: string, time?: string, userId?: string) {
+    const hasTime = time !== null && time !== undefined && time.trim() !== '';
+
+    const scheduleText = hasTime
+      ? `para o dia ${formatDate(date)} às ${time}`
+      : `para o dia ${formatDate(date)}`;
+
+    return {
+      notificationMessage: `O evento "${name}" foi criado ${scheduleText}.`,
+      muralNotificationMessage: `${groupNotificationUserReference(userId!)} criou o evento "${name}" ${scheduleText}.`,
+    };
+  }
+
+  private async sendGroupNotificationSafely(
+    groupId: string,
+    userId: string,
+    message: string,
+    eventId: string
+  ): Promise<void> {
+    try {
+      await this.groupNotifications.sendToGroup(
+        groupId,
+        {
+          title: 'Novo encontro no grupo',
+          body: message,
+          data: {
+            type: 'new_event',
+            eventId,
+            groupId,
+          },
+        },
+        userId
+      );
+    } catch (error) {
+      this.logger.error(
+        `Evento ${eventId} criado, mas os destinatários da notificação não puderam ser consultados`,
+        error instanceof Error ? error.stack : undefined
+      );
     }
   }
 }

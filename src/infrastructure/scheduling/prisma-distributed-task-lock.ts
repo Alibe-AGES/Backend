@@ -15,7 +15,7 @@ export class PrismaDistributedTaskLock extends DistributedTaskLock {
   }
 
   async runExclusive<T>(key: string, task: () => Promise<T>): Promise<DistributedTaskExecution<T>> {
-    return this.prisma.$transaction(
+    return await this.prisma.$transaction(
       async (transaction) => {
         const [lock] = await transaction.$queryRaw<Array<{ acquired: boolean }>>`
           SELECT pg_try_advisory_xact_lock(

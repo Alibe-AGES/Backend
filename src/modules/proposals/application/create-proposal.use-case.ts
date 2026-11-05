@@ -42,17 +42,7 @@ export class CreateProposalUseCase {
   ) {}
 
   async execute(input: CreateProposalInput): Promise<CreatedSuggestion> {
-    if (input.locationId && input.externalId) {
-      throw new InvalidProposalCreationError('Informe locationId ou externalId, não ambos');
-    }
-    if (input.image && !input.image.contentType.startsWith('image/')) {
-      throw new InvalidProposalCreationError('Somente imagens são aceitas');
-    }
-
-    const extension = input.image ? safeExtension(input.image.originalName) : '';
-    if (input.image && !extension) {
-      throw new InvalidProposalCreationError('Extensão inválida para imagem');
-    }
+    const extension = this.validateProposalInput(input);
 
     const membership = await this.proposals.findGroupMembership(input.groupId, input.userId);
     if (membership === null) {
@@ -92,6 +82,22 @@ export class CreateProposalUseCase {
       }
       throw error;
     }
+  }
+
+  private validateProposalInput(input: CreateProposalInput): string {
+    if (input.locationId && input.externalId) {
+      throw new InvalidProposalCreationError('Informe locationId ou externalId, não ambos');
+    }
+    if (input.image && !input.image.contentType.startsWith('image/')) {
+      throw new InvalidProposalCreationError('Somente imagens são aceitas');
+    }
+
+    const extension = input.image ? safeExtension(input.image.originalName) : '';
+    if (input.image && !extension) {
+      throw new InvalidProposalCreationError('Extensão inválida para imagem');
+    }
+
+    return extension;
   }
 
   private async resolveLocation(

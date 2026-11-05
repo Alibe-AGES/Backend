@@ -31,25 +31,38 @@ export class SendAttendanceRemindersUseCase {
       notifications: { attempted: 0, sent: 0, failed: 0 },
     };
 
-    for (const candidate of candidates) {
-      try {
-        const delivery = await this.groupNotifications.sendToRecipients(candidate.recipients, {
-          title: 'Confirme sua presença',
-          body: `Não esqueça de confirmar sua presença em ${candidate.eventName}, marcado para hoje.`,
-          data: {
-            type: 'attendance_reminder',
-            eventId: candidate.eventId,
-            groupId: candidate.groupId,
-          },
-        });
+    const results = await Promise.all(
+      candidates.map(async (candidate) => {
+        try {
+          const delivery = await this.groupNotifications.sendToRecipients(candidate.recipients, {
+            title: 'Confirme sua presença',
+            body: `Não esqueça de confirmar sua presença em ${candidate.eventName}, marcado para hoje.`,
+            data: {
+              type: 'attendance_reminder',
+              eventId: candidate.eventId,
+              groupId: candidate.groupId,
+            },
+          });
 
-        summary.notifications.attempted += delivery.attempted;
-        summary.notifications.sent += delivery.sent;
-        summary.notifications.failed += delivery.failed;
-      } catch {
-        summary.notifications.attempted += candidate.recipients.length;
-        summary.notifications.failed += candidate.recipients.length;
-      }
+          return {
+            attempted: delivery.attempted,
+            sent: delivery.sent,
+            failed: delivery.failed,
+          };
+        } catch {
+          return {
+            attempted: candidate.recipients.length,
+            sent: 0,
+            failed: candidate.recipients.length,
+          };
+        }
+      })
+    );
+
+    for (const res of results) {
+      summary.notifications.attempted += res.attempted;
+      summary.notifications.sent += res.sent;
+      summary.notifications.failed += res.failed;
     }
 
     return summary;
