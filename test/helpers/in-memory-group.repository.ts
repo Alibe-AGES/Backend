@@ -66,6 +66,10 @@ export class InMemoryGroupRepository extends GroupRepository {
     return Promise.resolve();
   }
 
+  removeMember(groupId: string, userId: string): Promise<boolean> {
+    return Promise.resolve(this.members.delete(`${groupId}:${userId}`));
+  }
+
   findProfilePictureAccess(groupId: string): Promise<GroupProfilePictureAccess | null> {
     const group = this.groups.get(groupId);
 

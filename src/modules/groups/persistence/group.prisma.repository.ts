@@ -154,6 +154,11 @@ export class PrismaGroupRepository implements GroupRepository {
     });
   }
 
+  async removeMember(groupId: string, userId: string): Promise<boolean> {
+    const { count } = await this.prisma.userGroup.deleteMany({ where: { groupId, userId } });
+    return count > 0;
+  }
+
   async findProfilePictureAccess(
     groupId: string,
     userId: string
