@@ -97,7 +97,7 @@ export class PrismaGroupNotificationRepository extends GroupNotificationReposito
     userId: string,
     readAt: Date
   ): Promise<boolean> {
-    return this.prisma.$transaction(async (transaction) => {
+    return await this.prisma.$transaction(async (transaction) => {
       const notification = await transaction.groupNotification.findFirst({
         where: { id: notificationId, groupId },
         select: { id: true },
