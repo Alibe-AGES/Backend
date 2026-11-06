@@ -17,7 +17,7 @@ A migration `20261106180000_add_group_owner` atribui uma única vez um participa
 
 A ALI-112 ainda não está nesta base. O método compartilhado `GroupRepository.removeMember(groupId, userId)` já transfere ownership para a saída voluntária; na integração da ALI-112 deve ser preservada esta implementação, substituindo a remoção simples daquela branch. Nenhuma rota de saída foi duplicada aqui.
 
-Os testes de PostgreSQL são opcionais localmente via `TEST_DATABASE_URL`, limitado a banco local cujo nome termina com `_test`, com migrations previamente aplicadas. No CI, o job de testes inicia um PostgreSQL 17 exclusivo, aplica as migrations e define essa variável para incluir as integrações reais no relatório de cobertura enviado ao SonarCloud. A suíte de ownership cobre permissões, troca de owner, grupo vazio, concorrência, rollback e a migration de grupos existentes. Ela não deve usar o banco de desenvolvimento.
+Os testes de PostgreSQL são opcionais via `TEST_DATABASE_URL`, limitado a banco local cujo nome termina com `_test`, com migrations previamente aplicadas. A suíte de ownership cobre permissões, troca de owner, grupo vazio, concorrência, rollback e a migration de grupos existentes. Ela não deve usar o banco de desenvolvimento.
 
 API do projeto Alibe construída com NestJS, TypeScript, Prisma e PostgreSQL.
 

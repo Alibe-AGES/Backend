@@ -1,6 +1,161 @@
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { PrismaGroupRepository } from '../../../../src/modules/groups/persistence/group.prisma.repository';
 
+describe('PrismaGroupRepository ownership', () => {
+  const groupId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const ownerId = '11111111-1111-4111-8111-111111111111';
+  const memberId = '22222222-2222-4222-8222-222222222222';
+  const otherId = '33333333-3333-4333-8333-333333333333';
+  let repository: PrismaGroupRepository;
+  let queryRaw: jest.Mock;
+  let findUnique: jest.Mock;
+  let update: jest.Mock;
+  let deleteMany: jest.Mock;
+  let findMany: jest.Mock;
+  let upsert: jest.Mock;
+
+  beforeEach(() => {
+    queryRaw = jest.fn().mockResolvedValue([{ ownerId, profilePic: 'old.png' }]);
+    findUnique = jest.fn();
+    update = jest.fn().mockResolvedValue({
+      id: groupId,
+      name: 'Atualizado',
+      profilePic: null,
+      createdAt: new Date(),
+    });
+    deleteMany = jest.fn().mockResolvedValue({ count: 1 });
+    findMany = jest.fn().mockResolvedValue([{ userId: memberId }, { userId: otherId }]);
+    upsert = jest.fn().mockResolvedValue({ userId: memberId, groupId });
+    const transaction = {
+      $queryRaw: queryRaw,
+      group: { findUnique, update },
+      userGroup: { deleteMany, findMany, upsert },
+    };
+    repository = new PrismaGroupRepository({
+      ...transaction,
+      $transaction: jest.fn(async (callback: (value: typeof transaction) => Promise<unknown>) =>
+        callback(transaction)
+      ),
+    } as unknown as PrismaService);
+  });
+
+  it('returns persisted ownership for authorization and null for a missing group', async () => {
+    findUnique
+      .mockResolvedValueOnce({ ownerId, profilePic: 'old.png' })
+      .mockResolvedValueOnce(null);
+    await expect(repository.findManagementState(groupId)).resolves.toEqual({
+      ownerId,
+      profilePic: 'old.png',
+    });
+    await expect(repository.findManagementState(groupId)).resolves.toBeNull();
+  });
+
+  it('updates only after checking the locked owner and returns the previous image for cleanup', async () => {
+    const result = await repository.updateOwned(groupId, ownerId, {
+      name: 'Atualizado',
+      profilePic: null,
+    });
+    expect(result.group.name).toBe('Atualizado');
+    expect(result.group.profilePic).toBeNull();
+    expect(result.previousImageKey).toBe('old.png');
+    expect(update).toHaveBeenCalledWith({
+      where: { id: groupId },
+      data: { name: 'Atualizado', profilePic: null },
+    });
+    expect(queryRaw.mock.invocationCallOrder[0]).toBeLessThan(update.mock.invocationCallOrder[0]);
+  });
+
+  it.each([
+    { state: [], reason: 'not-found' },
+    { state: [{ ownerId: otherId, profilePic: null }], reason: 'forbidden' },
+  ])(
+    'blocks editing before persistence when authorization fails: $reason',
+    async ({ state, reason }) => {
+      queryRaw.mockResolvedValue(state);
+      await expect(
+        repository.updateOwned(groupId, ownerId, { name: 'Proibido' })
+      ).rejects.toMatchObject({ reason });
+      expect(update).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { state: [], reason: 'not-found' },
+    { state: [{ ownerId: otherId, profilePic: null }], reason: 'forbidden' },
+  ])(
+    'blocks member removal before deleting when authorization fails: $reason',
+    async ({ state, reason }) => {
+      queryRaw.mockResolvedValue(state);
+      await expect(repository.removeMember(groupId, memberId, ownerId)).rejects.toMatchObject({
+        reason,
+      });
+      expect(deleteMany).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns false for a self-removal from a group that no longer exists', async () => {
+    queryRaw.mockResolvedValue([]);
+    await expect(repository.removeMember(groupId, memberId)).resolves.toBe(false);
+    expect(deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('returns false for an absent participant without changing ownership', async () => {
+    deleteMany.mockResolvedValue({ count: 0 });
+    await expect(repository.removeMember(groupId, memberId, ownerId)).resolves.toBe(false);
+    expect(update).not.toHaveBeenCalled();
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('removes an ordinary member only from the selected group and preserves its owner', async () => {
+    await expect(repository.removeMember(groupId, memberId, ownerId)).resolves.toBe(true);
+    expect(deleteMany).toHaveBeenCalledWith({ where: { groupId, userId: memberId } });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('selects a remaining member as owner after removing the current owner', async () => {
+    await expect(repository.removeMember(groupId, ownerId, ownerId)).resolves.toBe(true);
+    expect(queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteMany.mock.invocationCallOrder[0]
+    );
+    const selectedOwner = update.mock.calls[0][0].data.ownerId;
+    expect([memberId, otherId]).toContain(selectedOwner);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: groupId },
+      data: { ownerId: selectedOwner },
+    });
+  });
+
+  it('keeps the group ownerless when its last member leaves', async () => {
+    findMany.mockResolvedValue([]);
+    await expect(repository.removeMember(groupId, ownerId)).resolves.toBe(true);
+    expect(update).toHaveBeenCalledWith({ where: { id: groupId }, data: { ownerId: null } });
+  });
+
+  it('rejects joining a nonexistent group without creating a membership', async () => {
+    queryRaw.mockResolvedValue([]);
+    await expect(repository.addMember(groupId, memberId)).rejects.toMatchObject({
+      reason: 'not-found',
+    });
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('preserves the existing owner when another member joins', async () => {
+    await repository.addMember(groupId, memberId);
+    expect(upsert).toHaveBeenCalledWith({
+      where: { userId_groupId: { userId: memberId, groupId } },
+      update: {},
+      create: { userId: memberId, groupId },
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('assigns ownership to the first member joining an ownerless group', async () => {
+    queryRaw.mockResolvedValue([{ ownerId: null, profilePic: null }]);
+    await repository.addMember(groupId, memberId);
+    expect(update).toHaveBeenCalledWith({ where: { id: groupId }, data: { ownerId: memberId } });
+  });
+});
+
 describe('PrismaGroupRepository', () => {
   const create = jest.fn();
   const findUnique = jest.fn();
