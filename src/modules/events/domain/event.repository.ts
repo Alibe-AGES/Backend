@@ -78,6 +78,12 @@ export interface CreateEventData {
   };
 }
 
+export interface CreateMemoryData {
+  id: string;
+  eventId: string;
+  picture: string;
+}
+
 export interface EventCreationLocation {
   id: string;
   image: string | null;
@@ -128,4 +134,6 @@ export abstract class EventRepository {
   abstract findImageAccess(eventId: string, userId: string): Promise<EventImageAccess | null>;
 
   abstract findMemories(eventId: string, userId: string): Promise<EventMemories | null>;
+
+  abstract createMemory(data: CreateMemoryData): Promise<EventMemoryDetails | null>;
 }
