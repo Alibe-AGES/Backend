@@ -25,6 +25,7 @@ describe('JoinGroupByInviteUseCase', () => {
       findLatestInviteLinkByGroupId: jest.fn(),
       findInviteLinkByToken: jest.fn(),
       addMember: jest.fn(),
+      removeMember: jest.fn(),
       findProfilePictureAccess: jest.fn(),
       findAvailabilitiesByDate: jest.fn(),
     };

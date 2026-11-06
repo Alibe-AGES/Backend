@@ -70,6 +70,8 @@ export abstract class GroupRepository {
 
   abstract addMember(groupId: string, userId: string): Promise<void>;
 
+  abstract removeMember(groupId: string, userId: string): Promise<boolean>;
+
   abstract findProfilePictureAccess(
     groupId: string,
     userId: string
