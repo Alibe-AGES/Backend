@@ -42,6 +42,7 @@ import {
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { UpdateGroupUseCase } from '../application/update-group.use-case';
 import { RemoveGroupMemberUseCase } from '../application/remove-group-member.use-case';
+import { LeaveGroupUseCase } from '../application/leave-group.use-case';
 import { GroupManagementError } from '../domain/group.repository';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import {
@@ -78,7 +79,8 @@ export class GroupsController {
     private readonly listGroupsUseCase: ListGroupsUseCase,
     private readonly getAvailabilityIntervalsUseCase: GetAvailabilityIntervalsUseCase,
     private readonly updateGroupUseCase: UpdateGroupUseCase,
-    private readonly removeGroupMemberUseCase: RemoveGroupMemberUseCase
+    private readonly removeGroupMemberUseCase: RemoveGroupMemberUseCase,
+    private readonly leaveGroupUseCase: LeaveGroupUseCase
   ) {}
   /**
    * GET /groups
@@ -308,6 +310,31 @@ export class GroupsController {
     if (!ownerId) throw new UnauthorizedException('Authenticated user not found');
     try {
       await this.removeGroupMemberUseCase.execute(groupId, memberId, ownerId);
+    } catch (error) {
+      this.rethrowManagementError(error);
+    }
+  }
+
+  @Post(':groupId/leave')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove o usuário autenticado do grupo' })
+  @ApiParam({ name: 'groupId', format: 'uuid' })
+  @ApiNoContentResponse({
+    description:
+      'Saída concluída. Se o usuário era o owner, outro participante é sorteado; grupo vazio é preservado.',
+  })
+  @ApiBadRequestResponse({ description: 'UUID inválido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiNotFoundResponse({ description: 'Grupo inexistente ou usuário não participa dele.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
+  async leave(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<void> {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
+    try {
+      await this.leaveGroupUseCase.execute(groupId, userId);
     } catch (error) {
       this.rethrowManagementError(error);
     }

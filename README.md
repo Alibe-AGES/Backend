@@ -1,28 +1,5 @@
 # Alibe Backend
 
-## Edição de grupo (ALI-49)
-
-Somente o owner pode editar o grupo ou remover participantes. O usuário autenticado que cria um grupo passa a ser seu owner. `GET /groups/:groupId` informa `ownerId` (nulo para grupos vazios).
-
-| Método | Rota                               | Entrada                                                                                             | Sucesso               |
-| ------ | ---------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------- |
-| PATCH  | `/groups/:groupId`                 | `multipart/form-data`: `name` e/ou `profile_pic`; `removeProfilePicture=true` para remover a imagem | `200`, dados do grupo |
-| DELETE | `/groups/:groupId/members/:userId` | Sem body                                                                                            | `204`, sem corpo      |
-
-Na edição, campos omitidos são preservados. O nome segue os limites do DTO de criação (2–100 caracteres). A imagem segue os formatos/extensões atuais de criação, com limite de 5 MB. Não é permitido enviar uma nova imagem junto com a solicitação de removê-la. Retornos: `400` para dados inválidos ou edição vazia, `401` sem autenticação, `403` para quem não é owner, `404` para grupo/participante inexistente e `413` para upload maior que o limite; falhas inesperadas retornam `500`.
-
-O owner pode remover a si mesmo: outro participante é escolhido aleatoriamente e persistido como owner na mesma transação. Se não restar ninguém, o grupo permanece com `ownerId=null`. Se alguém voltar por um convite válido, o primeiro membro a entrar assume o grupo. A remoção preserva o usuário, os demais grupos e os dados históricos.
-
-A migration `20261106180000_add_group_owner` atribui uma única vez um participante aleatório a cada grupo existente com membros e preserva grupos vazios sem owner. O seed também atribui owners aos seus grupos. A migration deve ser aplicada pelo fluxo normal de deploy; não é necessário resetar dados.
-
-A ALI-112 ainda não está nesta base. O método compartilhado `GroupRepository.removeMember(groupId, userId)` já transfere ownership para a saída voluntária; na integração da ALI-112 deve ser preservada esta implementação, substituindo a remoção simples daquela branch. Nenhuma rota de saída foi duplicada aqui.
-
-Os testes de PostgreSQL são opcionais via `TEST_DATABASE_URL`, limitado a banco local cujo nome termina com `_test`, com migrations previamente aplicadas. A suíte de ownership cobre permissões, troca de owner, grupo vazio, concorrência, rollback e a migration de grupos existentes. Ela não deve usar o banco de desenvolvimento.
-
-## Sair de um grupo
-
-`PUT /api/groups/:groupId/leave` remove somente o vínculo do usuário autenticado com o grupo, sem body na requisição. Retorna `201` sem corpo em caso de sucesso; `400` para UUID inválido ou vínculo inexistente (incluindo grupo inexistente e saída repetida); `401` sem autenticação; `500` para falhas inesperadas. O grupo e os demais dados são preservados, inclusive quando o último membro sai.
-
 API do projeto Alibe construída com NestJS, TypeScript, Prisma e PostgreSQL.
 
 O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID, mantendo as convenções e o sistema de injeção de dependências do NestJS. O objetivo é separar regras de negócio, casos de uso, entrada HTTP e persistência sem transformar cada funcionalidade em um conjunto desnecessário de camadas.
@@ -844,6 +821,36 @@ query ou body.
 Os DTOs, exemplos de payload e respostas podem ser consultados e executados em
 <http://localhost:3000/docs>. Outros fluxos serão adicionados somente depois que seus contratos
 forem discutidos.
+
+### Edição, remoção e saída de grupo
+
+O usuário autenticado que cria um grupo passa a ser seu owner. Somente o owner pode editar o grupo
+ou remover outros participantes; qualquer participante pode sair. `GET /groups/:groupId` informa
+`ownerId` (nulo para grupos vazios).
+
+| Método | Rota                               | Quem pode         | Entrada                                                                                             | Sucesso               |
+| ------ | ---------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------- | --------------------- |
+| PATCH  | `/groups/:groupId`                 | owner             | `multipart/form-data`: `name` e/ou `profile_pic`; `removeProfilePicture=true` para remover a imagem | `200`, dados do grupo |
+| DELETE | `/groups/:groupId/members/:userId` | owner             | Sem body                                                                                            | `204`, sem corpo      |
+| POST   | `/groups/:groupId/leave`           | o próprio usuário | Sem body                                                                                            | `204`, sem corpo      |
+
+Na edição, campos omitidos são preservados. O nome segue os limites do DTO de criação (2–100
+caracteres). A imagem segue os formatos/extensões atuais de criação, com limite de 5 MB. Não é
+permitido enviar uma nova imagem junto com a solicitação de removê-la. Retornos: `400` para dados
+inválidos ou edição vazia, `401` sem autenticação, `403` para quem não é owner, `404` para
+grupo/participante inexistente e `413` para upload maior que o limite.
+
+Quando o owner sai ou remove a si mesmo, outro participante é sorteado e gravado como owner na mesma
+transação. Se não restar ninguém, o grupo permanece com `ownerId=null`, e o primeiro membro que
+entrar por um convite válido assume o grupo. A remoção preserva o usuário, os demais grupos e os
+dados históricos.
+
+A migration `20261106180000_add_group_owner` sorteia uma única vez um participante como owner de
+cada grupo existente com membros e preserva grupos vazios sem owner.
+
+Os testes de ownership com PostgreSQL (permissões, troca de owner, grupo vazio, concorrência,
+rollback e a migration) rodam somente com `TEST_DATABASE_URL` apontando para um banco local cujo
+nome termina com `_test`, com as migrations aplicadas. Sem essa variável, a suíte é pulada.
 
 ### Endpoint de calendário
 
