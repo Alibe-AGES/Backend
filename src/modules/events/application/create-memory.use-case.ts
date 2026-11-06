@@ -40,7 +40,7 @@ export class CreateMemoryUseCase {
       throw new InvalidMemoryCreationError('Extensão inválida para imagem');
     }
 
-    const userIsMember = this.events.findGroupMembership(event.groupId, userId);
+    const userIsMember = await this.events.findGroupMembership(event.groupId, userId);
 
     if (userIsMember === null) {
       throw new EventGroupNotFoundError('Grupo não encontrado');
