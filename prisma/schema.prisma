@@ -35,6 +35,7 @@ model User {
   expoPushToken String?   @unique @map("expo_push_token") @db.VarChar(255)
 
   groups            UserGroup[]
+  ownedGroups       Group[]                 @relation("GroupOwner")
   moods             Mood[]
   ownedProposals    Proposal[]
   proposalResponses ProposalResponse[]
@@ -102,6 +103,8 @@ model Group {
   name       String?
   profilePic String?  @map("profile_pic")
   createdAt  DateTime @map("created_at")
+  ownerId    String?  @map("owner_id") @db.Uuid
+  owner      User?    @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Restrict)
 
   users          UserGroup[]
   events         Event[]
@@ -112,6 +115,7 @@ model Group {
   notifications  GroupNotification[]
   proposals      Proposal[]
 
+  @@index([ownerId])
   @@map("group")
 }
 

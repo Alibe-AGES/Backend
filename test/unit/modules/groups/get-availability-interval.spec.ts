@@ -44,6 +44,9 @@ describe('GetAvailabilityIntervalsUseCase', () => {
       findLatestInviteLinkByGroupId: jest.fn(),
       findInviteLinkByToken: jest.fn(),
       addMember: jest.fn(),
+      findManagementState: jest.fn(),
+      updateOwned: jest.fn(),
+      removeMember: jest.fn(),
       findProfilePictureAccess: jest.fn(),
       findAvailabilitiesByDate: jest.fn(),
     };

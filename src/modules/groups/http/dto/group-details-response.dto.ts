@@ -6,6 +6,9 @@ export class GroupDetailsResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
+  @ApiProperty({ format: 'uuid', nullable: true })
+  ownerId!: string | null;
+
   @ApiProperty({ example: 'Amigos da faculdade' })
   name!: string;
 
