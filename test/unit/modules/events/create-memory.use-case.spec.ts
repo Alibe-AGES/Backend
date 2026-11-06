@@ -60,7 +60,7 @@ describe('CreateMemoryUseCase', () => {
     expect(result).toMatchObject({
       id: expect.any(String),
       eventId: EVENT_ID,
-      picture: expect.stringMatching(/^api\/events\/.*\/memories\/.*\/image$/),
+      picture: expect.stringMatching(/^\/memories\/.+\/images\/.+$/),
     });
 
     await expect(storage.findByKey(result.picture)).resolves.toEqual({

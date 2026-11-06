@@ -75,7 +75,7 @@ describe('Event memories endpoint (e2e)', () => {
     expect(response.body).toMatchObject({
       id: expect.any(String),
       eventId: EVENT_ID,
-      picture: expect.stringMatching(new RegExp(`^api/events/${EVENT_ID}/memories/.+/image$`)),
+      picture: expect.stringMatching(new RegExp(`^\/memories\/.+\/images\/.+$`)),
     });
 
     expect(saveSpy).toHaveBeenCalledTimes(1);

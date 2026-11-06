@@ -5,7 +5,7 @@ import { CreateMemoryDto } from '../http/dto/create-memory.dto';
 import { safeExtension } from '../../../../src/shared/utils';
 import { EventGroupNotFoundError } from './create-event.use-case';
 import { EventDetailsAccessDeniedError, GetEventUseCase } from './get-event.use-case';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
 export interface CreateMemoryInput {
   eventId: string;
@@ -40,7 +40,7 @@ export class CreateMemoryUseCase {
       throw new InvalidMemoryCreationError('Extensão inválida para imagem');
     }
 
-    const userIsMember = await this.events.findGroupMembership((await event).groupId, userId);
+    const userIsMember = this.events.findGroupMembership((await event).groupId, userId);
 
     if (userIsMember === null) {
       throw new EventGroupNotFoundError('Grupo não encontrado');
@@ -51,7 +51,7 @@ export class CreateMemoryUseCase {
     }
 
     const memoryId = randomUUID();
-    const imageKey = `api/events/${input.eventId}/memories/${memoryId}/image`;
+    const imageKey = `/memories/${memoryId}/images/${randomUUID()}${extension}`;
 
     await this.storage.save({
       key: imageKey,
