@@ -231,6 +231,7 @@ describe('GroupsModule integration', () => {
 
     await expect(getGroup.execute(groupId)).resolves.toEqual({
       ...row,
+      ownerId: null,
       profilePic: `/groups/${groupId}/profile-picture`,
       participants: [participant],
       nextEvent: event,

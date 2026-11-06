@@ -140,6 +140,7 @@ describe('Groups mock endpoints (e2e)', () => {
 
     expect(response.body).toEqual({
       id: DEMO_GROUP_ID,
+      ownerId: null,
       name: 'Amigos da faculdade',
       profilePic: `/groups/${DEMO_GROUP_ID}/profile-picture`,
       createdAt: '2026-08-01T15:00:00.000Z',

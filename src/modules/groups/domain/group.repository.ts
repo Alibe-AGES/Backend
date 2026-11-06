@@ -14,6 +14,7 @@ export interface GroupDetails {
   name: string;
   profilePic: string | null;
   createdAt: Date;
+  ownerId?: string | null;
   participants: Array<{
     id: string;
     name: string | null;
@@ -51,7 +52,40 @@ export interface GroupAvailabilitiesByDate {
   }>;
 }
 
+export interface UpdateGroupData {
+  name?: string;
+  profilePic?: string | null;
+}
+
+export interface GroupManagementState {
+  ownerId: string | null;
+  profilePic: string | null;
+}
+
+export class GroupManagementError extends Error {
+  constructor(
+    readonly reason: 'not-found' | 'forbidden',
+    message: string
+  ) {
+    super(message);
+  }
+}
+
 export abstract class GroupRepository {
+  abstract findManagementState(groupId: string): Promise<GroupManagementState | null>;
+
+  abstract updateOwned(
+    groupId: string,
+    ownerId: string,
+    data: UpdateGroupData
+  ): Promise<{
+    group: Group;
+    previousImageKey: string | null;
+  }>;
+
+  // Without actingOwnerId, removes the user's own membership (the leave flow).
+  abstract removeMember(groupId: string, userId: string, actingOwnerId?: string): Promise<boolean>;
+
   abstract create(data: CreateGroupData): Promise<Group>;
 
   abstract findById(id: string): Promise<Group | null>;

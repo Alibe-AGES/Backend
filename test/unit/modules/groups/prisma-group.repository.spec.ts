@@ -9,6 +9,8 @@ describe('PrismaGroupRepository', () => {
   const inviteLinkFindUnique = jest.fn();
   const userGroupUpsert = jest.fn();
   const prisma = {
+    $transaction: jest.fn((callback: (transaction: unknown) => unknown) => callback(prisma)),
+    $queryRaw: jest.fn().mockResolvedValue([{ ownerId: 'owner-id', profilePic: null }]),
     group: { create, findUnique },
     inviteLink: {
       create: inviteLinkCreate,
@@ -129,6 +131,7 @@ describe('PrismaGroupRepository', () => {
         name: data.name,
         profilePic: data.profilePic,
         createdAt: data.createdAt,
+        ownerId: data.creatorId,
         users: {
           create: {
             userId: data.creatorId,
@@ -137,7 +140,14 @@ describe('PrismaGroupRepository', () => {
       },
     });
 
-    expect(result).toEqual(expect.objectContaining({ ...data, createdAt }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: data.id,
+        name: data.name,
+        profilePic: data.profilePic,
+        createdAt,
+      })
+    );
   });
 
   it('finds and maps a group', async () => {
