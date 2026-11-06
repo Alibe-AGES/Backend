@@ -11,6 +11,7 @@ import {
   HttpStatus,
   NotFoundException,
   Post,
+  Put,
   Request,
   StreamableFile,
   UnauthorizedException,
@@ -37,6 +38,10 @@ import {
 } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import {
+  GroupMembershipNotFoundError,
+  LeaveGroupUseCase,
+} from '../application/leave-group.use-case';
+import {
   GetGroupProfilePictureUseCase,
   GroupImageAccessDeniedError,
   GroupNotFoundError as ProfileGroupNotFoundError,
@@ -61,21 +66,22 @@ import {
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
 @ApiTags('Groups')
-@Controller('groups')
+@Controller()
 export class GroupsController {
   constructor(
     private readonly createGroupUseCase: CreateGroupUseCase,
     private readonly getGroupUseCase: GetGroupUseCase,
     private readonly getGroupProfilePictureUseCase: GetGroupProfilePictureUseCase,
     private readonly listGroupsUseCase: ListGroupsUseCase,
-    private readonly getAvailabilityIntervalsUseCase: GetAvailabilityIntervalsUseCase
+    private readonly getAvailabilityIntervalsUseCase: GetAvailabilityIntervalsUseCase,
+    private readonly leaveGroupUseCase: LeaveGroupUseCase
   ) {}
   /**
    * GET /groups
    * Lista os grupos mockados da tela inicial. Futuramente, o usuário será identificado pela
    * autenticação e a rota devolverá somente os grupos dos quais ele participa.
    */
-  @Get()
+  @Get('groups')
   @ApiOperation({
     summary: 'Lista todos os grupos do usuário que será obtido pela autenticação',
   })
@@ -95,7 +101,7 @@ export class GroupsController {
    * GET /groups/:groupId/profile-picture
    * Entrega a foto do grupo somente quando o usuário autenticado pertence a ele.
    */
-  @Get(':groupId/profile-picture')
+  @Get('groups/:groupId/profile-picture')
   @Header('Cache-Control', 'private, max-age=300')
   @ApiOperation({ summary: 'Obtém a foto de perfil de um grupo do usuário autenticado' })
   @ApiParam({ name: 'groupId', format: 'uuid' })
@@ -141,7 +147,7 @@ export class GroupsController {
    * Retorna os dados do grupo, seus participantes e o próximo encontro mockado. Futuramente, o
    * acesso ao grupo será validado a partir do usuário autenticado.
    */
-  @Get(':groupId')
+  @Get('groups/:groupId')
   @ApiOperation({ summary: 'Obtém o grupo, seus participantes e o próximo encontro' })
   @ApiParam({ name: 'groupId', format: 'uuid' })
   @ApiOkResponse({
@@ -169,7 +175,7 @@ export class GroupsController {
    * Recebe name e profile_pic opcional via multipart/form-data e devolve o grupo mockado. Nesta etapa,
    * não persiste os dados nem armazena a imagem.
    */
-  @Post()
+  @Post('groups')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(
     FileInterceptor('profile_pic', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } })
@@ -228,7 +234,7 @@ export class GroupsController {
     }
   }
 
-  @Get(':groupId/availabilities')
+  @Get('groups/:groupId/availabilities')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Obtém os intervalos de disponibilidades para um dia específico' })
   @ApiParam({ name: 'groupId', format: 'uuid' })
@@ -290,6 +296,33 @@ export class GroupsController {
         throw new ForbiddenException(error.message);
       }
 
+      throw error;
+    }
+  }
+
+  @Put('api/groups/:groupId/leave')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Remove o usuário autenticado do grupo' })
+  @ApiParam({ name: 'groupId', format: 'uuid' })
+  @ApiCreatedResponse({ description: 'Participação removida com sucesso. Resposta sem corpo.' })
+  @ApiBadRequestResponse({
+    description: 'UUID inválido, grupo inexistente ou usuário sem vínculo.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
+  async leave(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<void> {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
+
+    try {
+      await this.leaveGroupUseCase.execute(groupId, userId);
+    } catch (error) {
+      if (error instanceof GroupMembershipNotFoundError) {
+        throw new BadRequestException(error.message);
+      }
       throw error;
     }
   }
