@@ -12,4 +12,6 @@ export abstract class UserProfileRepository {
   abstract findCurrentUserSummary(userId: string, now: Date): Promise<CurrentUserSummary | null>;
   abstract findExpoPushToken(userId: string): Promise<string | null>;
   abstract updateExpoPushToken(userId: string, token: string): Promise<void>;
+  abstract verifyPassword(userId: string, password: string): Promise<boolean>;
+  abstract updatePassword(userId: string, newPassword: string): Promise<void>;
 }
