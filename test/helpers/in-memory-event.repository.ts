@@ -11,6 +11,7 @@ import {
   EventMemories,
   CreateMemoryData,
   EventMemoryDetails,
+  MemoryImageAccess,
 } from '../../src/modules/events/domain/event.repository';
 
 export class InMemoryEventRepository extends EventRepository {
@@ -279,6 +280,32 @@ export class InMemoryEventRepository extends EventRepository {
 
     return Promise.resolve({
       memories: eventMemories,
+      userIsMember,
+    });
+  }
+
+  findMemoryImageAccess(
+    eventId: string,
+    memoryId: string,
+    userId: string
+  ): Promise<MemoryImageAccess | null> {
+    const event = this.events.get(eventId);
+    const memoryList = this.memories.get(memoryId);
+
+    if (!event || !memoryList || memoryList.length === 0) {
+      return Promise.resolve(null);
+    }
+    const memory = memoryList.find((m) => m.id === memoryId) || null;
+
+    if (memory === null) {
+      return null;
+    }
+
+    const groupMembers = event.groupId ? this.groups.get(event.groupId) : undefined;
+    const userIsMember = groupMembers ? groupMembers.has(userId) : false;
+
+    return Promise.resolve({
+      imageKey: memory.picture,
       userIsMember,
     });
   }
