@@ -309,4 +309,10 @@ export class InMemoryEventRepository extends EventRepository {
       userIsMember,
     });
   }
+
+  setMemory(eventId: string, memoryId: string, picture: string): void {
+    const existing = this.memories.get(eventId) ?? [];
+    existing.push({ id: memoryId, picture, eventId });
+    this.memories.set(memoryId, existing);
+  }
 }
