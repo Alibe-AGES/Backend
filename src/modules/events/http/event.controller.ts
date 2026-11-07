@@ -78,6 +78,7 @@ import {
   CreateMemoryUseCase,
   InvalidMemoryCreationError,
 } from '../application/create-memory.use-case';
+import { GetMemoryUseCase, MemoryNotFoundError } from '../application/get-memory.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -92,7 +93,8 @@ export class EventController {
     private readonly updateEventUseCase: UpdateEventUseCase,
     private readonly createEventUseCase: CreateEventUseCase,
     private readonly getMemoriesUseCase: GetEventMemoriesUseCase,
-    private readonly createMemoryUseCase: CreateMemoryUseCase
+    private readonly createMemoryUseCase: CreateMemoryUseCase,
+    private readonly getMemoryUseCase: GetMemoryUseCase
   ) {}
 
   @Post('groups/:groupId/events')
@@ -502,6 +504,43 @@ export class EventController {
       }
 
       if (error instanceof EventMemoriesAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  @Get('/api/events/:eventId/memories/:memoryId')
+  @ApiOperation({ summary: 'Consulta os dados de uma memória' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
+  @ApiParam({ name: 'memoryId', format: 'uuid' })
+  @ApiOkResponse({ type: EventMemoriesResponseDto })
+  @ApiBadRequestResponse({ description: 'Identificador do evento ou memória inválido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
+  @ApiNotFoundResponse({ description: 'Evento ou memória não encontrado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar a memória.' })
+  async getMemory(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Param('memoryId', new ParseUUIDPipe()) memoryId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<EventMemoriesResponseDto> {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    try {
+      const event = await this.getMemoryUseCase.execute(eventId, memoryId, userId);
+      return event;
+    } catch (error) {
+      if (error instanceof MemoryNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      if (error instanceof EventDetailsAccessDeniedError) {
         throw new ForbiddenException(error.message);
       }
 
