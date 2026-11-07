@@ -34,7 +34,7 @@ import {
   GetMemoryUseCase,
   MemoryNotFoundError,
 } from '../../../../src/modules/events/application/get-memory.use-case';
-import { GetMemoryImageUseCase } from 'src/modules/events/application/get-memory-image.use-case';
+import { GetMemoryImageUseCase } from '../../../../src/modules/events/application/get-memory-image.use-case';
 
 describe('EventController', () => {
   let controller: EventController;
