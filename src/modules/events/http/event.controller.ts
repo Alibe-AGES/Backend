@@ -581,7 +581,7 @@ export class EventController {
       if (error instanceof EventImageAccessDeniedError) {
         throw new ForbiddenException(error.message);
       }
-      if (error instanceof EventNotFoundError) {
+      if (error instanceof GetEventNotFoundError) {
         throw new NotFoundException('Evento não encontrado');
       }
       if (error instanceof MemoryImageNotFoundError) {

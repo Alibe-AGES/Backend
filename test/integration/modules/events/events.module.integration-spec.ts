@@ -1,10 +1,13 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import { EventsModule } from '../../../../src/modules/events/events.module';
 import { EventController } from '../../../../src/modules/events/http/event.controller';
-import { GetEventUseCase } from '../../../../src/modules/events/application/get-event.use-case';
+import {
+  EventNotFoundError,
+  GetEventUseCase,
+} from '../../../../src/modules/events/application/get-event.use-case';
 import { GetEventMemoriesUseCase } from '../../../../src/modules/events/application/get-event-memories.use-case';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import type { CreateEventDto } from '../../../../src/modules/events/http/dto/create-event.dto';
@@ -13,7 +16,11 @@ import { AttendanceReminderScheduler } from '../../../../src/modules/events/sche
 import { SendAttendanceRemindersUseCase } from '../../../../src/modules/events/application/send-attendance-reminders.use-case';
 import { DistributedTaskLock } from '../../../../src/shared/scheduling/distributed-task-lock';
 import { StreamableFile } from '@nestjs/common';
-import { GetMemoryImageUseCase } from '../../../../src/modules/events/application/get-memory-image.use-case';
+import {
+  GetMemoryImageUseCase,
+  MemoryImageNotFoundError,
+} from '../../../../src/modules/events/application/get-memory-image.use-case';
+import { EventImageAccessDeniedError } from '../../../../src/modules/events/application/get-event-image.use-case';
 
 const groupId = '33333333-3333-4333-8333-333333333333';
 const userId = '11111111-1111-4111-8111-111111111111';
@@ -341,6 +348,105 @@ describe('EventsModule integration', () => {
 
       expect(result).toBeInstanceOf(StreamableFile);
       expect(getMemoryImageUseCase.execute).toHaveBeenCalledWith(eventId, memoryId, userId);
+    });
+
+    it('throws UnauthorizedException when user is not authenticated', async () => {
+      const controller = moduleFixture.get(EventController);
+      const eventId = '22222222-2222-4222-8222-222222222222';
+      const memoryId = '11111111-1111-4111-8111-222222222222';
+
+      const unauthenticatedRequest = {
+        user: undefined,
+      } as unknown as AuthenticatedRequest;
+
+      await expect(
+        controller.getMemoryImage(eventId, memoryId, unauthenticatedRequest)
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('throws ForbiddenException when EventImageAccessDeniedError is thrown by use case', async () => {
+      const controller = moduleFixture.get(EventController);
+      const getMemoryImageUseCase = moduleFixture.get(GetMemoryImageUseCase);
+
+      const eventId = '22222222-2222-4222-8222-222222222222';
+      const memoryId = '11111111-1111-4111-8111-222222222222';
+      const userId = '33333333-3333-4333-8333-333333333333';
+
+      const authenticatedRequest = {
+        user: { id: userId },
+      } as AuthenticatedRequest;
+
+      jest
+        .spyOn(getMemoryImageUseCase, 'execute')
+        .mockRejectedValue(
+          new EventImageAccessDeniedError('O usuário não pertence ao grupo do evento')
+        );
+
+      await expect(
+        controller.getMemoryImage(eventId, memoryId, authenticatedRequest)
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws NotFoundException when EventNotFoundError is thrown by use case', async () => {
+      const controller = moduleFixture.get(EventController);
+      const getMemoryImageUseCase = moduleFixture.get(GetMemoryImageUseCase);
+
+      const eventId = '22222222-2222-4222-8222-222222222222';
+      const memoryId = '11111111-1111-4111-8111-222222222222';
+      const userId = '33333333-3333-4333-8333-333333333333';
+
+      const authenticatedRequest = {
+        user: { id: userId },
+      } as AuthenticatedRequest;
+
+      jest
+        .spyOn(getMemoryImageUseCase, 'execute')
+        .mockRejectedValue(new EventNotFoundError('Evento não encontrado'));
+
+      await expect(
+        controller.getMemoryImage(eventId, memoryId, authenticatedRequest)
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException when MemoryImageNotFoundError is thrown by use case', async () => {
+      const controller = moduleFixture.get(EventController);
+      const getMemoryImageUseCase = moduleFixture.get(GetMemoryImageUseCase);
+
+      const eventId = '22222222-2222-4222-8222-222222222222';
+      const memoryId = '11111111-1111-4111-8111-222222222222';
+      const userId = '33333333-3333-4333-8333-333333333333';
+
+      const authenticatedRequest = {
+        user: { id: userId },
+      } as AuthenticatedRequest;
+
+      jest
+        .spyOn(getMemoryImageUseCase, 'execute')
+        .mockRejectedValue(new MemoryImageNotFoundError('Imagem do evento não encontrada'));
+
+      await expect(
+        controller.getMemoryImage(eventId, memoryId, authenticatedRequest)
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rethrows unexpected errors from the use case', async () => {
+      const controller = moduleFixture.get(EventController);
+      const getMemoryImageUseCase = moduleFixture.get(GetMemoryImageUseCase);
+
+      const eventId = '22222222-2222-4222-8222-222222222222';
+      const memoryId = '11111111-1111-4111-8111-222222222222';
+      const userId = '33333333-3333-4333-8333-333333333333';
+
+      const authenticatedRequest = {
+        user: { id: userId },
+      } as AuthenticatedRequest;
+
+      const unexpectedError = new Error('Database connection failed');
+      jest.spyOn(getMemoryImageUseCase, 'execute').mockRejectedValue(unexpectedError);
+
+      await expect(
+        controller.getMemoryImage(eventId, memoryId, authenticatedRequest)
+      ).rejects.toThrow('Database connection failed');
     });
   });
 });
