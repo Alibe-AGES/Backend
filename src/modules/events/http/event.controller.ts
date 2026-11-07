@@ -79,6 +79,7 @@ import {
   InvalidMemoryCreationError,
 } from '../application/create-memory.use-case';
 import { GetMemoryUseCase, MemoryNotFoundError } from '../application/get-memory.use-case';
+import { GetMemoryImageUseCase } from '../application/get-memory-image.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -94,7 +95,8 @@ export class EventController {
     private readonly createEventUseCase: CreateEventUseCase,
     private readonly getMemoriesUseCase: GetEventMemoriesUseCase,
     private readonly createMemoryUseCase: CreateMemoryUseCase,
-    private readonly getMemoryUseCase: GetMemoryUseCase
+    private readonly getMemoryUseCase: GetMemoryUseCase,
+    private readonly getMemoryImageUseCase: GetMemoryImageUseCase
   ) {}
 
   @Post('groups/:groupId/events')
@@ -544,6 +546,40 @@ export class EventController {
         throw new ForbiddenException(error.message);
       }
 
+      throw error;
+    }
+  }
+
+  @Get('api/events/:eventId/memories/:memoryId/image')
+  @ApiOperation({ summary: 'Consulta a imagem de uma memória' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
+  @ApiParam({ name: 'memoryId', format: 'uuid' })
+  @ApiOkResponse({ type: StreamableFile })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
+  @ApiNotFoundResponse({ description: 'Evento ou imagem não encontrados.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar o evento.' })
+  async getMemoryImage(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Param('memoryId', new ParseUUIDPipe()) memoryId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<StreamableFile> {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
+    try {
+      const image = await this.getMemoryImageUseCase.execute(eventId, memoryId, userId);
+      return new StreamableFile(Buffer.from(image.bytes), {
+        type: image.contentType,
+        disposition: 'inline',
+        length: image.bytes.byteLength,
+      });
+    } catch (error) {
+      if (error instanceof EventImageAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+      if (error instanceof EventNotFoundError) {
+        throw new NotFoundException('Evento não encontrado');
+      }
       throw error;
     }
   }
