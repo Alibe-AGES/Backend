@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import { AuthService } from '@thallesp/nestjs-better-auth';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import type { createAuth } from '../../auth/auth.config';
 import { UserProfileRepository } from '../domain/user-profile.repository';
 
 @Injectable()
 export class PrismaUserProfileRepository extends UserProfileRepository {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auth: AuthService<ReturnType<typeof createAuth>>
+  ) {
     super();
   }
 
@@ -74,5 +79,23 @@ export class PrismaUserProfileRepository extends UserProfileRepository {
     });
 
     return user?.expoPushToken ?? null;
+  }
+
+  async verifyPassword(userId: string, password: string): Promise<boolean> {
+    const context = await this.auth.instance.$context;
+    const account = await context.internalAdapter.findCredentialAccount(userId);
+
+    if (!account?.password) {
+      return false;
+    }
+
+    return context.password.verify({ password, hash: account.password });
+  }
+
+  async updatePassword(userId: string, newPassword: string): Promise<void> {
+    const context = await this.auth.instance.$context;
+    const passwordHash = await context.password.hash(newPassword);
+
+    await context.internalAdapter.updatePassword(userId, passwordHash);
   }
 }
