@@ -142,5 +142,9 @@ export abstract class EventRepository {
 
   abstract createMemory(data: CreateMemoryData): Promise<EventMemoryDetails | null>;
 
-  abstract findMemoryById(id: string, eventId: string, userId: string): Promise<EventMemoryAccess | null>
+  abstract findMemoryById(
+    id: string,
+    eventId: string,
+    userId: string
+  ): Promise<EventMemoryAccess | null>;
 }

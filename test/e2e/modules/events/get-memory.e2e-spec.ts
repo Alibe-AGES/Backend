@@ -80,7 +80,7 @@ describe('EventMemoryController (e2e)', () => {
     eventRepository.setMemory(DEMO_EVENT_ID, {
       id: DEMO_MEMORY_ID,
       eventId: DEMO_EVENT_ID,
-      picture: `events/${DEMO_EVENT_ID}/memories/memory-1.jpg`,
+      picture: `events/${DEMO_EVENT_ID}/memories/${DEMO_MEMORY_ID}/image`,
     });
   });
 
@@ -99,7 +99,7 @@ describe('EventMemoryController (e2e)', () => {
 
     expect(response.body).toEqual({
       id: DEMO_MEMORY_ID,
-      picture: `/api/events/${DEMO_EVENT_ID}/memories/${DEMO_MEMORY_ID}/image`,
+      picture: `events/${DEMO_EVENT_ID}/memories/${DEMO_MEMORY_ID}/image`,
       eventId: DEMO_EVENT_ID,
     });
   });

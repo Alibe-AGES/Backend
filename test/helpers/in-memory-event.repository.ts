@@ -284,11 +284,7 @@ export class InMemoryEventRepository extends EventRepository {
     });
   }
 
-  findMemoryById(
-    id: string,
-    eventId: string,
-    userId: string
-  ): Promise<EventMemoryAccess | null> {
+  findMemoryById(id: string, eventId: string, userId: string): Promise<EventMemoryAccess | null> {
     const eventMemories = this.memories.get(eventId);
 
     if (!eventMemories || eventMemories.length === 0) {
@@ -321,7 +317,7 @@ export class InMemoryEventRepository extends EventRepository {
 
   setMemory(eventId: string, memory: { id: string; picture: string; eventId: string }): void {
     const existingMemories = this.memories.get(eventId) ?? [];
-    
+
     const index = existingMemories.findIndex((m) => m.id === memory.id);
     if (index >= 0) {
       existingMemories[index] = memory;

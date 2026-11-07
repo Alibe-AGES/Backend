@@ -415,7 +415,11 @@ export class PrismaEventRepository extends EventRepository {
     };
   }
 
-  async findMemoryById(id: string, eventId: string, userId: string): Promise<EventMemoryAccess | null> {
+  async findMemoryById(
+    id: string,
+    eventId: string,
+    userId: string
+  ): Promise<EventMemoryAccess | null> {
     const memory = await this.prisma.memory.findUnique({
       where: {
         id: id,
@@ -449,7 +453,7 @@ export class PrismaEventRepository extends EventRepository {
 
     return {
       memory: memoryDetails,
-      userIsMember: memory.event.group.users.length > 0
+      userIsMember: memory.event.group.users.length > 0,
     };
   }
 }
