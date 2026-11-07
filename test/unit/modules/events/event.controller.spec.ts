@@ -30,6 +30,7 @@ import { UpdateEventDto } from '../../../../src/modules/events/http/dto/update-e
 import { EventController } from '../../../../src/modules/events/http/event.controller';
 import { GetEventMemoriesUseCase } from '../../../../src/modules/events/application/get-event-memories.use-case';
 import { CreateMemoryUseCase } from '../../../../src/modules/events/application/create-memory.use-case';
+import { GetMemoryImageUseCase } from 'src/modules/events/application/get-memory-image.use-case';
 
 describe('EventController', () => {
   let controller: EventController;
@@ -38,9 +39,11 @@ describe('EventController', () => {
   let createMemoryUseCaseMock: { execute: jest.Mock };
   let getEventUseCaseMock: { execute: jest.Mock };
   let getMemoriesUseCaseMock: { execute: jest.Mock };
+  let getMemoryImageUseCaseMock: { execute: jest.Mock };
 
   const eventId = '22222222-2222-4222-8222-222222222222';
   const userId = '11111111-1111-4111-8111-111111111111';
+  const memoryId = '11111111-1111-4111-8111-222222222222';
   const authenticatedRequest = {
     user: { id: userId },
   } as AuthenticatedRequest;
@@ -51,6 +54,7 @@ describe('EventController', () => {
     createMemoryUseCaseMock = { execute: jest.fn() };
     getEventUseCaseMock = { execute: jest.fn() };
     getMemoriesUseCaseMock = { execute: jest.fn() };
+    getMemoryImageUseCaseMock = { execute: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EventController],
@@ -61,6 +65,7 @@ describe('EventController', () => {
         { provide: GetEventUseCase, useValue: getEventUseCaseMock },
         { provide: GetEventImageUseCase, useValue: { execute: jest.fn() } },
         { provide: GetEventMemoriesUseCase, useValue: getMemoriesUseCaseMock },
+        { provide: GetMemoryImageUseCase, useValue: getMemoryImageUseCaseMock },
       ],
     }).compile();
 
@@ -399,6 +404,15 @@ describe('EventController', () => {
         UnauthorizedException
       );
       expect(getEventUseCaseMock.execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getMemoryImage', () => {
+    it('rejects a request without an authenticated user', async () => {
+      await expect(
+        controller.getMemoryImage(eventId, memoryId, {} as AuthenticatedRequest)
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(getMemoryImageUseCaseMock.execute).not.toHaveBeenCalled();
     });
   });
 });
