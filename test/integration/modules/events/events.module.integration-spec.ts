@@ -13,7 +13,7 @@ import { AttendanceReminderScheduler } from '../../../../src/modules/events/sche
 import { SendAttendanceRemindersUseCase } from '../../../../src/modules/events/application/send-attendance-reminders.use-case';
 import { DistributedTaskLock } from '../../../../src/shared/scheduling/distributed-task-lock';
 import { StreamableFile } from '@nestjs/common';
-import { GetMemoryImageUseCase } from 'src/modules/events/application/get-memory-image.use-case';
+import { GetMemoryImageUseCase } from '../../../../src/modules/events/application/get-memory-image.use-case';
 
 const groupId = '33333333-3333-4333-8333-333333333333';
 const userId = '11111111-1111-4111-8111-111111111111';
