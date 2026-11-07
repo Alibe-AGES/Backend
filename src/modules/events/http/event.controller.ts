@@ -79,7 +79,10 @@ import {
   InvalidMemoryCreationError,
 } from '../application/create-memory.use-case';
 import { GetMemoryUseCase, MemoryNotFoundError } from '../application/get-memory.use-case';
-import { GetMemoryImageUseCase } from '../application/get-memory-image.use-case';
+import {
+  GetMemoryImageUseCase,
+  MemoryImageNotFoundError,
+} from '../application/get-memory-image.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -557,6 +560,7 @@ export class EventController {
   @ApiOkResponse({ type: StreamableFile })
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
   @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
+  @ApiBadRequestResponse({ description: 'eventId ou memoryId não são UUIDs válidos.' })
   @ApiNotFoundResponse({ description: 'Evento ou imagem não encontrados.' })
   @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar o evento.' })
   async getMemoryImage(
@@ -579,6 +583,9 @@ export class EventController {
       }
       if (error instanceof EventNotFoundError) {
         throw new NotFoundException('Evento não encontrado');
+      }
+      if (error instanceof MemoryImageNotFoundError) {
+        throw new NotFoundException(error.message);
       }
       throw error;
     }

@@ -12,7 +12,6 @@ import {
   CreateMemoryData,
   EventMemoryDetails,
   EventMemoryAccess,
-  MemoryImageAccess,
 } from '../../src/modules/events/domain/event.repository';
 
 export class InMemoryEventRepository extends EventRepository {
@@ -333,21 +332,23 @@ export class InMemoryEventRepository extends EventRepository {
     eventId: string,
     memoryId: string,
     userId: string
-  ): Promise<MemoryImageAccess | null> {
+  ): Promise<{ imageKey: string | null; userIsMember: boolean } | null> {
     const event = this.events.get(eventId);
-    const memoryList = this.memories.get(memoryId);
-
-    if (!event || !memoryList || memoryList.length === 0) {
+    if (!event) {
       return Promise.resolve(null);
     }
-    const memory = memoryList.find((m) => m.id === memoryId) || null;
 
-    if (memory === null) {
-      return null;
+    const eventMemories = this.memories.get(eventId) ?? [];
+    const memory = eventMemories.find((m) => m.id === memoryId);
+
+    if (!memory) {
+      return Promise.resolve({
+        imageKey: null,
+        userIsMember: this.groups.get(event.groupId)?.has(userId) ?? false,
+      });
     }
 
-    const groupMembers = event.groupId ? this.groups.get(event.groupId) : undefined;
-    const userIsMember = groupMembers ? groupMembers.has(userId) : false;
+    const userIsMember = this.groups.get(event.groupId)?.has(userId) ?? false;
 
     return Promise.resolve({
       imageKey: memory.picture,
@@ -357,7 +358,8 @@ export class InMemoryEventRepository extends EventRepository {
 
   setMemory(eventId: string, memoryId: string, picture: string): void {
     const existing = this.memories.get(eventId) ?? [];
-    existing.push({ id: memoryId, picture, eventId });
-    this.memories.set(memoryId, existing);
+    const filtered = existing.filter((m) => m.id !== memoryId);
+    filtered.push({ id: memoryId, picture, eventId });
+    this.memories.set(eventId, filtered);
   }
 }

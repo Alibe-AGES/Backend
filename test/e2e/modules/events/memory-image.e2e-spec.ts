@@ -5,6 +5,7 @@ import { AppModule } from '../../../../src/app.module';
 import { setupApplication } from '../../../../src/app.setup';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
+import { Event } from '../../../../src/modules/events/domain/event.entity';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryEventRepository } from '../../../helpers/in-memory-event.repository';
@@ -49,10 +50,9 @@ describe('Memory image endpoint (e2e)', () => {
   beforeEach(async () => {
     process.env.MOCK_AUTH_ENABLED = 'true';
     process.env.MOCK_AUTH_USER_ID = USER_ID;
-
+    events.set(createEvent());
     events.setGroupMembers(GROUP_ID, [USER_ID]);
-    events.setMemory(MEMORY_ID, EVENT_ID, IMAGE_KEY);
-
+    events.setMemory(EVENT_ID, MEMORY_ID, IMAGE_KEY);
     await storage.save({ key: IMAGE_KEY, bytes: IMAGE_BYTES, contentType: 'image/png' });
   });
 
@@ -89,7 +89,7 @@ describe('Memory image endpoint (e2e)', () => {
   });
 
   it('returns 404 when the image no longer exists in storage', async () => {
-    events.setMemory(MEMORY_ID, EVENT_ID, `events/${EVENT_ID}/memories/missing.png`);
+    events.setMemory(EVENT_ID, MEMORY_ID, `events/${EVENT_ID}/memories/missing.png`);
 
     await request(app.getHttpServer())
       .get(`/api/events/${EVENT_ID}/memories/${MEMORY_ID}/image`)
@@ -127,6 +127,27 @@ describe('Memory image endpoint (e2e)', () => {
     ]);
   });
 });
+
+function createEvent(): Event {
+  return new Event({
+    id: EVENT_ID,
+    name: 'Jantar',
+    timeslot: new Date('2026-10-15T20:00:00.000Z'),
+    image: null,
+    budgetStart: '50.00',
+    budgetEnd: '120.00',
+    status: 'pending',
+    groupId: GROUP_ID,
+    location: {
+      id: '44444444-4444-4444-8444-444444444444',
+      description: 'Casa da Ana',
+      manuallyCreated: true,
+    },
+    proposals: [{ id: '55555555-5555-4555-8555-555555555555', ownerId: USER_ID }],
+    createdAt: new Date('2026-09-22T18:30:00.000Z'),
+    updatedAt: new Date('2026-09-22T18:30:00.000Z'),
+  });
+}
 
 function restoreEnvironment(name: string, value: string | undefined): void {
   if (value === undefined) {

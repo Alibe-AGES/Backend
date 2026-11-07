@@ -5,7 +5,6 @@ import {
 } from '../../../../src/modules/events/application/get-memory-image.use-case';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
-import { EventNotFoundError } from 'src/modules/events/application/update-event.use-case';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -56,7 +55,7 @@ describe('GetMemoryImageUseCase', () => {
 
   it('throws MemoryImageNotFoundError when image key is missing', async () => {
     events.findMemoryImageAccess.mockResolvedValue({
-      imageKey: '', 
+      imageKey: '',
       userIsMember: true,
     });
 
@@ -65,7 +64,7 @@ describe('GetMemoryImageUseCase', () => {
     );
     expect(storage.findByKey).not.toHaveBeenCalled();
   });
-  
+
   it('denies a user who does not belong to the event group', async () => {
     events.findMemoryImageAccess.mockResolvedValue({ imageKey: IMAGE_KEY, userIsMember: false });
 
