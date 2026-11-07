@@ -24,6 +24,7 @@ describe('EventsModule integration', () => {
   let moduleFixture: TestingModule;
 
   const findUnique = jest.fn();
+  const findUniqueMemory = jest.fn(); // Mock específico para a memória
 
   const transaction = {
     location: { create: jest.fn() },
@@ -37,6 +38,7 @@ describe('EventsModule integration', () => {
     group: { findUnique: jest.fn() },
     event: { findUnique },
     userGroup: { findMany: jest.fn() },
+    memory: { findUnique: findUniqueMemory }, // Corrigido para usar findUnique
     $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) => callback(transaction)),
   } as unknown as PrismaService;
 
@@ -59,6 +61,7 @@ describe('EventsModule integration', () => {
 
   beforeEach(() => {
     findUnique.mockReset();
+    findUniqueMemory.mockReset();
     jest.clearAllMocks();
     (prisma.userGroup.findMany as jest.Mock).mockResolvedValue([]);
   });
@@ -260,6 +263,55 @@ describe('EventsModule integration', () => {
           include: expect.any(Object),
         })
       );
+    });
+  });
+
+  describe('EventController - getMemory', () => {
+    it('returns memory details when memory exists and user belongs to group', async () => {
+      const controller = moduleFixture.get(EventController);
+      const eventId = '22222222-2222-4222-8222-222222222222';
+      const memoryId = '77777777-7777-4777-8777-777777777777';
+
+      findUniqueMemory.mockResolvedValue({
+        id: memoryId,
+        picture: `/api/events/${eventId}/memories/${memoryId}/image`,
+        eventId,
+        event: {
+          group: {
+            users: [{ userId }],
+          },
+        },
+      });
+
+      const result = await controller.getMemory(eventId, memoryId, authenticatedRequest);
+
+      expect(result).toEqual({
+        id: memoryId,
+        picture: `/api/events/${eventId}/memories/${memoryId}/image`,
+        eventId,
+      });
+
+      expect(findUniqueMemory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: memoryId,
+            eventId: eventId,
+          },
+          select: expect.any(Object),
+        })
+      );
+    });
+
+    it('maps a missing memory to NotFoundException', async () => {
+      const controller = moduleFixture.get(EventController);
+      const eventId = '22222222-2222-4222-8222-222222222222';
+      const memoryId = '99999999-9999-4999-8999-999999999999';
+
+      findUniqueMemory.mockResolvedValue(null);
+
+      await expect(
+        controller.getMemory(eventId, memoryId, authenticatedRequest)
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });
