@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EventRepository } from '../domain/event.repository';
 import { EventNotFoundError } from './get-event.use-case';
-import { ObjectStorage, StoredObject } from 'src/shared/storage/object-storage';
+import { ObjectStorage, StoredObject } from '../../../../src/shared/storage/object-storage';
 import { EventImageAccessDeniedError } from './get-event-image.use-case';
 
 export class MemoryImageNotFoundError extends Error {}

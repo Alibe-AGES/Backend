@@ -2,10 +2,10 @@ import { EventImageAccessDeniedError } from '../../../../src/modules/events/appl
 import {
   GetMemoryImageUseCase,
   MemoryImageNotFoundError,
-} from 'src/modules/events/application/get-memory-image.use-case';
+} from '../../../../src/modules/events/application/get-memory-image.use-case';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
-import { EventNotFoundError } from 'src/modules/events/application/update-event.use-case';
+import { EventNotFoundError } from '../../../../src/modules/events/application/update-event.use-case';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
