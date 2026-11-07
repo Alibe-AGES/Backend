@@ -34,6 +34,7 @@ import {
   GetMemoryUseCase,
   MemoryNotFoundError,
 } from '../../../../src/modules/events/application/get-memory.use-case';
+import { GetMemoryImageUseCase } from 'src/modules/events/application/get-memory-image.use-case';
 
 describe('EventController', () => {
   let controller: EventController;
@@ -43,6 +44,7 @@ describe('EventController', () => {
   let getEventUseCaseMock: { execute: jest.Mock };
   let getMemoriesUseCaseMock: { execute: jest.Mock };
   let getMemoryUseCaseMock: { execute: jest.Mock };
+  let getMemoryImageUseCaseMock: { execute: jest.Mock };
 
   const eventId = '22222222-2222-4222-8222-222222222222';
   const userId = '11111111-1111-4111-8111-111111111111';
@@ -58,6 +60,7 @@ describe('EventController', () => {
     getEventUseCaseMock = { execute: jest.fn() };
     getMemoriesUseCaseMock = { execute: jest.fn() };
     getMemoryUseCaseMock = { execute: jest.fn() };
+    getMemoryImageUseCaseMock = { execute: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EventController],
@@ -69,6 +72,7 @@ describe('EventController', () => {
         { provide: GetEventImageUseCase, useValue: { execute: jest.fn() } },
         { provide: GetEventMemoriesUseCase, useValue: getMemoriesUseCaseMock },
         { provide: GetMemoryUseCase, useValue: getMemoryUseCaseMock },
+        { provide: GetMemoryImageUseCase, useValue: getMemoryImageUseCaseMock },
       ],
     }).compile();
 
@@ -450,6 +454,15 @@ describe('EventController', () => {
       await expect(
         controller.getMemory(eventId, memoryId, authenticatedRequest)
       ).rejects.toBeInstanceOf(exception);
+    });
+  });
+
+  describe('getMemoryImage', () => {
+    it('rejects a request without an authenticated user', async () => {
+      await expect(
+        controller.getMemoryImage(eventId, memoryId, {} as AuthenticatedRequest)
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(getMemoryImageUseCaseMock.execute).not.toHaveBeenCalled();
     });
   });
 });

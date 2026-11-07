@@ -12,6 +12,8 @@ import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/aut
 import { AttendanceReminderScheduler } from '../../../../src/modules/events/scheduling/attendance-reminder.scheduler';
 import { SendAttendanceRemindersUseCase } from '../../../../src/modules/events/application/send-attendance-reminders.use-case';
 import { DistributedTaskLock } from '../../../../src/shared/scheduling/distributed-task-lock';
+import { StreamableFile } from '@nestjs/common';
+import { GetMemoryImageUseCase } from 'src/modules/events/application/get-memory-image.use-case';
 
 const groupId = '33333333-3333-4333-8333-333333333333';
 const userId = '11111111-1111-4111-8111-111111111111';
@@ -312,6 +314,33 @@ describe('EventsModule integration', () => {
       await expect(
         controller.getMemory(eventId, memoryId, authenticatedRequest)
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('EventController - getMemoryImage', () => {
+    it('returns a StreamableFile when event, image exist and user has access', async () => {
+      const controller = moduleFixture.get(EventController);
+      const getMemoryImageUseCase = moduleFixture.get(GetMemoryImageUseCase);
+
+      const eventId = '22222222-2222-4222-8222-222222222222';
+      const memoryId = '11111111-1111-4111-8111-222222222222';
+      const userId = '33333333-3333-4333-8333-333333333333';
+
+      const authenticatedRequest = {
+        user: { id: userId },
+      } as AuthenticatedRequest;
+
+      const mockImageResult = {
+        bytes: Buffer.from('fake-image'),
+        contentType: 'image/jpeg',
+      };
+
+      jest.spyOn(getMemoryImageUseCase, 'execute').mockResolvedValue(mockImageResult);
+
+      const result = await controller.getMemoryImage(eventId, memoryId, authenticatedRequest);
+
+      expect(result).toBeInstanceOf(StreamableFile);
+      expect(getMemoryImageUseCase.execute).toHaveBeenCalledWith(eventId, memoryId, userId);
     });
   });
 });
