@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import {
-  type EventDetails,
-  EventMemories,
   EventMemoryDetails,
   EventRepository,
 } from '../domain/event.repository';

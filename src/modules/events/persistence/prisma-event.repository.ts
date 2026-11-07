@@ -449,10 +449,12 @@ export class PrismaEventRepository extends EventRepository {
       return null;
     }
 
-    const { event, ...memoryDetails } = memory;
-
     return {
-      memory: memoryDetails,
+      memory: {
+        id: memory.id,
+        picture: memory.picture,
+        eventId: memory.eventId,
+      },
       userIsMember: memory.event.group.users.length > 0,
     };
   }
