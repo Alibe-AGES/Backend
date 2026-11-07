@@ -30,7 +30,7 @@ import { UpdateEventDto } from '../../../../src/modules/events/http/dto/update-e
 import { EventController } from '../../../../src/modules/events/http/event.controller';
 import { GetEventMemoriesUseCase } from '../../../../src/modules/events/application/get-event-memories.use-case';
 import { CreateMemoryUseCase } from '../../../../src/modules/events/application/create-memory.use-case';
-import { GetMemoryImageUseCase } from 'src/modules/events/application/get-memory-image.use-case';
+import { GetMemoryImageUseCase } from '../../../../src/modules/events/application/get-memory-image.use-case';
 
 describe('EventController', () => {
   let controller: EventController;

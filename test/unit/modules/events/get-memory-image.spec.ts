@@ -5,7 +5,7 @@ import {
 } from '../../../../src/modules/events/application/get-memory-image.use-case';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
-import { EventNotFoundError } from '../../../../src/modules/events/application/update-event.use-case';
+import { EventNotFoundError } from 'src/modules/events/application/update-event.use-case';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -42,15 +42,30 @@ describe('GetMemoryImageUseCase', () => {
     expect(storage.findByKey).toHaveBeenCalledWith(IMAGE_KEY);
   });
 
-  it('reports an event that does not exist', async () => {
-    events.findMemoryImageAccess.mockResolvedValue(null);
+  it('throws EventImageAccessDeniedError when user is not a member', async () => {
+    events.findMemoryImageAccess.mockResolvedValue({
+      imageKey: 'some-key',
+      userIsMember: false,
+    });
 
     await expect(useCase.execute(EVENT_ID, MEMORY_ID, USER_ID)).rejects.toBeInstanceOf(
-      EventNotFoundError
+      EventImageAccessDeniedError
     );
     expect(storage.findByKey).not.toHaveBeenCalled();
   });
 
+  it('throws MemoryImageNotFoundError when image key is missing', async () => {
+    events.findMemoryImageAccess.mockResolvedValue({
+      imageKey: '', 
+      userIsMember: true,
+    });
+
+    await expect(useCase.execute(EVENT_ID, MEMORY_ID, USER_ID)).rejects.toBeInstanceOf(
+      MemoryImageNotFoundError
+    );
+    expect(storage.findByKey).not.toHaveBeenCalled();
+  });
+  
   it('denies a user who does not belong to the event group', async () => {
     events.findMemoryImageAccess.mockResolvedValue({ imageKey: IMAGE_KEY, userIsMember: false });
 
