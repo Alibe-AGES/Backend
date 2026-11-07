@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  EventMemoryDetails,
-  EventRepository,
-} from '../domain/event.repository';
+import { EventMemoryDetails, EventRepository } from '../domain/event.repository';
 import { EventDetailsAccessDeniedError } from './get-event.use-case';
 
 export class MemoryNotFoundError extends Error {}
