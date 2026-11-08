@@ -9,6 +9,15 @@ Parameters:
     Type: String
     Default: Alibe-AGES
 
+  # IDs numericos do GitHub (nao mudam): gh api orgs/Alibe-AGES -q .id e gh api repos/Alibe-AGES/Backend -q .id
+  GitHubOrganizationId:
+    Type: String
+    Default: '314500127'
+
+  BackendRepositoryId:
+    Type: String
+    Default: '1330432961'
+
   CreateGitHubOidcProvider:
     Type: String
     Default: 'true'
@@ -46,7 +55,11 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubOrganization}/Backend:ref:refs/heads/main'
+                # O GitHub manda o "sub" em um de dois formatos: so com nomes, ou com nomes e IDs
+                # (formato imutavel, padrao desde 2026). Os dois apontam para Backend na branch main.
+                token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubOrganization}/Backend:ref:refs/heads/main'
+                  - !Sub 'repo:${GitHubOrganization}@${GitHubOrganizationId}/Backend@${BackendRepositoryId}:ref:refs/heads/main'
       Policies:
         - PolicyName: RunDeployOnEc2
           PolicyDocument:
