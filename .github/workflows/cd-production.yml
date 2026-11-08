@@ -1,0 +1,147 @@
+name: CD Production
+
+# Merge na main -> "Pull Request Quality Checks" passa -> dois jobs em paralelo:
+#   deploy: pede a EC2 (via SSM, sem SSH) que rode /home/ec2-user/deploy.sh com o commit novo.
+#           O deploy.sh fica na EC2.
+#   lambda: se o submodulo services/notification-service aponta para um commit diferente do
+#           que a Lambda roda hoje, builda esse commit, envia ao ECR e atualiza a Lambda.
+#
+# Secrets (Settings -> Secrets and variables -> Actions -> Secrets):
+#   AWS_ROLE_ARN     output BackendDeployRoleArn da stack alibe-prod-cicd (05-cicd.yml)
+#   EC2_INSTANCE_ID  ID da instancia EC2 (i-...), em EC2 -> Instancias
+#
+# Voltar uma versao: Actions -> CD Production -> Run workflow, informando um commit anterior.
+
+on:
+  workflow_run:
+    workflows: ['Pull Request Quality Checks']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit da main a implantar (vazio = ultimo commit da main)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write # login na AWS sem chave (OIDC)
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # So depois de push na main com os testes verdes (PR de fork nunca dispara deploy).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Login na AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Rodar o deploy na EC2
+        env:
+          INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+          SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          # Aceita so um hash de commit (evita injetar comandos pelo campo do Run workflow).
+          [[ "$SHA" =~ ^[0-9a-f]{7,40}$ ]] || { echo "SHA invalido: $SHA"; exit 1; }
+
+          command_id=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "backend ${SHA:0:12}" \
+            --parameters "{\"commands\":[\"SHA=$SHA sh /home/ec2-user/deploy.sh\"],\"executionTimeout\":[\"1800\"]}" \
+            --query 'Command.CommandId' --output text)
+
+          # Espera o deploy terminar (no maximo 30 min).
+          status=Pending
+          for _ in $(seq 1 360); do
+            sleep 5
+            status=$(aws ssm get-command-invocation --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)
+            case "$status" in Pending|InProgress|Delayed) continue ;; *) break ;; esac
+          done
+
+          # Mostra aqui o que o deploy.sh imprimiu na EC2.
+          aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text
+          echo "Status: $status"
+          [ "$status" = Success ]
+
+  lambda:
+    # A Lambda roda o commit do submodulo services/notification-service. Para atualizar a Lambda,
+    # aponte o submodulo para o commit novo do Notification_Service e faca merge na main.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FUNCTION_NAME: alibe-prod-notification
+      REPOSITORY: alibe/notification-service
+
+    steps:
+      - name: Baixar o codigo com o submodulo
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
+          submodules: true
+
+      - name: Ler o commit do submodulo
+        id: sub
+        run: echo "sha=$(git rev-parse HEAD:services/notification-service)" >> "$GITHUB_OUTPUT"
+
+      - name: Login na AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Login no ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ver se a Lambda ja esta nesse commit
+        id: current
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/alibe/notification-service:${{ steps.sub.outputs.sha }}
+        run: |
+          current=$(aws lambda get-function --function-name "$FUNCTION_NAME" --query 'Code.ImageUri' --output text)
+          echo "Lambda hoje: $current"
+          echo "Submodulo:   $IMAGE"
+          if [ "$current" = "$IMAGE" ]; then echo "same=true" >> "$GITHUB_OUTPUT"; else echo "same=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Build e envio da imagem (x86_64)
+        if: steps.current.outputs.same != 'true'
+        env:
+          TAG: ${{ steps.sub.outputs.sha }}
+          IMAGE: ${{ steps.ecr.outputs.registry }}/alibe/notification-service:${{ steps.sub.outputs.sha }}
+        run: |
+          # As tags do ECR nao podem ser sobrescritas: se a imagem desse commit ja existe, reaproveita.
+          if aws ecr describe-images --repository-name "$REPOSITORY" --image-ids imageTag="$TAG" >/dev/null 2>&1; then
+            echo "Imagem $TAG ja existe no ECR."
+            exit 0
+          fi
+          # --provenance=false: a Lambda nao aceita os metadados extras que o buildx anexaria.
+          docker buildx build --platform linux/amd64 --provenance=false \
+            --build-arg TARGETOS=linux --build-arg TARGETARCH=amd64 \
+            -t "$IMAGE" --push services/notification-service
+
+      - name: Atualizar a Lambda
+        if: steps.current.outputs.same != 'true'
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/alibe/notification-service:${{ steps.sub.outputs.sha }}
+        run: |
+          aws lambda update-function-code --function-name "$FUNCTION_NAME" --image-uri "$IMAGE" >/dev/null
+          aws lambda wait function-updated-v2 --function-name "$FUNCTION_NAME"
+          echo "Lambda atualizada para $IMAGE"

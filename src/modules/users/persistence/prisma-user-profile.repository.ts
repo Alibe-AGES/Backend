@@ -50,4 +50,29 @@ export class PrismaUserProfileRepository extends UserProfileRepository {
 
     return { ...user, completedEvents, eventsInDecision };
   }
+
+  async updateExpoPushToken(userId: string, token: string): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.user.updateMany({
+        where: {
+          expoPushToken: token,
+          id: { not: userId },
+        },
+        data: { expoPushToken: null },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { expoPushToken: token },
+      }),
+    ]);
+  }
+
+  async findExpoPushToken(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { expoPushToken: true },
+    });
+
+    return user?.expoPushToken ?? null;
+  }
 }

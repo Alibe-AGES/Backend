@@ -7,6 +7,11 @@ import { CreateAvailabilityUseCase } from '../../../../src/modules/availability/
 const groupId = '8549aded-7ca6-45bf-b96c-a8ddc49c95f0';
 const userId = '11111111-1111-4111-8111-111111111111';
 
+const futureDate = new Date();
+futureDate.setDate(futureDate.getDate() + 30);
+const dateString = futureDate.toISOString().split('T')[0];
+const expectedDateUTC = new Date(`${dateString}T00:00:00.000Z`);
+
 describe('AvailabilityModule integration', () => {
   let moduleFixture: TestingModule;
 
@@ -75,9 +80,26 @@ describe('AvailabilityModule integration', () => {
   });
 
   beforeEach(() => {
+    jest.useFakeTimers({
+      now: new Date('2026-10-10T12:00:00.000Z'),
+      doNotFake: [
+        'nextTick',
+        'setImmediate',
+        'clearImmediate',
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'queueMicrotask',
+      ],
+    });
     rows.clear();
     jest.clearAllMocks();
     prisma.group.findUnique.mockResolvedValue({ users: [{ userId }] });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('connects controller, use case and Prisma repository for creation with multiple timeslots', async () => {
@@ -85,7 +107,7 @@ describe('AvailabilityModule integration', () => {
 
     const dto = {
       userId,
-      date: '2026-10-15',
+      date: dateString,
       intervals: [
         {
           startTime: '15:00',
@@ -112,9 +134,9 @@ describe('AvailabilityModule integration', () => {
       data: {
         group: { connect: { id: groupId } },
         user: { connect: { id: userId } },
-        date: new Date('2026-10-15T00:00:00.000Z'),
-        timeslotStart: new Date('2026-10-15T15:00:00.000Z'),
-        timeslotEnd: new Date('2026-10-15T16:00:00.000Z'),
+        date: expectedDateUTC,
+        timeslotStart: new Date(`${dateString}T15:00:00.000Z`),
+        timeslotEnd: new Date(`${dateString}T16:00:00.000Z`),
       },
     });
 
@@ -122,9 +144,9 @@ describe('AvailabilityModule integration', () => {
       data: {
         group: { connect: { id: groupId } },
         user: { connect: { id: userId } },
-        date: new Date('2026-10-15T00:00:00.000Z'),
-        timeslotStart: new Date('2026-10-15T18:00:00.000Z'),
-        timeslotEnd: new Date('2026-10-15T20:00:00.000Z'),
+        date: expectedDateUTC,
+        timeslotStart: new Date(`${dateString}T18:00:00.000Z`),
+        timeslotEnd: new Date(`${dateString}T20:00:00.000Z`),
       },
     });
 
@@ -148,14 +170,14 @@ describe('AvailabilityModule integration', () => {
     const created = await createAvailabilityUseCase.create({
       groupId,
       userId,
-      date: '2026-10-15',
+      date: dateString,
     });
 
     expect(created).toEqual([
       expect.objectContaining({
         groupId,
         userId,
-        date: new Date('2026-10-15T00:00:00.000Z'),
+        date: expectedDateUTC,
         timeslotStart: null,
         timeslotEnd: null,
       }),
@@ -167,7 +189,7 @@ describe('AvailabilityModule integration', () => {
       data: {
         group: { connect: { id: groupId } },
         user: { connect: { id: userId } },
-        date: new Date('2026-10-15T00:00:00.000Z'),
+        date: expectedDateUTC,
         timeslotStart: null,
         timeslotEnd: null,
       },

@@ -4,6 +4,11 @@ type NodeResponse = {
   statusCode: number;
 };
 
+process.env.AWS_REGION ??= 'us-east-2';
+process.env.AWS_SQS_NOTIFICATION_QUEUE_URL ??=
+  'http://localhost:4566/000000000000/alibe-test-notifications';
+process.env.ENABLE_NOTIFICATION_TEST_ENDPOINT ??= 'true';
+
 type NodeRequest = {
   method?: string;
   url?: string;
@@ -207,6 +212,18 @@ jest.mock('better-auth/node', () => ({
           },
         })
       );
+      return;
+    }
+
+    if (request.method === 'POST' && path?.endsWith('/sign-out')) {
+      response.statusCode = 200;
+      response.setHeader('Cache-Control', 'no-store');
+      response.setHeader('Content-type', 'application/json');
+      response.setHeader(
+        'Set-Cookie',
+        'better-auth.session_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+      );
+      response.end(JSON.stringify({ success: true }));
       return;
     }
 

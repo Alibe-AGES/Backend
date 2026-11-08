@@ -62,16 +62,33 @@ export interface CreateEventData {
   ownerId: string;
   name: string;
   timeslot: Date;
-  location: {
-    description: string;
-    manuallyCreated: boolean;
-  };
+  location:
+    | { kind: 'existing'; id: string }
+    | { kind: 'new'; id: string; address: string; image: string | null };
   image: string | null;
   budgetStart: string | null;
   budgetEnd: string | null;
   status: EventStatus;
   ownerAnswer: ProposalAnswer;
   createdAt: Date;
+  notification: {
+    type: 'createdEvent';
+    message: string;
+    createdAt: Date;
+  };
+}
+
+export interface CreateMemoryData {
+  id: string;
+  eventId: string;
+  picture: string;
+}
+
+export interface EventCreationLocation {
+  id: string;
+  image: string | null;
+  priceStart: string | null;
+  priceEnd: string | null;
 }
 
 export interface CreatedEvent {
@@ -79,9 +96,24 @@ export interface CreatedEvent {
   ownerResponse: EventProposalResponse;
 }
 
+export type CreateLocatedEventData = Omit<CreateEventData, 'location' | 'notification'> & {
+  locationId: string;
+};
+
 export interface EventImageAccess {
   imageKey: string | null;
   userIsMember: boolean;
+}
+
+export interface EventMemories {
+  memories: EventMemoryDetails[];
+  userIsMember: boolean;
+}
+
+export interface EventMemoryDetails {
+  id: string;
+  picture: string;
+  eventId: string;
 }
 
 export abstract class EventRepository {
@@ -89,6 +121,8 @@ export abstract class EventRepository {
 
   /** Retorna null quando o grupo não existe. */
   abstract findGroupMembership(groupId: string, userId: string): Promise<boolean | null>;
+
+  abstract findLocationById(id: string): Promise<EventCreationLocation | null>;
 
   /** Cria location, evento, proposta e resposta do criador de forma atômica. */
   abstract create(data: CreateEventData): Promise<CreatedEvent>;
@@ -98,4 +132,8 @@ export abstract class EventRepository {
   abstract findEventDetails(eventId: string, userId: string): Promise<EventDetailsAccess | null>;
 
   abstract findImageAccess(eventId: string, userId: string): Promise<EventImageAccess | null>;
+
+  abstract findMemories(eventId: string, userId: string): Promise<EventMemories | null>;
+
+  abstract createMemory(data: CreateMemoryData): Promise<EventMemoryDetails | null>;
 }

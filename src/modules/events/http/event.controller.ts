@@ -48,6 +48,7 @@ import {
   CreateEventUseCase,
   EventGroupAccessDeniedError,
   EventGroupNotFoundError,
+  EventLocationNotFoundError,
   InvalidEventCreationError,
 } from '../application/create-event.use-case';
 import {
@@ -67,6 +68,16 @@ import {
   EventNotFoundError as GetEventNotFoundError,
   GetEventUseCase,
 } from '../application/get-event.use-case';
+import { EventMemoriesResponseDto } from './dto/event-memories.dto';
+import {
+  EventMemoriesAccessDeniedError,
+  GetEventMemoriesUseCase,
+} from '../application/get-event-memories.use-case';
+import { CreateMemoryDto } from './dto/create-memory.dto';
+import {
+  CreateMemoryUseCase,
+  InvalidMemoryCreationError,
+} from '../application/create-memory.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -79,7 +90,9 @@ export class EventController {
     private readonly getEventUseCase: GetEventUseCase,
     private readonly getEventImageUseCase: GetEventImageUseCase,
     private readonly updateEventUseCase: UpdateEventUseCase,
-    private readonly createEventUseCase: CreateEventUseCase
+    private readonly createEventUseCase: CreateEventUseCase,
+    private readonly getMemoriesUseCase: GetEventMemoriesUseCase,
+    private readonly createMemoryUseCase: CreateMemoryUseCase
   ) {}
 
   @Post('groups/:groupId/events')
@@ -91,12 +104,18 @@ export class EventController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['name', 'date', 'time', 'location'],
+      required: ['name', 'date', 'time'],
       properties: {
         name: { type: 'string', example: 'Jantar de aniversário' },
         date: { type: 'string', format: 'date', example: '2026-10-15' },
         time: { type: 'string', example: '20:00' },
         location: { type: 'string', example: 'Rua dos Andradas, 1234, Porto Alegre' },
+        locationId: {
+          type: 'string',
+          format: 'uuid',
+          nullable: true,
+          description: 'Location salva que será reutilizada no evento.',
+        },
         image: { type: 'string', format: 'binary' },
         budgetStart: { type: 'string', example: '50.00' },
         budgetEnd: { type: 'string', example: '120.00' },
@@ -104,7 +123,9 @@ export class EventController {
     },
   })
   @ApiCreatedResponse({ type: CreatedEventResponseDto })
-  @ApiBadRequestResponse({ description: 'Nome, dia, horário e endereço são obrigatórios.' })
+  @ApiBadRequestResponse({
+    description: 'Nome, dia, horário e locationId ou endereço são obrigatórios.',
+  })
   @ApiPayloadTooLargeResponse({ description: 'A imagem ultrapassa o limite de 5 MB.' })
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
   @ApiForbiddenResponse({ description: 'O usuário não pertence a este grupo.' })
@@ -139,7 +160,7 @@ export class EventController {
         throw new BadRequestException(error.message);
       }
 
-      if (error instanceof EventGroupNotFoundError) {
+      if (error instanceof EventGroupNotFoundError || error instanceof EventLocationNotFoundError) {
         throw new NotFoundException(error.message);
       }
 
@@ -303,6 +324,71 @@ export class EventController {
     }
   }
 
+  @Post('api/events/:eventId/memories')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } }))
+  @ApiOperation({ summary: 'Cria uma memória relacionada a um evento existente' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
+  @ApiConsumes('multipart/form-data', 'application/json')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['image'],
+      properties: {
+        image: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiCreatedResponse({ type: CreateMemoryDto })
+  @ApiBadRequestResponse({
+    description: 'Uma imagem é obrigatória',
+  })
+  @ApiPayloadTooLargeResponse({ description: 'A imagem ultrapassa o limite de 5 MB.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence a este grupo.' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado.' })
+  async createMemory(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @UploadedFile() image: Express.Multer.File | undefined,
+    @Request() request: AuthenticatedRequest
+  ): Promise<CreateMemoryDto> {
+    if (image == null) {
+      throw new BadRequestException('É necessária uma imagem para essa operação.');
+    }
+    const userId = request.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    try {
+      const created = await this.createMemoryUseCase.execute(
+        {
+          eventId,
+          image: image && {
+            originalName: image.originalname,
+            contentType: image.mimetype,
+            bytes: image.buffer,
+          },
+        },
+        userId
+      );
+
+      return created;
+    } catch (error) {
+      if (error instanceof InvalidMemoryCreationError) {
+        throw new BadRequestException(error.message);
+      }
+      if (error instanceof GetEventNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      if (error instanceof EventDetailsAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+      throw error;
+    }
+  }
+
   private toDetailsResponse(event: EventDetails): EventDetailsResponseDto {
     return {
       id: event.id,
@@ -386,5 +472,40 @@ export class EventController {
       createdAt: event.createdAt,
       updatedAt: event.updatedAt,
     };
+  }
+
+  @Get('api/events/:eventId/memories')
+  @ApiOperation({ summary: 'Consulta todas as memórias de um evento' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
+  @ApiOkResponse({ type: EventMemoriesResponseDto })
+  @ApiBadRequestResponse({ description: 'Identificador do evento inválido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar o evento.' })
+  async getMemories(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<EventMemoriesResponseDto[]> {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    try {
+      const memories = await this.getMemoriesUseCase.execute(eventId, userId);
+      return memories;
+    } catch (error) {
+      if (error instanceof GetEventNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      if (error instanceof EventMemoriesAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+
+      throw error;
+    }
   }
 }

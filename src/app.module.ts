@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_PIPE } from '@nestjs/core';
 import { ZodValidationPipe } from 'nestjs-zod';
+import { HealthModule } from './infrastructure/health/health.module';
 import { MonitoringModule } from './infrastructure/monitoring/monitoring.module';
 import { ExampleModule } from './modules/example/example.module';
 import { GroupsModule } from './modules/groups/groups.module';
@@ -10,18 +11,23 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { EventsModule } from './modules/events/events.module';
 import { ProposalsModule } from './modules/proposals/proposals.module';
+import { LocationsModule } from './modules/locations/locations.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     AuthModule,
     ExampleModule,
     MonitoringModule,
+    HealthModule,
     GroupsModule,
     CalendarModule,
     AvailabilityModule,
     UsersModule,
     EventsModule,
     ProposalsModule,
+    LocationsModule,
   ],
   providers: [
     {

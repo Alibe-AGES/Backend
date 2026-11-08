@@ -384,6 +384,7 @@ describe('PrismaEventRepository', () => {
         },
         proposal: { create: jest.fn().mockResolvedValue({ id: baseRecord.proposals[0].id }) },
         proposalResponse: { create: jest.fn().mockResolvedValue(ownerResponse) },
+        groupNotification: { create: jest.fn().mockResolvedValue({ id: 'notification-id' }) },
       };
       const $transaction = jest.fn((callback: (tx: typeof transaction) => unknown) =>
         callback(transaction)
@@ -396,18 +397,34 @@ describe('PrismaEventRepository', () => {
         ownerId: 'owner-id',
         name: 'Event',
         timeslot: baseRecord.timeslot,
-        location: { description: 'Location', manuallyCreated: true },
+        location: {
+          kind: 'new',
+          id: baseRecord.location.id,
+          address: 'Location',
+          image: null,
+        },
         image: null,
         budgetStart: '50.00',
         budgetEnd: null,
         status: 'pending',
         ownerAnswer: 'yes',
         createdAt,
+        notification: {
+          type: 'createdEvent',
+          message: 'O evento "Event" foi criado para o dia 15/10/2026.',
+          createdAt,
+        },
       });
 
       expect($transaction).toHaveBeenCalledTimes(1);
       expect(transaction.location.create).toHaveBeenCalledWith({
-        data: { description: 'Location', manuallyCreated: true },
+        data: {
+          id: baseRecord.location.id,
+          description: 'Location',
+          address: 'Location',
+          image: null,
+          manuallyCreated: true,
+        },
         select: { id: true },
       });
       expect(transaction.event.create).toHaveBeenCalledWith({
@@ -420,7 +437,7 @@ describe('PrismaEventRepository', () => {
         select: { id: true },
       });
       expect(transaction.proposal.create).toHaveBeenCalledWith({
-        data: { eventId, ownerId: 'owner-id', createdAt },
+        data: { eventId, groupId: baseRecord.groupId, ownerId: 'owner-id', createdAt },
         select: { id: true },
       });
       expect(transaction.proposalResponse.create).toHaveBeenCalledWith({
@@ -431,6 +448,16 @@ describe('PrismaEventRepository', () => {
           createdAt,
         },
         select: { id: true, userId: true, answer: true },
+      });
+      expect(transaction.groupNotification.create).toHaveBeenCalledWith({
+        data: {
+          type: 'createdEvent',
+          message: 'O evento "Event" foi criado para o dia 15/10/2026.',
+          createdAt,
+          groupId: baseRecord.groupId,
+          eventId,
+        },
+        select: { id: true },
       });
       expect(result.event).toMatchObject({ id: eventId, budgetStart: '50.00' });
       expect(result.ownerResponse).toEqual(ownerResponse);
@@ -453,6 +480,126 @@ describe('PrismaEventRepository', () => {
       expect(findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: baseRecord.groupId } })
       );
+    });
+  });
+
+  describe('findMemories', () => {
+    const memoryRow = {
+      id: '77777777-7777-4777-8777-777777777777',
+      picture: `events/${eventId}/memories/memory-1.jpg`,
+      eventId,
+    };
+
+    it('returns memories and true membership for a member user', async () => {
+      const userId = authenticatedRequest.user.id;
+      const findUnique = jest.fn().mockResolvedValue({
+        id: eventId,
+        group: { users: [{ userId }] },
+        memories: [memoryRow],
+      });
+      const prisma = { event: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      await expect(repository.findMemories(eventId, userId)).resolves.toEqual({
+        memories: [memoryRow],
+        userIsMember: true,
+      });
+
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id: eventId },
+        include: {
+          group: {
+            select: {
+              users: {
+                where: { userId },
+                select: { userId: true },
+                take: 1,
+              },
+            },
+          },
+          memories: true,
+        },
+      });
+    });
+
+    it('returns memories and false membership for a user outside the group', async () => {
+      const findUnique = jest.fn().mockResolvedValue({
+        id: eventId,
+        group: { users: [] },
+        memories: [memoryRow],
+      });
+      const prisma = { event: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      const result = await repository.findMemories(eventId, 'outside-user');
+
+      expect(result).toEqual({
+        memories: [memoryRow],
+        userIsMember: false,
+      });
+    });
+
+    it('returns null when the event does not exist', async () => {
+      const findUnique = jest.fn().mockResolvedValue(null);
+      const prisma = { event: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      await expect(
+        repository.findMemories(
+          '550e8400-e29b-41d4-a716-446655440000',
+          authenticatedRequest.user.id
+        )
+      ).resolves.toBeNull();
+    });
+  });
+
+  describe('createMemory', () => {
+    const memoryData = {
+      id: '77777777-7777-4777-8777-777777777777',
+      eventId,
+      picture: `events/${eventId}/memories/memory-1.jpg`,
+    };
+
+    const dbMemoryRow = {
+      id: memoryData.id,
+      eventId: memoryData.eventId,
+      picture: memoryData.picture,
+    };
+
+    it('successfully creates and maps a memory record', async () => {
+      const memoryCreate = jest.fn().mockResolvedValue(dbMemoryRow);
+      const prisma = {
+        memory: { create: memoryCreate },
+      } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      const result = await repository.createMemory(memoryData);
+
+      expect(memoryCreate).toHaveBeenCalledWith({
+        data: {
+          id: memoryData.id,
+          eventId: memoryData.eventId,
+          picture: memoryData.picture,
+        },
+      });
+      expect(result).toEqual({
+        id: memoryData.id,
+        picture: memoryData.picture,
+        eventId: memoryData.eventId,
+      });
+    });
+
+    it('returns null if the memory creation returns null', async () => {
+      const memoryCreate = jest.fn().mockResolvedValue(null);
+      const prisma = {
+        memory: { create: memoryCreate },
+      } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      const result = await repository.createMemory(memoryData);
+
+      expect(memoryCreate).toHaveBeenCalledTimes(1);
+      expect(result).toBeNull();
     });
   });
 });

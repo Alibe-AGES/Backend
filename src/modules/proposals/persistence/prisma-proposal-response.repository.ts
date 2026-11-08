@@ -5,9 +5,12 @@ import { ProposalResponse, type UserProposalAnswer } from '../domain/proposal-re
 import {
   type CreateProposalResponseData,
   type EventProposalContext,
+  type ProposalAnswerResult,
+  type ProposalContext,
   ProposalResponseAlreadyExistsError,
   ProposalResponseRepository,
 } from '../domain/proposal-response.repository';
+import { lockProposal, registerMatchIfComplete } from './proposal-match.transaction';
 
 const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 const RECORD_NOT_FOUND = 'P2025';
@@ -40,10 +43,25 @@ export class PrismaProposalResponseRepository extends ProposalResponseRepository
     };
   }
 
-  async create(data: CreateProposalResponseData): Promise<ProposalResponse> {
+  async findProposalContext(proposalId: string, userId: string): Promise<ProposalContext | null> {
+    const proposal = await this.prisma.proposal.findUnique({
+      where: { id: proposalId },
+      select: {
+        group: { select: { users: { where: { userId }, select: { userId: true }, take: 1 } } },
+      },
+    });
+
+    return proposal ? { isGroupMember: proposal.group.users.length > 0 } : null;
+  }
+
+  async create(data: CreateProposalResponseData): Promise<ProposalAnswerResult> {
     try {
-      const record = await this.prisma.proposalResponse.create({ data });
-      return new ProposalResponse(record);
+      return await this.prisma.$transaction(async (transaction) => {
+        await lockProposal(transaction, data.proposalId);
+        const record = await transaction.proposalResponse.create({ data });
+        const matched = await registerMatchIfComplete(transaction, data.proposalId, data.createdAt);
+        return { response: new ProposalResponse(record), matched };
+      });
     } catch (error) {
       if (isPrismaError(error, UNIQUE_CONSTRAINT_VIOLATION)) {
         throw new ProposalResponseAlreadyExistsError('O usuário já respondeu esta proposta');
@@ -55,14 +73,19 @@ export class PrismaProposalResponseRepository extends ProposalResponseRepository
   async updateAnswer(
     proposalId: string,
     userId: string,
-    answer: UserProposalAnswer
-  ): Promise<ProposalResponse | null> {
+    answer: UserProposalAnswer,
+    answeredAt: Date
+  ): Promise<ProposalAnswerResult | null> {
     try {
-      const record = await this.prisma.proposalResponse.update({
-        where: { proposalId_userId: { proposalId, userId } },
-        data: { answer },
+      return await this.prisma.$transaction(async (transaction) => {
+        await lockProposal(transaction, proposalId);
+        const record = await transaction.proposalResponse.update({
+          where: { proposalId_userId: { proposalId, userId } },
+          data: { answer },
+        });
+        const matched = await registerMatchIfComplete(transaction, proposalId, answeredAt);
+        return { response: new ProposalResponse(record), matched };
       });
-      return new ProposalResponse(record);
     } catch (error) {
       if (isPrismaError(error, RECORD_NOT_FOUND)) {
         return null;

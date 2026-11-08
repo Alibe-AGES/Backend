@@ -346,17 +346,17 @@ async function main() {
   const eventsData = [
     {
       name: 'Jantar da turma',
-      timeslot: new Date('2026-09-05T20:00:00'),
+      timeslot: new Date('2026-12-05T20:00:00'),
       budgetStart: '40.00',
       budgetEnd: '80.00',
-      status: StatusEnum.confirmed,
+      status: StatusEnum.pending,
       createdAt: new Date('2026-08-10'),
       groupIndex: 0,
       locationIndex: 4,
     },
     {
       name: 'Sessão de cinema',
-      timeslot: new Date('2026-09-12T19:30:00'),
+      timeslot: new Date('2026-12-12T19:30:00'),
       budgetStart: '30.00',
       budgetEnd: '60.00',
       status: StatusEnum.pending,
@@ -366,10 +366,10 @@ async function main() {
     },
     {
       name: 'Piquenique no parque',
-      timeslot: new Date('2026-09-06T15:00:00'),
+      timeslot: new Date('2026-12-06T15:00:00'),
       budgetStart: '15.00',
       budgetEnd: '40.00',
-      status: StatusEnum.confirmed,
+      status: StatusEnum.pending,
       createdAt: new Date('2026-08-12'),
       groupIndex: 3,
       locationIndex: 2,
@@ -533,6 +533,7 @@ async function main() {
     const proposal = await prisma.proposal.create({
       data: {
         eventId: events[proposalData.eventIndex].id,
+        groupId: events[proposalData.eventIndex].groupId,
         ownerId: users[proposalData.ownerIndex].id,
         createdAt: new Date('2026-08-25'),
       },
@@ -799,6 +800,26 @@ async function main() {
       },
     });
   }
+
+  // ============================================================
+  // FEATURE FLAGS
+  // ============================================================
+  //
+  // Disabled by default so the team does not flood Google Places with budget requests.
+  //
+
+  console.log('Configurando feature flags...');
+
+  await prisma.featureFlag.upsert({
+    where: { key: 'google_places_budget' },
+    update: { enabled: false },
+    create: {
+      key: 'google_places_budget',
+      enabled: false,
+      description:
+        'Fetch the budget (price range) of places from Google Places; when disabled, mocked random values are used.',
+    },
+  });
 
   // ============================================================
   // FINALIZAÇÃO

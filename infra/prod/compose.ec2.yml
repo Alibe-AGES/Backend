@@ -1,0 +1,35 @@
+# Deploy inicial de producao da API diretamente na EC2, usado ate a migracao para K3s.
+# A API usa o RDS e o S3 reais. PostgreSQL local, MiniStack e Adminer nao fazem parte deste ambiente.
+# Prometheus e Grafana entram posteriormente como workloads do K3s, conforme a arquitetura do projeto.
+name: alibe-ec2
+
+services:
+  migrate:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: migration
+    image: alibe-backend:migrate
+    env_file:
+      - .env.production
+    restart: 'no'
+
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: production
+    image: alibe-backend:prod
+    env_file:
+      - .env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - '80:3000'
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'

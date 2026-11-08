@@ -13,6 +13,9 @@ export class GetAvailabilityUserResponseDto {
   })
   image!: string | null;
 
+  @ApiProperty({ example: true })
+  isCurrentUser!: boolean;
+
   @ApiProperty({ example: false })
   availableAllDay!: boolean;
 

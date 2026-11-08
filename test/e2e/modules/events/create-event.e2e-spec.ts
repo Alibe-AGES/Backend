@@ -9,9 +9,11 @@ import { EventRepository } from '../../../../src/modules/events/domain/event.rep
 import { ObjectStorage } from '../../../../src/shared/storage/object-storage';
 import { InMemoryEventRepository } from '../../../helpers/in-memory-event.repository';
 import { InMemoryObjectStorage } from '../../../helpers/in-memory-object.storage';
+import { GroupPushNotificationService } from '../../../../src/modules/events/application/group-push-notification.service';
 
 const GROUP_ID = '33333333-3333-4333-8333-333333333333';
 const OWNER_ID = '11111111-1111-4111-8111-111111111111';
+const LOCATION_ID = '44444444-4444-4444-8444-444444444444';
 const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 const validBody = {
@@ -42,6 +44,11 @@ describe('Create event endpoint (e2e)', () => {
       .useClass(InMemoryEventRepository)
       .overrideProvider(ObjectStorage)
       .useClass(InMemoryObjectStorage)
+      .overrideProvider(GroupPushNotificationService)
+      .useValue({
+        sendToGroup: jest.fn().mockResolvedValue({ attempted: 0, sent: 0, failed: 0 }),
+        sendToRecipients: jest.fn(),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -106,12 +113,38 @@ describe('Create event endpoint (e2e)', () => {
     expect(response.body.image).toBe(`/api/events/${response.body.id}/image`);
 
     const createdEvent = await events.findById(response.body.id);
-    expect(createdEvent?.image).toMatch(
-      new RegExp(`^events/${response.body.id}/images/[0-9a-f-]{36}\\.png$`, 'i')
-    );
+    expect(createdEvent?.image).toMatch(/^locations\/[0-9a-f-]{36}\/images\/[0-9a-f-]{36}\.png$/i);
     await expect(storage.findByKey(createdEvent?.image ?? '')).resolves.toEqual({
       bytes: PNG_BYTES,
       contentType: 'image/png',
+    });
+  });
+
+  it('creates an event from a saved Google location and inherits its data', async () => {
+    events.setLocation({
+      id: LOCATION_ID,
+      image: `locations/${LOCATION_ID}/images/place.png`,
+      priceStart: '30.00',
+      priceEnd: '70.00',
+      description: 'Local do Google',
+      manuallyCreated: false,
+    });
+
+    const response = await request(app.getHttpServer())
+      .post(`/groups/${GROUP_ID}/events`)
+      .send({
+        name: validBody.name,
+        date: validBody.date,
+        time: validBody.time,
+        locationId: LOCATION_ID,
+      })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      image: `/api/events/${response.body.id}/image`,
+      budgetStart: '30.00',
+      budgetEnd: '70.00',
+      location: { id: LOCATION_ID, manuallyCreated: false },
     });
   });
 
@@ -123,7 +156,7 @@ describe('Create event endpoint (e2e)', () => {
 
     expect(response.body).toEqual({
       statusCode: 400,
-      message: 'Nome, dia, horário e endereço são obrigatórios',
+      message: 'Nome, dia, horário e locationId ou endereço são obrigatórios',
       error: 'Bad Request',
     });
   });

@@ -28,6 +28,86 @@ describe('PrismaGroupRepository', () => {
     userGroupUpsert.mockReset();
   });
 
+  it('loads all members and preserves full-day records alongside unsorted UTC intervals', async () => {
+    const groupId = 'group-id';
+    const userId = 'current-user';
+    const date = '2000-02-29';
+    findUnique.mockResolvedValue({
+      users: [
+        { user: { id: 'no-records', name: 'Bruno', profilePic: null, availabilities: [] } },
+        {
+          user: {
+            id: userId,
+            name: 'Ana',
+            profilePic: 'key',
+            availabilities: [
+              { timeslotStart: null, timeslotEnd: null },
+              {
+                timeslotStart: new Date(`${date}T18:00:00.000Z`),
+                timeslotEnd: new Date(`${date}T23:59:00.000Z`),
+              },
+              {
+                timeslotStart: new Date(`${date}T00:05:00.000Z`),
+                timeslotEnd: new Date(`${date}T03:00:00.000Z`),
+              },
+            ],
+          },
+        },
+        {
+          user: {
+            id: 'full-day',
+            name: 'Camila',
+            profilePic: null,
+            availabilities: [{ timeslotStart: null, timeslotEnd: null }],
+          },
+        },
+      ],
+    });
+    await expect(repository.findAvailabilitiesByDate(groupId, date, userId)).resolves.toEqual({
+      date,
+      users: [
+        {
+          id: 'no-records',
+          name: 'Bruno',
+          profilePic: null,
+          availableAllDay: false,
+          intervals: [],
+        },
+        {
+          id: userId,
+          name: 'Ana',
+          profilePic: 'key',
+          availableAllDay: true,
+          intervals: [
+            ['18:00', '23:59'],
+            ['00:05', '03:00'],
+          ],
+        },
+        { id: 'full-day', name: 'Camila', profilePic: null, availableAllDay: true, intervals: [] },
+      ],
+    });
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: groupId, users: { some: { userId } } },
+      select: {
+        users: {
+          select: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profilePic: true,
+                availabilities: {
+                  where: { groupId, date: new Date(`${date}T00:00:00.000Z`) },
+                  select: { timeslotStart: true, timeslotEnd: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it('creates and maps a group', async () => {
     const createdAt = new Date('2026-08-30T00:00:00.000Z');
     const userId = '11111111-1111-4111-8111-111111111111';

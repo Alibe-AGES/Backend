@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
 import {
   CreateGroupUseCase,
@@ -15,6 +20,7 @@ import {
   GetAvailabilityIntervalsUseCase,
   GroupNotFoundError,
   InvalidAvailabilityDateError,
+  AvailabilityAccessDeniedError,
 } from '../../../../src/modules/groups/application/get-availability-intervals.use-case';
 
 describe('GroupsController', () => {
@@ -160,6 +166,22 @@ describe('GroupsController', () => {
   });
 
   describe('Endpoint para get de intervalos de disponibilidade', () => {
+    it('maps denied group access to HTTP 403', async () => {
+      getAvailabilityIntervalsUseCase.execute.mockRejectedValue(
+        new AvailabilityAccessDeniedError('Denied')
+      );
+      await expect(
+        controller.getAvailabilities('group-id', { date: '2026-09-05' }, authenticatedRequest)
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects a request missing its session user', async () => {
+      await expect(
+        controller.getAvailabilities('group-id', { date: '2026-09-05' }, {} as AuthenticatedRequest)
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(getAvailabilityIntervalsUseCase.execute).not.toHaveBeenCalled();
+    });
+
     it('maps availability data and protected profile-picture URLs', async () => {
       const groupId = randomUUID();
       const dateParam = '2026-06-05';
@@ -185,7 +207,7 @@ describe('GroupsController', () => {
       });
 
       await expect(
-        controller.getAvailabilities(groupId, dateParam, authenticatedRequest)
+        controller.getAvailabilities(groupId, { date: dateParam }, authenticatedRequest)
       ).resolves.toEqual({
         date: dateParam,
         users: [
@@ -193,6 +215,7 @@ describe('GroupsController', () => {
             id: '11111111-1111-4111-8111-111111111111',
             name: 'Ana Beatriz Silva',
             image: '/users/11111111-1111-4111-8111-111111111111/profile-picture',
+            isCurrentUser: true,
             availableAllDay: false,
             intervals: [],
           },
@@ -200,6 +223,7 @@ describe('GroupsController', () => {
             id: '22222222-2222-4222-8222-222222222222',
             name: 'Bruno Henrique Souza',
             image: null,
+            isCurrentUser: false,
             availableAllDay: true,
             intervals: [],
           },
@@ -220,7 +244,7 @@ describe('GroupsController', () => {
       await expect(
         controller.getAvailabilities(
           '11111111-1111-4111-8111-111111111111',
-          '2026-06-05',
+          { date: '2026-06-05' },
           authenticatedRequest
         )
       ).rejects.toThrow(NotFoundException);
@@ -236,7 +260,7 @@ describe('GroupsController', () => {
       await expect(
         controller.getAvailabilities(
           '11111111-1111-4111-8111-111111111111',
-          invalidDateFormat,
+          { date: invalidDateFormat },
           authenticatedRequest
         )
       ).rejects.toThrow(BadRequestException);

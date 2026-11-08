@@ -58,4 +58,52 @@ describe('PrismaUserProfileRepository', () => {
     await expect(repository.findCurrentUserSummary(userId, now)).resolves.toBeNull();
     expect(count).not.toHaveBeenCalled();
   });
+
+  it('moves the Expo push token to the current user', async () => {
+    const clearPreviousOwner = Symbol('clearPreviousOwner');
+    const updateCurrentUser = Symbol('updateCurrentUser');
+    const updateMany = jest.fn().mockReturnValue(clearPreviousOwner);
+    const update = jest.fn().mockReturnValue(updateCurrentUser);
+    const transaction = jest.fn().mockResolvedValue([]);
+    const repository = new PrismaUserProfileRepository({
+      user: { updateMany, update },
+      $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await repository.updateExpoPushToken(userId, 'ExpoPushToken[test-token]');
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        expoPushToken: 'ExpoPushToken[test-token]',
+        id: { not: userId },
+      },
+      data: { expoPushToken: null },
+    });
+    expect(update).toHaveBeenCalledWith({
+      where: { id: userId },
+      data: { expoPushToken: 'ExpoPushToken[test-token]' },
+    });
+    expect(transaction).toHaveBeenCalledWith([clearPreviousOwner, updateCurrentUser]);
+  });
+
+  it('finds the Expo push token without selecting other user fields', async () => {
+    const findUnique = jest.fn().mockResolvedValue({ expoPushToken: 'ExpoPushToken[test-token]' });
+    const repository = new PrismaUserProfileRepository({
+      user: { findUnique },
+    } as unknown as PrismaService);
+
+    await expect(repository.findExpoPushToken(userId)).resolves.toBe('ExpoPushToken[test-token]');
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: userId },
+      select: { expoPushToken: true },
+    });
+  });
+
+  it('returns null when the user has no Expo push token', async () => {
+    const repository = new PrismaUserProfileRepository({
+      user: { findUnique: jest.fn().mockResolvedValue({ expoPushToken: null }) },
+    } as unknown as PrismaService);
+
+    await expect(repository.findExpoPushToken(userId)).resolves.toBeNull();
+  });
 });
