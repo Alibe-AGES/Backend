@@ -2,8 +2,8 @@
 
 ## Como funciona
 
-Tudo fica no workflow `.github/workflows/cd-production.yml` do Backend. A cada merge na `main`
-com os testes verdes, dois jobs rodam em paralelo:
+Tudo fica no workflow `.github/workflows/cd-production.yml` do Backend. A cada merge (push) na
+`main`, dois jobs rodam em paralelo (os testes já rodaram no PR antes do merge):
 
 | Job      | O que faz                                                                                                                                             |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -21,7 +21,8 @@ git add services/notification-service && git commit -m "chore: atualiza notifica
 ```
 
 O login do GitHub na AWS é feito sem chave (OIDC), com a permissão criada pela stack
-`alibe-prod-cicd` (`infra/prod/cloudformation/05-cicd.yml`).
+`alibe-prod-cicd` (`infra/prod/cloudformation/05-cicd.yml`). A AWS só aceita execuções da branch
+`main`: um re-run ou Run workflow a partir de outra branch falha no passo **Login na AWS**.
 
 ## Configuração (uma vez)
 
@@ -54,7 +55,8 @@ O login do GitHub na AWS é feito sem chave (OIDC), com a permissão criada pela
 
 ## Voltar uma versão
 
-GitHub → Actions → _CD Production_ → **Run workflow** → informe o commit anterior do Backend.
+GitHub → Actions → _CD Production_ → **Run workflow** → em **Use workflow from** escolha `main` →
+informe o commit anterior do Backend.
 A EC2 e a Lambda voltam para o que esse commit tinha.
 
 ## Atenção

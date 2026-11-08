@@ -1,6 +1,7 @@
 name: CD Production
 
-# Merge na main -> "Pull Request Quality Checks" passa -> dois jobs em paralelo:
+# Merge (push) na main -> dois jobs em paralelo. Os testes ja rodaram no PR antes do merge.
+# Roda sempre como branch main: e a unica branch que a AWS aceita (05-cicd.yml).
 #   deploy: pede a EC2 (via SSM, sem SSH) que rode /home/ec2-user/deploy.sh com o commit novo.
 #           O deploy.sh fica na EC2.
 #   lambda: se o submodulo services/notification-service aponta para um commit diferente do
@@ -10,12 +11,11 @@ name: CD Production
 #   AWS_ROLE_ARN     output BackendDeployRoleArn da stack alibe-prod-cicd (05-cicd.yml)
 #   EC2_INSTANCE_ID  ID da instancia EC2 (i-...), em EC2 -> Instancias
 #
-# Voltar uma versao: Actions -> CD Production -> Run workflow, informando um commit anterior.
+# Voltar uma versao: Actions -> CD Production -> Run workflow, com "Use workflow from" = main,
+# informando um commit anterior.
 
 on:
-  workflow_run:
-    workflows: ['Pull Request Quality Checks']
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -34,10 +34,7 @@ concurrency:
 
 jobs:
   deploy:
-    # So depois de push na main com os testes verdes (PR de fork nunca dispara deploy).
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -51,7 +48,7 @@ jobs:
       - name: Rodar o deploy na EC2
         env:
           INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
-          SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
+          SHA: ${{ inputs.sha || github.sha }}
         run: |
           # Aceita so um hash de commit (evita injetar comandos pelo campo do Run workflow).
           [[ "$SHA" =~ ^[0-9a-f]{7,40}$ ]] || { echo "SHA invalido: $SHA"; exit 1; }
@@ -81,9 +78,7 @@ jobs:
   lambda:
     # A Lambda roda o commit do submodulo services/notification-service. Para atualizar a Lambda,
     # aponte o submodulo para o commit novo do Notification_Service e faca merge na main.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -94,7 +89,7 @@ jobs:
       - name: Baixar o codigo com o submodulo
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ inputs.sha || github.sha }}
           submodules: true
 
       - name: Ler o commit do submodulo
