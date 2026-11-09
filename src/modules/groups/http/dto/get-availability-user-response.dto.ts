@@ -25,7 +25,7 @@ export class GetAvailabilityUserResponseDto {
       type: 'array',
       minItems: 2,
       maxItems: 2,
-      items: { type: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' },
+      items: { type: 'string', pattern: String.raw`^([01]\d|2[0-3]):[0-5]\d$` },
     },
     example: [['14:00', '20:00']],
   })

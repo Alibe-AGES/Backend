@@ -1,4 +1,4 @@
-import { extname } from 'path';
+import { extname } from 'node:path';
 
 export function safeExtension(originalName: string): string {
   const extension = extname(originalName).toLowerCase();

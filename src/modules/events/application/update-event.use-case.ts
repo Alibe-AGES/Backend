@@ -31,12 +31,38 @@ export class UpdateEventUseCase {
   ) {}
 
   async execute(eventId: string, userId: string, input: UpdateEventInput): Promise<Event> {
+    this.validateUpdateInput(input);
+    const currentEvent = await this.findAndValidateEvent(eventId, userId);
+
+    const update = this.buildEventUpdateData(input, currentEvent);
+    const newImageKey = await this.handleImageUpdate(eventId, input);
+    if (newImageKey) {
+      update.image = newImageKey;
+    }
+
+    let updatedEvent: Event;
+    try {
+      updatedEvent = await this.events.update(eventId, update);
+    } catch (error) {
+      if (newImageKey) {
+        await this.storage.delete(newImageKey).catch(() => undefined);
+      }
+      throw error;
+    }
+
+    await this.cleanupOldImageIfNeeded(newImageKey, currentEvent);
+
+    return updatedEvent;
+  }
+
+  private validateUpdateInput(input: UpdateEventInput): void {
     if (!Object.values(input).some((value) => value !== undefined)) {
       throw new InvalidEventUpdateError('At least one event field must be provided');
     }
+  }
 
+  private async findAndValidateEvent(eventId: string, userId: string) {
     const currentEvent = await this.events.findById(eventId);
-
     if (!currentEvent) {
       throw new EventNotFoundError('Event not found');
     }
@@ -45,6 +71,10 @@ export class UpdateEventUseCase {
       throw new EventAccessDeniedError('User is not the owner of an event proposal');
     }
 
+    return currentEvent;
+  }
+
+  private buildEventUpdateData(input: UpdateEventInput, currentEvent: any) {
     const update: {
       name?: string;
       timeslot?: Date;
@@ -72,38 +102,41 @@ export class UpdateEventUseCase {
       update.timeslot = new Date(`${date}T${time}:00.000Z`);
     }
 
-    let newImageKey: string | null = null;
+    return update;
+  }
 
-    if (input.image) {
-      if (!input.image.contentType.startsWith('image/')) {
-        throw new InvalidEventUpdateError('Somente imagens são aceitas');
-      }
-
-      const extension = safeExtension(input.image.originalName);
-      if (!extension) {
-        throw new InvalidEventUpdateError('Extensão inválida para imagem');
-      }
-
-      newImageKey = `events/${eventId}/images/${randomUUID()}${extension}`;
-
-      await this.storage.save({
-        key: newImageKey,
-        bytes: input.image.bytes,
-        contentType: input.image.contentType,
-      });
-      update.image = newImageKey;
+  private async handleImageUpdate(
+    eventId: string,
+    input: UpdateEventInput
+  ): Promise<string | null> {
+    if (!input.image) {
+      return null;
     }
 
-    let updatedEvent: Event;
-    try {
-      updatedEvent = await this.events.update(eventId, update);
-    } catch (error) {
-      if (newImageKey) {
-        await this.storage.delete(newImageKey).catch(() => undefined);
-      }
-      throw error;
+    if (!input.image.contentType.startsWith('image/')) {
+      throw new InvalidEventUpdateError('Somente imagens são aceitas');
     }
 
+    const extension = safeExtension(input.image.originalName);
+    if (!extension) {
+      throw new InvalidEventUpdateError('Extensão inválida para imagem');
+    }
+
+    const newImageKey = `events/${eventId}/images/${randomUUID()}${extension}`;
+
+    await this.storage.save({
+      key: newImageKey,
+      bytes: input.image.bytes,
+      contentType: input.image.contentType,
+    });
+
+    return newImageKey;
+  }
+
+  private async cleanupOldImageIfNeeded(
+    newImageKey: string | null,
+    currentEvent: any
+  ): Promise<void> {
     if (
       newImageKey &&
       currentEvent.image?.startsWith('events/') &&
@@ -111,7 +144,5 @@ export class UpdateEventUseCase {
     ) {
       await this.storage.delete(currentEvent.image).catch(() => undefined);
     }
-
-    return updatedEvent;
   }
 }
