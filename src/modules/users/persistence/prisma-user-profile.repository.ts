@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { UserProfileRepository } from '../domain/user-profile.repository';
+import { UserProfileRepository, type UpdatedUserProfile } from '../domain/user-profile.repository';
 
 @Injectable()
 export class PrismaUserProfileRepository extends UserProfileRepository {
@@ -74,5 +74,22 @@ export class PrismaUserProfileRepository extends UserProfileRepository {
     });
 
     return user?.expoPushToken ?? null;
+  }
+
+  async updateName(userId: string, name: string): Promise<UpdatedUserProfile | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { name },
+      select: { name: true },
+    });
   }
 }

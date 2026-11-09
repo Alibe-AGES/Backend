@@ -8,8 +8,13 @@ export interface CurrentUserSummary {
   eventsInDecision: number;
 }
 
+export interface UpdatedUserProfile {
+  name: string;
+}
+
 export abstract class UserProfileRepository {
   abstract findCurrentUserSummary(userId: string, now: Date): Promise<CurrentUserSummary | null>;
   abstract findExpoPushToken(userId: string): Promise<string | null>;
   abstract updateExpoPushToken(userId: string, token: string): Promise<void>;
+  abstract updateName(userId: string, name: string): Promise<UpdatedUserProfile | null>;
 }
