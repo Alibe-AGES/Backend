@@ -2,6 +2,7 @@ import { AnswerEnum, PrismaClient, StatusEnum } from 'generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { hashPassword } from 'better-auth/crypto';
 import 'dotenv/config';
+import { randomInt } from 'node:crypto';
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -273,6 +274,15 @@ async function main() {
         userId: users[userIndex].id,
         groupId: groups[groupIndex].id,
       },
+    });
+  }
+
+  for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+    const members = groupMemberships.filter(([, index]) => index === groupIndex);
+    const [userIndex] = members[randomInt(members.length)];
+    await prisma.group.update({
+      where: { id: groups[groupIndex].id },
+      data: { ownerId: users[userIndex].id },
     });
   }
 

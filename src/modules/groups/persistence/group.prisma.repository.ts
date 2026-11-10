@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { randomInt } from 'node:crypto';
+import type { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import {
   CreateGroupData,
@@ -7,6 +9,9 @@ import {
   GroupProfilePictureAccess,
   GroupDetails,
   GroupRepository,
+  GroupManagementError,
+  GroupManagementState,
+  UpdateGroupData,
 } from '../domain/group.repository';
 import { Group } from '../domain/group.entity';
 import { GroupInviteLink } from '../domain/group-invite-link.entity';
@@ -22,6 +27,7 @@ export class PrismaGroupRepository implements GroupRepository {
         name: data.name,
         profilePic: data.profilePic,
         createdAt: data.createdAt,
+        ownerId: data.creatorId,
         users: {
           create: {
             userId: data.creatorId,
@@ -30,7 +36,7 @@ export class PrismaGroupRepository implements GroupRepository {
       },
     });
 
-    return group;
+    return new Group(group);
   }
 
   async findById(id: string): Promise<Group | null> {
@@ -78,6 +84,7 @@ export class PrismaGroupRepository implements GroupRepository {
       name: group.name,
       profilePic: group.profilePic,
       createdAt: group.createdAt,
+      ownerId: group.ownerId,
       participants: group.users.map(({ user }) => user),
       nextEvent: nextEvent
         ? {
@@ -147,11 +154,74 @@ export class PrismaGroupRepository implements GroupRepository {
   }
 
   async addMember(groupId: string, userId: string): Promise<void> {
-    await this.prisma.userGroup.upsert({
-      where: { userId_groupId: { userId, groupId } },
-      update: {},
-      create: { userId, groupId },
+    await this.prisma.$transaction(async (transaction) => {
+      const group = await this.lockGroup(transaction, groupId);
+      if (!group) throw new GroupManagementError('not-found', 'Grupo não encontrado');
+      await transaction.userGroup.upsert({
+        where: { userId_groupId: { userId, groupId } },
+        update: {},
+        create: { userId, groupId },
+      });
+      if (!group.ownerId) {
+        await transaction.group.update({ where: { id: groupId }, data: { ownerId: userId } });
+      }
     });
+  }
+
+  async findManagementState(groupId: string): Promise<GroupManagementState | null> {
+    return this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: { ownerId: true, profilePic: true },
+    });
+  }
+
+  async updateOwned(groupId: string, ownerId: string, data: UpdateGroupData) {
+    return this.prisma.$transaction(async (transaction) => {
+      const current = await this.lockGroup(transaction, groupId);
+      this.requireOwner(current, ownerId);
+      const updated = await transaction.group.update({ where: { id: groupId }, data });
+      return { group: new Group(updated), previousImageKey: current.profilePic };
+    });
+  }
+
+  async removeMember(groupId: string, userId: string, actingOwnerId?: string): Promise<boolean> {
+    return this.prisma.$transaction(async (transaction) => {
+      const current = await this.lockGroup(transaction, groupId);
+      if (actingOwnerId !== undefined) this.requireOwner(current, actingOwnerId);
+      if (!current) return false;
+      const { count } = await transaction.userGroup.deleteMany({ where: { groupId, userId } });
+      if (!count) return false;
+      if (current.ownerId === userId) {
+        const members = await transaction.userGroup.findMany({
+          where: { groupId },
+          select: { userId: true },
+        });
+        const ownerId = members.length ? members[randomInt(members.length)].userId : null;
+        await transaction.group.update({ where: { id: groupId }, data: { ownerId } });
+      }
+      return true;
+    });
+  }
+
+  private async lockGroup(transaction: Prisma.TransactionClient, groupId: string) {
+    const [group] = await transaction.$queryRaw<GroupManagementState[]>`
+      SELECT "owner_id" AS "ownerId", "profile_pic" AS "profilePic"
+      FROM "group" WHERE "id" = ${groupId}::uuid FOR UPDATE
+    `;
+    return group ?? null;
+  }
+
+  private requireOwner(
+    group: GroupManagementState | null,
+    ownerId: string
+  ): asserts group is GroupManagementState {
+    if (!group) throw new GroupManagementError('not-found', 'Grupo não encontrado');
+    if (group.ownerId !== ownerId) {
+      throw new GroupManagementError(
+        'forbidden',
+        'Somente o owner pode editar o grupo ou remover membros'
+      );
+    }
   }
 
   async findProfilePictureAccess(

@@ -2,6 +2,8 @@ import { Group } from '../../src/modules/groups/domain/group.entity';
 import { GroupInviteLink } from '../../src/modules/groups/domain/group-invite-link.entity';
 import {
   GroupRepository,
+  GroupManagementError,
+  type UpdateGroupData,
   type CreateGroupData,
   type CreateGroupInviteLinkData,
   type GroupProfilePictureAccess,
@@ -13,6 +15,7 @@ export class InMemoryGroupRepository extends GroupRepository {
   private readonly groups = new Map<string, Group>();
   private readonly inviteLinks: GroupInviteLink[] = [];
   private readonly members = new Set<string>();
+  private readonly owners = new Map<string, string | null>();
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   findByUserId(_userId: string): Promise<Group[]> {
@@ -26,11 +29,47 @@ export class InMemoryGroupRepository extends GroupRepository {
     });
 
     this.groups.set(group.id, group);
+    this.owners.set(group.id, data.creatorId);
+    this.members.add(`${group.id}:${data.creatorId}`);
     return Promise.resolve(group);
   }
 
   findById(id: string): Promise<Group | null> {
     return Promise.resolve(this.groups.get(id) ?? null);
+  }
+
+  async findManagementState(groupId: string) {
+    const group = this.groups.get(groupId);
+    return group
+      ? { ownerId: this.owners.get(groupId) ?? null, profilePic: group.profilePic }
+      : null;
+  }
+
+  async updateOwned(groupId: string, ownerId: string, data: UpdateGroupData) {
+    const current = this.groups.get(groupId);
+    if (!current) throw new GroupManagementError('not-found', 'Grupo não encontrado');
+    if (this.owners.get(groupId) !== ownerId)
+      throw new GroupManagementError('forbidden', 'Somente o owner');
+    const group = new Group({ ...current, ...data });
+    this.groups.set(groupId, group);
+    return { group, previousImageKey: current.profilePic };
+  }
+
+  async removeMember(groupId: string, userId: string, actingOwnerId?: string) {
+    if (actingOwnerId !== undefined && this.owners.get(groupId) !== actingOwnerId) {
+      throw new GroupManagementError('forbidden', 'Somente o owner');
+    }
+    const removed = this.members.delete(`${groupId}:${userId}`);
+    if (removed && this.owners.get(groupId) === userId) {
+      const remaining = [...this.members].filter((key) => key.startsWith(`${groupId}:`));
+      this.owners.set(
+        groupId,
+        remaining.length
+          ? remaining[Math.floor(Math.random() * remaining.length)].slice(groupId.length + 1)
+          : null
+      );
+    }
+    return removed;
   }
 
   findMembership(groupId: string, userId: string): Promise<boolean | null> {
@@ -84,6 +123,7 @@ export class InMemoryGroupRepository extends GroupRepository {
       name: group.name,
       profilePic: group.profilePic,
       createdAt: group.createdAt,
+      ownerId: this.owners.get(id) ?? null,
       participants: [],
       nextEvent: null,
     });
