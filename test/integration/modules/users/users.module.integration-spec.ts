@@ -6,6 +6,7 @@ import { UsersModule } from '../../../../src/modules/users/users.module';
 import { PushTokensController } from '../../../../src/modules/users/http/push-tokens.controller';
 import { RegisterPushTokenUseCase } from '../../../../src/modules/users/application/register-push-token.use-case';
 import { SendTestPushNotificationUseCase } from '../../../../src/modules/users/application/send-test-push-notification.use-case';
+import { UpdateUserProfileUseCase } from '../../../../src/modules/users/application/update-user-profile.use-case';
 
 describe('UsersModule integration', () => {
   let module: TestingModule;
@@ -34,5 +35,6 @@ describe('UsersModule integration', () => {
     expect(module.get(SendTestPushNotificationUseCase)).toBeInstanceOf(
       SendTestPushNotificationUseCase
     );
+    expect(module.get(UpdateUserProfileUseCase)).toBeInstanceOf(UpdateUserProfileUseCase);
   });
 });
