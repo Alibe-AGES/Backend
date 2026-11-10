@@ -52,7 +52,7 @@ describe('Memory image endpoint (e2e)', () => {
     process.env.MOCK_AUTH_USER_ID = USER_ID;
     events.set(createEvent());
     events.setGroupMembers(GROUP_ID, [USER_ID]);
-    events.setMemory(EVENT_ID, MEMORY_ID, IMAGE_KEY);
+    events.setMemory(EVENT_ID, { id: MEMORY_ID, picture: IMAGE_KEY, eventId: EVENT_ID });
     await storage.save({ key: IMAGE_KEY, bytes: IMAGE_BYTES, contentType: 'image/png' });
   });
 
@@ -89,7 +89,11 @@ describe('Memory image endpoint (e2e)', () => {
   });
 
   it('returns 404 when the image no longer exists in storage', async () => {
-    events.setMemory(EVENT_ID, MEMORY_ID, `events/${EVENT_ID}/memories/missing.png`);
+    events.setMemory(EVENT_ID, {
+      id: MEMORY_ID,
+      picture: `events/${EVENT_ID}/memories/missing.png`,
+      eventId: EVENT_ID,
+    });
 
     await request(app.getHttpServer())
       .get(`/api/events/${EVENT_ID}/memories/${MEMORY_ID}/image`)
