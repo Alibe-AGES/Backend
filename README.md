@@ -1,5 +1,9 @@
 # Alibe Backend
 
+## Sair de um grupo
+
+`PUT /groups/:groupId/leave` remove somente o vínculo do usuário autenticado com o grupo, sem body na requisição. Retorna `201` sem corpo em caso de sucesso; `400` para UUID inválido ou vínculo inexistente (incluindo grupo inexistente e saída repetida); `401` sem autenticação; `500` para falhas inesperadas. O grupo e os demais dados são preservados, inclusive quando o último membro sai.
+
 ## Edição de grupo (ALI-49)
 
 Somente o owner pode editar o grupo ou remover participantes. O usuário autenticado que cria um grupo passa a ser seu owner. `GET /groups/:groupId` informa `ownerId` (nulo para grupos vazios).

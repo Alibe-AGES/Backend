@@ -13,6 +13,7 @@ import {
   HttpStatus,
   NotFoundException,
   Post,
+  Put,
   Request,
   StreamableFile,
   UnauthorizedException,
@@ -42,6 +43,10 @@ import {
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { UpdateGroupUseCase } from '../application/update-group.use-case';
 import { RemoveGroupMemberUseCase } from '../application/remove-group-member.use-case';
+import {
+  GroupMembershipNotFoundError,
+  LeaveGroupUseCase,
+} from '../application/leave-group.use-case';
 import { GroupManagementError } from '../domain/group.repository';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import {
@@ -78,7 +83,8 @@ export class GroupsController {
     private readonly listGroupsUseCase: ListGroupsUseCase,
     private readonly getAvailabilityIntervalsUseCase: GetAvailabilityIntervalsUseCase,
     private readonly updateGroupUseCase: UpdateGroupUseCase,
-    private readonly removeGroupMemberUseCase: RemoveGroupMemberUseCase
+    private readonly removeGroupMemberUseCase: RemoveGroupMemberUseCase,
+    private readonly leaveGroupUseCase: LeaveGroupUseCase
   ) {}
   /**
    * GET /groups
@@ -310,6 +316,33 @@ export class GroupsController {
       await this.removeGroupMemberUseCase.execute(groupId, memberId, ownerId);
     } catch (error) {
       this.rethrowManagementError(error);
+    }
+  }
+
+  @Put(':groupId/leave')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Remove o usuário autenticado do grupo' })
+  @ApiParam({ name: 'groupId', format: 'uuid' })
+  @ApiCreatedResponse({ description: 'Participação removida com sucesso. Resposta sem corpo.' })
+  @ApiBadRequestResponse({
+    description: 'UUID inválido, grupo inexistente ou usuário sem vínculo.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
+  async leave(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<void> {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
+
+    try {
+      await this.leaveGroupUseCase.execute(groupId, userId);
+    } catch (error) {
+      if (error instanceof GroupMembershipNotFoundError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
     }
   }
 
