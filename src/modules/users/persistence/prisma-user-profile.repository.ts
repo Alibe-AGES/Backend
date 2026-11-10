@@ -98,7 +98,7 @@ export class PrismaUserProfileRepository extends UserProfileRepository {
 
     await context.internalAdapter.updatePassword(userId, passwordHash);
   }
-  
+
   async updateName(userId: string, name: string): Promise<UpdatedUserProfile | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
