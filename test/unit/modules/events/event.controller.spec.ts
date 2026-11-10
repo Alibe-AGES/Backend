@@ -250,8 +250,11 @@ describe('EventController', () => {
     } as Express.Multer.File;
 
     it('successfully creates a memory', async () => {
-      const expectedMemoryDto = { id: 'memory-uuid', eventId, pictureUrl: 'some-url' };
-      createMemoryUseCaseMock.execute.mockResolvedValue(expectedMemoryDto);
+      createMemoryUseCaseMock.execute.mockResolvedValue({
+        id: 'memory-uuid',
+        eventId,
+        picture: `events/${eventId}/memories/memory.jpg`,
+      });
 
       const result = await controller.createMemory(eventId, validImage, authenticatedRequest);
 
@@ -266,7 +269,11 @@ describe('EventController', () => {
         },
         userId
       );
-      expect(result).toEqual(expectedMemoryDto);
+      expect(result).toEqual({
+        id: 'memory-uuid',
+        eventId,
+        picture: `/api/events/${eventId}/memories/memory-uuid/image`,
+      });
     });
 
     it('rejects a request when the image is missing (null)', async () => {

@@ -265,7 +265,12 @@ describe('EventsModule integration', () => {
 
       const result = await controller.getMemories(eventId, authenticatedRequest);
 
-      expect(result).toEqual([memoryRow]);
+      expect(result).toEqual([
+        {
+          ...memoryRow,
+          picture: `/api/events/${eventId}/memories/${memoryRow.id}/image`,
+        },
+      ]);
       expect(findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: eventId },

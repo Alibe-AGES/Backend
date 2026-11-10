@@ -58,7 +58,7 @@ import {
   UpdateEventUseCase,
 } from '../application/update-event.use-case';
 import { Event } from '../domain/event.entity';
-import type { CreatedEvent, EventDetails } from '../domain/event.repository';
+import type { CreatedEvent, EventDetails, EventMemoryDetails } from '../domain/event.repository';
 import { CreateEventDto } from './dto/create-event.dto';
 import { CreatedEventResponseDto, EventResponseDto } from './dto/event-response.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -381,7 +381,7 @@ export class EventController {
         userId
       );
 
-      return created;
+      return this.toMemoryResponse(created);
     } catch (error) {
       if (error instanceof InvalidMemoryCreationError) {
         throw new BadRequestException(error.message);
@@ -394,6 +394,14 @@ export class EventController {
       }
       throw error;
     }
+  }
+
+  private toMemoryResponse(memory: EventMemoryDetails): EventMemoriesResponseDto {
+    return {
+      id: memory.id,
+      picture: `/api/events/${memory.eventId}/memories/${memory.id}/image`,
+      eventId: memory.eventId,
+    };
   }
 
   private toDetailsResponse(event: EventDetails): EventDetailsResponseDto {
@@ -502,7 +510,7 @@ export class EventController {
 
     try {
       const memories = await this.getMemoriesUseCase.execute(eventId, userId);
-      return memories;
+      return memories.map((memory) => this.toMemoryResponse(memory));
     } catch (error) {
       if (error instanceof GetEventNotFoundError) {
         throw new NotFoundException(error.message);
@@ -538,8 +546,8 @@ export class EventController {
     }
 
     try {
-      const event = await this.getMemoryUseCase.execute(eventId, memoryId, userId);
-      return event;
+      const memory = await this.getMemoryUseCase.execute(eventId, memoryId, userId);
+      return this.toMemoryResponse(memory);
     } catch (error) {
       if (error instanceof MemoryNotFoundError) {
         throw new NotFoundException(error.message);
