@@ -12,6 +12,9 @@ import {
   type EventImageAccess,
   EventRepository,
   type UpdateEventData,
+  EventMemories,
+  EventMemoryDetails,
+  CreateMemoryData,
 } from '../domain/event.repository';
 
 const eventInclude = {
@@ -341,6 +344,26 @@ export class PrismaEventRepository extends EventRepository {
     };
   }
 
+  async createMemory(data: CreateMemoryData): Promise<EventMemoryDetails | null> {
+    const memory = await this.prisma.memory.create({
+      data: {
+        id: data.id,
+        eventId: data.eventId,
+        picture: data.picture,
+      },
+    });
+
+    if (memory == null) {
+      return null;
+    }
+
+    return {
+      id: memory.id,
+      picture: memory.picture,
+      eventId: memory.eventId,
+    };
+  }
+
   private toDomain(data: EventRecord): Event {
     return new Event({
       id: data.id,
@@ -360,5 +383,34 @@ export class PrismaEventRepository extends EventRepository {
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     });
+  }
+
+  async findMemories(eventId: string, userId: string): Promise<EventMemories | null> {
+    const event = await this.prisma.event.findUnique({
+      where: {
+        id: eventId,
+      },
+      include: {
+        group: {
+          select: {
+            users: {
+              where: { userId },
+              select: { userId: true },
+              take: 1,
+            },
+          },
+        },
+        memories: true,
+      },
+    });
+
+    if (!event) {
+      return null;
+    }
+
+    return {
+      memories: event.memories,
+      userIsMember: event.group.users.length > 0,
+    };
   }
 }

@@ -8,6 +8,7 @@ import { RegisterPushTokenUseCase } from '../../../../src/modules/users/applicat
 import { SendTestPushNotificationUseCase } from '../../../../src/modules/users/application/send-test-push-notification.use-case';
 import { UpdatePasswordUseCase } from '../../../../src/modules/users/application/update-password.use-case';
 import { UserProfileRepository } from '../../../../src/modules/users/domain/user-profile.repository';
+import { UpdateUserProfileUseCase } from '../../../../src/modules/users/application/update-user-profile.use-case';
 
 describe('UsersModule integration', () => {
   let module: TestingModule;
@@ -39,5 +40,6 @@ describe('UsersModule integration', () => {
       SendTestPushNotificationUseCase
     );
     expect(module.get(UpdatePasswordUseCase)).toBeInstanceOf(UpdatePasswordUseCase);
+    expect(module.get(UpdateUserProfileUseCase)).toBeInstanceOf(UpdateUserProfileUseCase);
   });
 });

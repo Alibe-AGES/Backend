@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_PIPE } from '@nestjs/core';
 import { ZodValidationPipe } from 'nestjs-zod';
+import { HealthModule } from './infrastructure/health/health.module';
 import { MonitoringModule } from './infrastructure/monitoring/monitoring.module';
 import { ExampleModule } from './modules/example/example.module';
 import { GroupsModule } from './modules/groups/groups.module';
@@ -19,6 +20,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     AuthModule,
     ExampleModule,
     MonitoringModule,
+    HealthModule,
     GroupsModule,
     CalendarModule,
     AvailabilityModule,

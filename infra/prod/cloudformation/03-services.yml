@@ -166,6 +166,9 @@ Resources:
             Principal:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # Sem esta policy a Lambda nao consegue criar o log group nem escrever logs no CloudWatch.
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
       Policies:
         - PolicyName: ConsumeNotificationQueue
           PolicyDocument:

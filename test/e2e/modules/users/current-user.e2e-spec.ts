@@ -12,6 +12,7 @@ const AUTHENTICATED_USER_ID = '11111111-1111-4111-8111-111111111111';
 describe('Current user endpoint (e2e)', () => {
   let app: INestApplication;
   const findCurrentUserSummary = jest.fn();
+  const updateName = jest.fn();
   const previousMockAuthEnabled = process.env.MOCK_AUTH_ENABLED;
   const previousMockAuthUserId = process.env.MOCK_AUTH_USER_ID;
 
@@ -24,7 +25,7 @@ describe('Current user endpoint (e2e)', () => {
       .overrideProvider(PrismaService)
       .useValue({})
       .overrideProvider(UserProfileRepository)
-      .useValue({ findCurrentUserSummary })
+      .useValue({ findCurrentUserSummary, updateName })
       .compile();
 
     app = moduleFixture.createNestApplication({ bodyParser: false });
@@ -51,6 +52,8 @@ describe('Current user endpoint (e2e)', () => {
       createdAt: new Date('2026-09-01T12:00:00.000Z'),
       profilePic: 'users/11111111-1111-4111-8111-111111111111/profile-picture.png',
     });
+    updateName.mockReset();
+    updateName.mockImplementation(async (_userId: string, name: string) => ({ name }));
   });
 
   it('returns the public profile and event summary for the Better Auth session user', async () => {
@@ -77,6 +80,40 @@ describe('Current user endpoint (e2e)', () => {
 
     await request(app.getHttpServer()).get('/api/users/me').expect(401);
     expect(findCurrentUserSummary).not.toHaveBeenCalled();
+  });
+
+  it('updates the name of the authenticated user', async () => {
+    const response = await request(app.getHttpServer())
+      .put('/api/users/me')
+      .send({ name: '  Ana Silva  ' })
+      .expect(201);
+
+    expect(updateName).toHaveBeenCalledWith(AUTHENTICATED_USER_ID, 'Ana Silva');
+    expect(response.body).toEqual({ name: 'Ana Silva' });
+  });
+
+  it.each([
+    ['a missing name', {}],
+    ['a blank name', { name: '   ' }],
+    ['a name longer than 100 characters', { name: 'a'.repeat(101) }],
+    ['unknown fields', { name: 'Ana Silva', email: 'outro@example.com' }],
+  ])('returns 400 for %s', async (_case, body) => {
+    await request(app.getHttpServer()).put('/api/users/me').send(body).expect(400);
+
+    expect(updateName).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the authenticated user no longer exists', async () => {
+    updateName.mockResolvedValue(null);
+
+    await request(app.getHttpServer()).put('/api/users/me').send({ name: 'Ana Silva' }).expect(404);
+  });
+
+  it('returns 401 when updating without an authenticated session', async () => {
+    process.env.MOCK_AUTH_ENABLED = 'false';
+
+    await request(app.getHttpServer()).put('/api/users/me').send({ name: 'Ana Silva' }).expect(401);
+    expect(updateName).not.toHaveBeenCalled();
   });
 });
 

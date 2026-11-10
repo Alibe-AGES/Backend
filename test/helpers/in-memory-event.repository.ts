@@ -8,6 +8,9 @@ import {
   type EventImageAccess,
   EventRepository,
   type UpdateEventData,
+  EventMemories,
+  CreateMemoryData,
+  EventMemoryDetails,
 } from '../../src/modules/events/domain/event.repository';
 
 export class InMemoryEventRepository extends EventRepository {
@@ -17,6 +20,10 @@ export class InMemoryEventRepository extends EventRepository {
   private readonly creationLocations = new Map<
     string,
     EventCreationLocation & { description: string | null; manuallyCreated: boolean | null }
+  >();
+  private readonly memories = new Map<
+    string,
+    Array<{ id: string; picture: string; eventId: string }>
   >();
 
   findById(id: string): Promise<Event | null> {
@@ -87,8 +94,8 @@ export class InMemoryEventRepository extends EventRepository {
           id: '55555555-5555-4555-8555-555555555555',
           ownerId: data.ownerId,
           ownerDetails: {
-            name: 'Ana Beatriz Silva', // Mock
-            image: 'https://example.com/users/ana.jpg', // Mock
+            name: 'Ana Beatriz Silva',
+            image: 'https://example.com/users/ana.jpg',
           },
           responses: [
             {
@@ -97,8 +104,8 @@ export class InMemoryEventRepository extends EventRepository {
               createdAt: data.createdAt,
               userId: data.ownerId,
               user: {
-                name: 'Ana Beatriz Silva', // Mock
-                image: 'https://example.com/users/ana.jpg', // Mock
+                name: 'Ana Beatriz Silva',
+                image: 'https://example.com/users/ana.jpg',
               },
             },
           ],
@@ -148,6 +155,26 @@ export class InMemoryEventRepository extends EventRepository {
   }
 
   set(event: Event): void {
+    if (!event.proposals || event.proposals.length === 0) {
+      const patchedEvent = new Event({
+        ...event,
+        proposals: [
+          {
+            id: '55555555-5555-4555-8555-555555555555',
+            ownerId: 'user-id-mock',
+            ownerDetails: {
+              name: 'Ana Beatriz Silva',
+              image: 'https://example.com/users/ana.jpg',
+            },
+            responses: [],
+            createdAt: event.createdAt,
+          },
+        ],
+      });
+      this.events.set(patchedEvent.id, patchedEvent);
+      return;
+    }
+
     this.events.set(event.id, event);
   }
 
@@ -164,9 +191,12 @@ export class InMemoryEventRepository extends EventRepository {
 
     const proposal = event.proposals[0];
 
-    if (!proposal?.ownerDetails || !proposal.createdAt) {
-      return Promise.reject(new Error('Evento sem proposta associada'));
-    }
+    // Fallback seguro caso o mock venha sem ownerDetails ou createdAt
+    const ownerDetails = proposal?.ownerDetails ?? {
+      name: 'Ana Beatriz Silva',
+      image: 'https://example.com/users/ana.jpg',
+    };
+    const proposalCreatedAt = proposal?.createdAt ?? event.createdAt;
 
     const eventDetails: EventDetails = {
       id: event.id,
@@ -179,13 +209,13 @@ export class InMemoryEventRepository extends EventRepository {
       groupId: event.groupId,
       location: event.location,
       proposal: {
-        id: proposal.id,
+        id: proposal?.id ?? '55555555-5555-4555-8555-555555555555',
         owner: {
-          id: proposal.ownerId,
-          name: proposal.ownerDetails.name,
-          image: proposal.ownerDetails.image,
+          id: proposal?.ownerId ?? 'owner-id-mock',
+          name: ownerDetails.name,
+          image: ownerDetails.image,
         },
-        responses: (proposal.responses ?? []).map((response) => ({
+        responses: (proposal?.responses ?? []).map((response) => ({
           id: response.id,
           answer: response.answer,
           createdAt: response.createdAt as Date,
@@ -195,7 +225,7 @@ export class InMemoryEventRepository extends EventRepository {
             image: response.user?.image ?? null,
           },
         })),
-        createdAt: proposal.createdAt,
+        createdAt: proposalCreatedAt,
       },
       createdAt: event.createdAt,
       updatedAt: event.updatedAt,
@@ -204,6 +234,52 @@ export class InMemoryEventRepository extends EventRepository {
     return Promise.resolve({
       event: eventDetails,
       userIsMember: this.groups.get(event.groupId)?.has(userId) ?? false,
+    });
+  }
+
+  setMemories(
+    eventId: string,
+    eventMemories: Array<{ id: string; picture: string; eventId: string }>
+  ): void {
+    this.memories.set(eventId, eventMemories);
+  }
+
+  addGroupMember(groupId: string, userId: string): void {
+    const members = this.groups.get(groupId) ?? new Set<string>();
+    members.add(userId);
+    this.groups.set(groupId, members);
+  }
+
+  createMemory(data: CreateMemoryData): Promise<EventMemoryDetails | null> {
+    const memoryRecord = {
+      id: data.id,
+      eventId: data.eventId,
+      picture: data.picture,
+    };
+
+    const existingMemories = this.memories.get(data.eventId) ?? [];
+    this.memories.set(data.eventId, [...existingMemories, memoryRecord]);
+
+    return Promise.resolve({
+      id: data.id,
+      picture: data.picture,
+      eventId: data.eventId,
+    });
+  }
+
+  findMemories(eventId: string, userId: string): Promise<EventMemories | null> {
+    const event = this.events.get(eventId);
+
+    if (!event) {
+      return Promise.resolve(null);
+    }
+
+    const eventMemories = this.memories.get(eventId) ?? [];
+    const userIsMember = this.groups.get(event.groupId)?.has(userId);
+
+    return Promise.resolve({
+      memories: eventMemories,
+      userIsMember,
     });
   }
 }

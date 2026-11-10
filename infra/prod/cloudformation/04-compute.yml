@@ -24,7 +24,8 @@ Parameters:
 
   AllowedClientCidr:
     Type: String
-    Description: IPv4 publico autorizado a acessar temporariamente a API, no formato 203.0.113.10/32.
+    Default: 0.0.0.0/0
+    Description: Origem autorizada na porta 80. 0.0.0.0/0 libera a API para o app de todo o time.
     AllowedPattern: '^(?:[0-9]{1,3}\.){3}[0-9]{1,3}/(?:[0-9]|[12][0-9]|3[0-2])$'
     ConstraintDescription: Informe um IPv4 em formato CIDR, preferencialmente o seu IP publico com /32.
 
@@ -39,6 +40,18 @@ Parameters:
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
     Description: AMI oficial mais recente do Amazon Linux 2023 para processadores ARM64.
 
+  PinnedAmiId:
+    Type: String
+    Default: ''
+    AllowedPattern: '^(ami-[0-9a-f]+)?$'
+    Description: >-
+      AMI atual da EC2 (ex.: ami-0abc...). Preencha em TODA atualizacao da stack: sem ela, o
+      parametro SSM acima resolve para uma AMI mais nova e o CloudFormation SUBSTITUI a EC2,
+      apagando tudo o que foi instalado nela. Vazio somente na criacao inicial.
+
+Conditions:
+  UsePinnedAmi: !Not [!Equals [!Ref PinnedAmiId, '']]
+
 Resources:
   ComputeSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -47,7 +60,7 @@ Resources:
       VpcId:
         Fn::ImportValue: !Sub '${NetworkStackName}-VpcId'
       SecurityGroupIngress:
-        - Description: HTTP temporario da API e do Swagger, restrito ao administrador
+        - Description: HTTP da API
           IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -98,6 +111,9 @@ Resources:
             Principal:
               Service: ec2.amazonaws.com
             Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # Permite que o GitHub Actions rode o deploy na EC2 via SSM, sem SSH e sem abrir portas.
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
       Policies:
         - PolicyName: AccessAlibeMediaObjects
           PolicyDocument:
@@ -150,7 +166,7 @@ Resources:
   ComputeInstance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Ref LatestArm64AmiId
+      ImageId: !If [UsePinnedAmi, !Ref PinnedAmiId, !Ref LatestArm64AmiId]
       InstanceType: t4g.medium
       IamInstanceProfile: !Ref ComputeInstanceProfile
       SubnetId:

@@ -177,5 +177,30 @@ describe('PrismaUserProfileRepository', () => {
       expect(hash).toHaveBeenCalledWith('nova-senha-segura');
       expect(updatePassword).toHaveBeenCalledWith(userId, 'new-hash');
     });
+  it('updates only the name and returns it', async () => {
+    const findUnique = jest.fn().mockResolvedValue({ id: userId });
+    const update = jest.fn().mockResolvedValue({ name: 'Ana Silva' });
+    const repository = new PrismaUserProfileRepository({
+      user: { findUnique, update },
+    } as unknown as PrismaService);
+
+    await expect(repository.updateName(userId, 'Ana Silva')).resolves.toEqual({
+      name: 'Ana Silva',
+    });
+    expect(update).toHaveBeenCalledWith({
+      where: { id: userId },
+      data: { name: 'Ana Silva' },
+      select: { name: true },
+    });
+  });
+
+  it('returns null without updating when the user does not exist', async () => {
+    const update = jest.fn();
+    const repository = new PrismaUserProfileRepository({
+      user: { findUnique: jest.fn().mockResolvedValue(null), update },
+    } as unknown as PrismaService);
+
+    await expect(repository.updateName(userId, 'Ana Silva')).resolves.toBeNull();
+    expect(update).not.toHaveBeenCalled();
   });
 });

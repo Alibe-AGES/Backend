@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Permissao do GitHub Actions do repositorio Backend para o CD do Alibe, sem access keys (OIDC):
+  mandar a EC2 rodar /home/ec2-user/deploy.sh via SSM e publicar/atualizar a Lambda de
+  notificacoes a partir do submodulo services/notification-service.
+
+Parameters:
+  GitHubOrganization:
+    Type: String
+    Default: Alibe-AGES
+
+  # IDs numericos do GitHub (nao mudam): gh api orgs/Alibe-AGES -q .id e gh api repos/Alibe-AGES/Backend -q .id
+  GitHubOrganizationId:
+    Type: String
+    Default: '314500127'
+
+  BackendRepositoryId:
+    Type: String
+    Default: '1330432961'
+
+  CreateGitHubOidcProvider:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Use false se a conta ja tiver o provider token.actions.githubusercontent.com.
+
+Conditions:
+  ShouldCreateOidcProvider: !Equals [!Ref CreateGitHubOidcProvider, 'true']
+
+Resources:
+  # Diz a AWS para confiar nos tokens emitidos pelo GitHub Actions.
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  # Usada somente pelo repositorio Backend, somente na branch main.
+  BackendDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: alibe-github-backend-deploy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # O GitHub manda o "sub" em um de dois formatos: so com nomes, ou com nomes e IDs
+                # (formato imutavel, padrao desde 2026). Os dois apontam para Backend na branch main.
+                token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubOrganization}/Backend:ref:refs/heads/main'
+                  - !Sub 'repo:${GitHubOrganization}@${GitHubOrganizationId}/Backend@${BackendRepositoryId}:ref:refs/heads/main'
+      Policies:
+        - PolicyName: RunDeployOnEc2
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # So pode mandar comandos para instancias do projeto (tag Project=alibe).
+              - Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
+                Condition:
+                  StringEquals:
+                    ssm:resourceTag/Project: alibe
+              - Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript'
+              - Effect: Allow
+                Action: ssm:GetCommandInvocation
+                Resource: '*'
+        - PolicyName: DeployNotificationLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:DescribeImages
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                Resource: !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/alibe/notification-service'
+              - Effect: Allow
+                Action:
+                  - lambda:UpdateFunctionCode
+                  - lambda:GetFunction
+                  - lambda:GetFunctionConfiguration
+                Resource: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:alibe-prod-notification'
+
+Outputs:
+  BackendDeployRoleArn:
+    Description: Secret AWS_ROLE_ARN do repositorio Backend.
+    Value: !GetAtt BackendDeployRole.Arn

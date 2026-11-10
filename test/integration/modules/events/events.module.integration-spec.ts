@@ -5,6 +5,7 @@ import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-
 import { EventsModule } from '../../../../src/modules/events/events.module';
 import { EventController } from '../../../../src/modules/events/http/event.controller';
 import { GetEventUseCase } from '../../../../src/modules/events/application/get-event.use-case';
+import { GetEventMemoriesUseCase } from '../../../../src/modules/events/application/get-event-memories.use-case';
 import { EventRepository } from '../../../../src/modules/events/domain/event.repository';
 import type { CreateEventDto } from '../../../../src/modules/events/http/dto/create-event.dto';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
@@ -65,6 +66,7 @@ describe('EventsModule integration', () => {
   it('registers the events controller and connects use cases to repository', () => {
     expect(moduleFixture.get(EventController)).toBeInstanceOf(EventController);
     expect(moduleFixture.get(GetEventUseCase)).toBeDefined();
+    expect(moduleFixture.get(GetEventMemoriesUseCase)).toBeDefined();
     expect(moduleFixture.get(EventRepository)).toBeDefined();
     expect(moduleFixture.get(SendAttendanceRemindersUseCase)).toBeDefined();
     expect(moduleFixture.get(AttendanceReminderScheduler)).toBeDefined();
@@ -229,6 +231,34 @@ describe('EventsModule integration', () => {
 
       await expect(controller.get(eventId, authenticatedRequest)).rejects.toBeInstanceOf(
         NotFoundException
+      );
+    });
+  });
+
+  describe('EventController - getMemories', () => {
+    it('returns event memories when event exists and user belongs to group', async () => {
+      const controller = moduleFixture.get(EventController);
+      const eventId = '22222222-2222-4222-8222-222222222222';
+      const memoryRow = {
+        id: '77777777-7777-4777-8777-777777777777',
+        picture: 'events/memory.jpg',
+        eventId,
+      };
+
+      findUnique.mockResolvedValue({
+        id: eventId,
+        group: { users: [{ userId }] },
+        memories: [memoryRow],
+      });
+
+      const result = await controller.getMemories(eventId, authenticatedRequest);
+
+      expect(result).toEqual([memoryRow]);
+      expect(findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: eventId },
+          include: expect.any(Object),
+        })
       );
     });
   });

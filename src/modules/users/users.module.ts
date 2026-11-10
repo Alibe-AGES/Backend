@@ -5,6 +5,7 @@ import { StorageModule } from '../../infrastructure/storage/storage.module';
 import { GetUserProfilePictureUseCase } from './application/get-user-profile-picture.use-case';
 import { UpdateUserProfilePictureUseCase } from './application/update-user-profile-picture.use-case';
 import { GetCurrentUserSummaryUseCase } from './application/get-current-user-summary.use-case';
+import { UpdateUserProfileUseCase } from './application/update-user-profile.use-case';
 import { UserProfileRepository } from './domain/user-profile.repository';
 import { UserImageRepository } from './domain/user-image.repository';
 import { CurrentUserController } from './http/current-user.controller';
@@ -23,6 +24,7 @@ import { UpdatePasswordUseCase } from './application/update-password.use-case';
     GetUserProfilePictureUseCase,
     UpdateUserProfilePictureUseCase,
     GetCurrentUserSummaryUseCase,
+    UpdateUserProfileUseCase,
     RegisterPushTokenUseCase,
     SendTestPushNotificationUseCase,
     UpdatePasswordUseCase,
