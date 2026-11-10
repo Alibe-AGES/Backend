@@ -93,6 +93,8 @@ Variáveis atuais:
 | `BETTER_AUTH_SECRET`                | Segredo de alta entropia usado para assinar dados de autenticação.   |
 | `BETTER_AUTH_URL`                   | URL pública da API utilizada pelo Better Auth.                       |
 | `BETTER_AUTH_TRUSTED_ORIGINS`       | Origens web e schemes Expo aceitos, separados por vírgula.           |
+| `GOOGLE_CLIENT_ID`                  | Client ID OAuth Web do Google; vazio desativa o login com Google.    |
+| `GOOGLE_CLIENT_SECRET`              | Client secret OAuth Web do Google; exigido junto com o Client ID.    |
 | `AWS_REGION`                        | Região usada pelo MiniStack e pelos comandos da AWS CLI.             |
 | `AWS_S3_BUCKET`                     | Nome do bucket utilizado pela aplicação.                             |
 | `AWS_SQS_NOTIFICATION_QUEUE_URL`    | URL da fila usada para publicar notificações.                        |
@@ -779,6 +781,37 @@ opcionalmente, `rememberMe`. Em caso de sucesso, o Better Auth cria o registro e
 o cookie `better-auth.session_token`. No aplicativo, o plugin cliente Better Auth Expo guarda e
 reenvia esse cookie; o campo `token` do JSON não deve ser salvo manualmente. Credenciais inválidas
 retornam `401` com a mesma mensagem para e-mail inexistente ou senha incorreta.
+
+#### Login com Google
+
+O provider Google do Better Auth é habilitado quando `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`
+estão preenchidos; com os dois vazios, a API inicia normalmente e `POST /api/auth/sign-in/social`
+responde `404`. Preencher apenas um deles impede a inicialização.
+
+O aplicativo usa o fluxo de redirecionamento do Better Auth Expo, sem SDK nativo do Google:
+
+```ts
+await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
+```
+
+1. o cliente chama `POST /api/auth/sign-in/social` e abre a URL do Google com `expo-web-browser`;
+2. o Google redireciona para `GET /api/auth/callback/google`;
+3. o Better Auth cria o usuário no primeiro acesso (com `emailVerified: true`) ou entra na conta já
+   vinculada, cria a sessão e devolve o app pelo scheme `alibe://`, onde o plugin Expo salva o cookie.
+
+Para obter as credenciais, crie no Google Cloud Console um cliente OAuth do tipo **Aplicativo da Web**
+e cadastre como URI de redirecionamento autorizado `${BETTER_AUTH_URL}/api/auth/callback/google`, por
+exemplo `http://localhost:3000/api/auth/callback/google`. O Google aceita `http` somente para
+`localhost`; em outros ambientes, `BETTER_AUTH_URL` precisa ser HTTPS com domínio, não IP. Em um
+celular físico, `localhost` não é alcançável: use um túnel HTTPS e ajuste `BETTER_AUTH_URL` e o URI.
+
+A foto do Google não é importada para `profilePic`, porque esse campo guarda a chave do S3 servida por
+`GET /users/:id/profile-picture`; o usuário pode enviar uma foto pelo endpoint de upload.
+
+Um e-mail já cadastrado com senha não é vinculado automaticamente à conta Google, porque o cadastro por
+e-mail ainda não verifica o endereço (`requireLocalEmailVerified`, padrão do Better Auth). Nesse caso,
+o callback redireciona com `error=account_not_linked`. Isso impede que alguém cadastre o e-mail de
+outra pessoa com uma senha conhecida e passe a compartilhar a conta quando ela entrar pelo Google.
 
 ### Endpoints mockados de grupos
 
