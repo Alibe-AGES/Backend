@@ -30,6 +30,10 @@ import { UpdateEventDto } from '../../../../src/modules/events/http/dto/update-e
 import { EventController } from '../../../../src/modules/events/http/event.controller';
 import { GetEventMemoriesUseCase } from '../../../../src/modules/events/application/get-event-memories.use-case';
 import { CreateMemoryUseCase } from '../../../../src/modules/events/application/create-memory.use-case';
+import {
+  GetMemoryUseCase,
+  MemoryNotFoundError,
+} from '../../../../src/modules/events/application/get-memory.use-case';
 
 describe('EventController', () => {
   let controller: EventController;
@@ -38,9 +42,11 @@ describe('EventController', () => {
   let createMemoryUseCaseMock: { execute: jest.Mock };
   let getEventUseCaseMock: { execute: jest.Mock };
   let getMemoriesUseCaseMock: { execute: jest.Mock };
+  let getMemoryUseCaseMock: { execute: jest.Mock };
 
   const eventId = '22222222-2222-4222-8222-222222222222';
   const userId = '11111111-1111-4111-8111-111111111111';
+  const memoryId = '11111111-1111-4111-8111-222222222222';
   const authenticatedRequest = {
     user: { id: userId },
   } as AuthenticatedRequest;
@@ -51,6 +57,7 @@ describe('EventController', () => {
     createMemoryUseCaseMock = { execute: jest.fn() };
     getEventUseCaseMock = { execute: jest.fn() };
     getMemoriesUseCaseMock = { execute: jest.fn() };
+    getMemoryUseCaseMock = { execute: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EventController],
@@ -61,6 +68,7 @@ describe('EventController', () => {
         { provide: GetEventUseCase, useValue: getEventUseCaseMock },
         { provide: GetEventImageUseCase, useValue: { execute: jest.fn() } },
         { provide: GetEventMemoriesUseCase, useValue: getMemoriesUseCaseMock },
+        { provide: GetMemoryUseCase, useValue: getMemoryUseCaseMock },
       ],
     }).compile();
 
@@ -399,6 +407,49 @@ describe('EventController', () => {
         UnauthorizedException
       );
       expect(getEventUseCaseMock.execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getMemoryById', () => {
+    const memoryDetails = {
+      id: memoryId,
+      picture: `/api/events/${eventId}/memories/${memoryId}/image`,
+      eventId,
+    };
+
+    it('returns memory details when user is a group member', async () => {
+      getMemoryUseCaseMock.execute.mockResolvedValue(memoryDetails);
+
+      const result = await controller.getMemory(eventId, memoryId, authenticatedRequest);
+
+      expect(getMemoryUseCaseMock.execute).toHaveBeenCalledWith(eventId, memoryId, userId);
+      expect(result).toEqual({
+        id: memoryId,
+        picture: `/api/events/${eventId}/memories/${memoryId}/image`,
+        eventId,
+      });
+    });
+
+    it('rejects a request without an authenticated user', async () => {
+      await expect(
+        controller.getMemory(eventId, memoryId, {} as AuthenticatedRequest)
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(getMemoryUseCaseMock.execute).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [new MemoryNotFoundError('Memória não encontrada'), NotFoundException],
+      [
+        new EventDetailsAccessDeniedError('O usuário não pertence ao grupo do evento'),
+        ForbiddenException,
+      ],
+    ])('maps %p to the matching HTTP exception', async (error, exception) => {
+      getMemoryUseCaseMock.execute.mockRejectedValue(error);
+
+      await expect(
+        controller.getMemory(eventId, memoryId, authenticatedRequest)
+      ).rejects.toBeInstanceOf(exception);
     });
   });
 });

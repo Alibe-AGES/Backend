@@ -602,4 +602,98 @@ describe('PrismaEventRepository', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('findMemoryById', () => {
+    const memoryId = '77777777-7777-4777-8777-777777777777';
+    const memoryRow = {
+      id: memoryId,
+      picture: `events/${eventId}/memories/memory-1.jpg`,
+      eventId,
+      event: {
+        group: {
+          users: [{ userId: authenticatedRequest.user.id }],
+        },
+      },
+    };
+
+    it('returns memory details and true membership for a member user', async () => {
+      const userId = authenticatedRequest.user.id;
+      const findUnique = jest.fn().mockResolvedValue(memoryRow);
+      const prisma = { memory: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      await expect(repository.findMemoryById(memoryId, eventId, userId)).resolves.toEqual({
+        memory: {
+          id: memoryId,
+          picture: `events/${eventId}/memories/memory-1.jpg`,
+          eventId,
+        },
+        userIsMember: true,
+      });
+
+      expect(findUnique).toHaveBeenCalledWith({
+        where: {
+          id: memoryId,
+          eventId: eventId,
+        },
+        select: {
+          id: true,
+          picture: true,
+          eventId: true,
+          event: {
+            select: {
+              group: {
+                select: {
+                  users: {
+                    where: { userId },
+                    select: { userId: true },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    it('returns memory details and false membership for a user outside the group', async () => {
+      const outsideUserId = 'outside-user';
+      const findUnique = jest.fn().mockResolvedValue({
+        ...memoryRow,
+        event: {
+          group: {
+            users: [],
+          },
+        },
+      });
+      const prisma = { memory: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      const result = await repository.findMemoryById(memoryId, eventId, outsideUserId);
+
+      expect(result).toEqual({
+        memory: {
+          id: memoryId,
+          picture: `events/${eventId}/memories/memory-1.jpg`,
+          eventId,
+        },
+        userIsMember: false,
+      });
+    });
+
+    it('returns null when the memory does not exist', async () => {
+      const findUnique = jest.fn().mockResolvedValue(null);
+      const prisma = { memory: { findUnique } } as unknown as PrismaService;
+      const repository = new PrismaEventRepository(prisma);
+
+      await expect(
+        repository.findMemoryById(
+          '00000000-0000-0000-0000-000000000000',
+          eventId,
+          authenticatedRequest.user.id
+        )
+      ).resolves.toBeNull();
+    });
+  });
 });
