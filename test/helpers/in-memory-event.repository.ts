@@ -327,4 +327,32 @@ export class InMemoryEventRepository extends EventRepository {
 
     this.memories.set(eventId, existingMemories);
   }
+
+  findMemoryImageAccess(
+    eventId: string,
+    memoryId: string,
+    userId: string
+  ): Promise<{ imageKey: string | null; userIsMember: boolean } | null> {
+    const event = this.events.get(eventId);
+    if (!event) {
+      return Promise.resolve(null);
+    }
+
+    const eventMemories = this.memories.get(eventId) ?? [];
+    const memory = eventMemories.find((m) => m.id === memoryId);
+
+    if (!memory) {
+      return Promise.resolve({
+        imageKey: null,
+        userIsMember: this.groups.get(event.groupId)?.has(userId) ?? false,
+      });
+    }
+
+    const userIsMember = this.groups.get(event.groupId)?.has(userId) ?? false;
+
+    return Promise.resolve({
+      imageKey: memory.picture,
+      userIsMember,
+    });
+  }
 }

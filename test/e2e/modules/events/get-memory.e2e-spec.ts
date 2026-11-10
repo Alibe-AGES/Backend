@@ -99,7 +99,7 @@ describe('EventMemoryController (e2e)', () => {
 
     expect(response.body).toEqual({
       id: DEMO_MEMORY_ID,
-      picture: `events/${DEMO_EVENT_ID}/memories/${DEMO_MEMORY_ID}/image`,
+      picture: `/api/events/${DEMO_EVENT_ID}/memories/${DEMO_MEMORY_ID}/image`,
       eventId: DEMO_EVENT_ID,
     });
   });

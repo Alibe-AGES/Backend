@@ -75,19 +75,23 @@ describe('Event memories endpoint (e2e)', () => {
     expect(response.body).toMatchObject({
       id: expect.any(String),
       eventId: EVENT_ID,
-      picture: expect.stringMatching(new RegExp(`^\/memories\/.+\/images\/.+$`)),
-    });
-
-    expect(saveSpy).toHaveBeenCalledTimes(1);
-    await expect(storage.findByKey(response.body.picture)).resolves.toEqual({
-      bytes: IMAGE_BYTES,
-      contentType: 'image/png',
+      picture: `/api/events/${EVENT_ID}/memories/${response.body.id}/image`,
     });
 
     const stored = await events.findMemories(EVENT_ID, USER_ID);
     expect(stored?.memories).toEqual([
-      expect.objectContaining({ id: response.body.id, eventId: EVENT_ID }),
+      expect.objectContaining({
+        id: response.body.id,
+        eventId: EVENT_ID,
+        picture: expect.stringMatching(new RegExp(`^\/memories\/.+\/images\/.+$`)),
+      }),
     ]);
+
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+    await expect(storage.findByKey(stored!.memories[0].picture)).resolves.toEqual({
+      bytes: IMAGE_BYTES,
+      contentType: 'image/png',
+    });
   });
 
   it('rejects a request when the image file is missing', async () => {
