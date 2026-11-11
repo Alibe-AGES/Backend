@@ -409,7 +409,7 @@ async function main() {
       timeslot: new Date('2026-10-03T20:00:00'),
       budgetStart: '60.00',
       budgetEnd: '120.00',
-      status: StatusEnum.pending,
+      status: StatusEnum.confirmed,
       createdAt: new Date('2026-08-24'),
       groupIndex: 0,
       locationIndex: 4,
