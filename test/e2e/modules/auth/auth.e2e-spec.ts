@@ -260,6 +260,12 @@ describe('Better Auth configuration (e2e)', () => {
     expect(response.body.paths['/api/auth/sign-out'].post).toEqual(
       expect.objectContaining({ operationId: 'signOut' })
     );
+    expect(response.body.paths['/api/auth/sign-in/social'].post).toEqual(
+      expect.objectContaining({ operationId: 'signInWithSocialProvider' })
+    );
+    expect(response.body.paths['/api/auth/callback/google'].get).toEqual(
+      expect.objectContaining({ operationId: 'googleOAuthCallback' })
+    );
     expect(response.body.components.securitySchemes['better-auth-bearer']).toEqual(
       expect.objectContaining({ type: 'http', scheme: 'bearer' })
     );

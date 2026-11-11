@@ -224,6 +224,100 @@ export function addBetterAuthOpenApiPaths(document: OpenAPIObject): OpenAPIObjec
     },
   };
 
+  document.paths['/api/auth/sign-in/social'] = {
+    post: {
+      tags: ['Authentication'],
+      operationId: 'signInWithSocialProvider',
+      summary: 'Iniciar login com Google',
+      description:
+        'Gera a URL de autorização do Google. No aplicativo mobile, o cliente Better Auth Expo ' +
+        'abre essa URL no navegador e recebe a sessão pelo deep link após o callback. ' +
+        'Disponível somente quando GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET estão configurados.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              required: ['provider'],
+              properties: {
+                provider: { type: 'string', enum: ['google'] },
+                callbackURL: {
+                  type: 'string',
+                  example: '/',
+                  description: 'Destino após o login; no app, é convertido para o scheme alibe://.',
+                },
+                newUserCallbackURL: {
+                  type: 'string',
+                  description: 'Destino quando o login cria um novo usuário.',
+                },
+                errorCallbackURL: {
+                  type: 'string',
+                  description: 'Destino quando o Google ou o Better Auth recusam o login.',
+                },
+                disableRedirect: {
+                  type: 'boolean',
+                  description: 'Quando true, apenas retorna a URL sem indicar redirecionamento.',
+                },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: 'URL de autorização do Google e cookie temporário de estado do OAuth.',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['url', 'redirect'],
+                properties: {
+                  url: {
+                    type: 'string',
+                    format: 'uri',
+                    example: 'https://accounts.google.com/o/oauth2/v2/auth?...',
+                  },
+                  redirect: { type: 'boolean', example: true },
+                },
+              },
+            },
+          },
+        },
+        404: {
+          description: 'Provider não configurado neste ambiente.',
+          content: { 'application/json': { schema: errorSchema } },
+        },
+      },
+    },
+  };
+
+  document.paths['/api/auth/callback/google'] = {
+    get: {
+      tags: ['Authentication'],
+      operationId: 'googleOAuthCallback',
+      summary: 'Callback OAuth do Google',
+      description:
+        'Chamado pelo Google, não pelo aplicativo. Cria o usuário no primeiro acesso ou entra na ' +
+        'conta já vinculada ao Google, cria a sessão e redireciona para o callbackURL informado. ' +
+        'Um e-mail já cadastrado com senha e não verificado não é vinculado automaticamente.',
+      parameters: [
+        { name: 'code', in: 'query', required: false, schema: { type: 'string' } },
+        { name: 'state', in: 'query', required: true, schema: { type: 'string' } },
+        { name: 'error', in: 'query', required: false, schema: { type: 'string' } },
+      ],
+      responses: {
+        302: {
+          description:
+            'Redireciona para o callbackURL com o cookie de sessão, ou para o errorCallbackURL com ?error=.',
+          headers: {
+            Location: { description: 'Destino do redirecionamento.', schema: { type: 'string' } },
+          },
+        },
+      },
+    },
+  };
+
   document.paths['/api/auth/sign-out'] = {
     post: {
       tags: ['Authentication'],
