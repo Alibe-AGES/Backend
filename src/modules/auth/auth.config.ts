@@ -14,10 +14,16 @@ const { prismaAdapter } = nodeRequire('@better-auth/prisma-adapter') as typeof P
 const { betterAuth } = nodeRequire('better-auth') as typeof BetterAuthModule;
 const { bearer } = nodeRequire('better-auth/plugins') as typeof BetterAuthPluginsModule;
 
+export interface GoogleAuthEnvironment {
+  clientId: string;
+  clientSecret: string;
+}
+
 export interface AuthEnvironment {
   secret: string;
   baseURL: string;
   trustedOrigins: string[];
+  google: GoogleAuthEnvironment | null;
 }
 
 export function createAuth(prisma: PrismaService, environment = process.env) {
@@ -30,6 +36,7 @@ export function createAuth(prisma: PrismaService, environment = process.env) {
    * - POST /api/auth/sign-in/email
    * - POST /api/auth/sign-up/email
    * - GET /api/auth/get-session
+   * - POST /api/auth/sign-in/social e GET /api/auth/callback/google, quando o Google está configurado
    *
    * Essas rotas pertencem ao handler do Better Auth e não a controllers Nest.
    */
@@ -53,6 +60,17 @@ export function createAuth(prisma: PrismaService, environment = process.env) {
       minPasswordLength: 8,
       maxPasswordLength: 128,
     },
+    socialProviders: authEnvironment.google
+      ? {
+          google: {
+            clientId: authEnvironment.google.clientId,
+            clientSecret: authEnvironment.google.clientSecret,
+            prompt: 'select_account',
+            // `profilePic` guarda uma chave do S3; a URL do Google não pode ser servida por ela.
+            mapProfileToUser: () => ({ image: undefined }),
+          },
+        }
+      : {},
     advanced: {
       database: {
         generateId: 'uuid',
@@ -92,5 +110,21 @@ export function readAuthEnvironment(environment: NodeJS.ProcessEnv): AuthEnviron
     secret,
     baseURL: parsedBaseURL.toString().replace(/\/$/, ''),
     trustedOrigins,
+    google: readGoogleAuthEnvironment(environment),
   };
+}
+
+function readGoogleAuthEnvironment(environment: NodeJS.ProcessEnv): GoogleAuthEnvironment | null {
+  const clientId = environment.GOOGLE_CLIENT_ID?.trim() ?? '';
+  const clientSecret = environment.GOOGLE_CLIENT_SECRET?.trim() ?? '';
+
+  if (!clientId && !clientSecret) {
+    return null;
+  }
+
+  if (!clientId || !clientSecret) {
+    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together');
+  }
+
+  return { clientId, clientSecret };
 }

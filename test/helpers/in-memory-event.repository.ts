@@ -11,6 +11,7 @@ import {
   EventMemories,
   CreateMemoryData,
   EventMemoryDetails,
+  EventMemoryAccess,
 } from '../../src/modules/events/domain/event.repository';
 
 export class InMemoryEventRepository extends EventRepository {
@@ -279,6 +280,78 @@ export class InMemoryEventRepository extends EventRepository {
 
     return Promise.resolve({
       memories: eventMemories,
+      userIsMember,
+    });
+  }
+
+  findMemoryById(id: string, eventId: string, userId: string): Promise<EventMemoryAccess | null> {
+    const eventMemories = this.memories.get(eventId);
+
+    if (!eventMemories || eventMemories.length === 0) {
+      return null;
+    }
+
+    const memory = eventMemories.find((m) => m.id === id);
+
+    if (!memory) {
+      return null;
+    }
+
+    const event = this.events.get(eventId);
+    if (!event) {
+      return null;
+    }
+
+    const groupMembers = this.groups.get(event.groupId);
+    const userIsMember = groupMembers ? groupMembers.has(userId) : false;
+
+    return Promise.resolve({
+      memory: {
+        id: memory.id,
+        picture: memory.picture,
+        eventId: memory.eventId,
+      },
+      userIsMember,
+    });
+  }
+
+  setMemory(eventId: string, memory: { id: string; picture: string; eventId: string }): void {
+    const existingMemories = this.memories.get(eventId) ?? [];
+
+    const index = existingMemories.findIndex((m) => m.id === memory.id);
+    if (index >= 0) {
+      existingMemories[index] = memory;
+    } else {
+      existingMemories.push(memory);
+    }
+
+    this.memories.set(eventId, existingMemories);
+  }
+
+  findMemoryImageAccess(
+    eventId: string,
+    memoryId: string,
+    userId: string
+  ): Promise<{ imageKey: string | null; userIsMember: boolean } | null> {
+    const event = this.events.get(eventId);
+    if (!event) {
+      return Promise.resolve(null);
+    }
+
+    const eventMemories = this.memories.get(eventId) ?? [];
+    const memory = eventMemories.find((m) => m.id === memoryId);
+
+    if (!memory) {
+      return Promise.resolve({
+        imageKey: null,
+        userIsMember: this.groups.get(event.groupId)?.has(userId) ?? false,
+      });
+    }
+
+    const userIsMember = this.groups.get(event.groupId)?.has(userId) ?? false;
+
+    return Promise.resolve({
+      imageKey: memory.picture,
       userIsMember,
     });
   }

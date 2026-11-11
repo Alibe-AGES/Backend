@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
+  Patch,
   ForbiddenException,
   Get,
   Header,
@@ -11,6 +13,7 @@ import {
   HttpStatus,
   NotFoundException,
   Post,
+  Put,
   Request,
   StreamableFile,
   UnauthorizedException,
@@ -27,6 +30,8 @@ import {
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
+  ApiNoContentResponse,
+  ApiPayloadTooLargeResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -36,6 +41,14 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
+import { UpdateGroupUseCase } from '../application/update-group.use-case';
+import { RemoveGroupMemberUseCase } from '../application/remove-group-member.use-case';
+import {
+  GroupMembershipNotFoundError,
+  LeaveGroupUseCase,
+} from '../application/leave-group.use-case';
+import { GroupManagementError } from '../domain/group.repository';
+import { UpdateGroupDto } from './dto/update-group.dto';
 import {
   GetGroupProfilePictureUseCase,
   GroupImageAccessDeniedError,
@@ -68,7 +81,10 @@ export class GroupsController {
     private readonly getGroupUseCase: GetGroupUseCase,
     private readonly getGroupProfilePictureUseCase: GetGroupProfilePictureUseCase,
     private readonly listGroupsUseCase: ListGroupsUseCase,
-    private readonly getAvailabilityIntervalsUseCase: GetAvailabilityIntervalsUseCase
+    private readonly getAvailabilityIntervalsUseCase: GetAvailabilityIntervalsUseCase,
+    private readonly updateGroupUseCase: UpdateGroupUseCase,
+    private readonly removeGroupMemberUseCase: RemoveGroupMemberUseCase,
+    private readonly leaveGroupUseCase: LeaveGroupUseCase
   ) {}
   /**
    * GET /groups
@@ -202,9 +218,8 @@ export class GroupsController {
     @UploadedFile() image: Express.Multer.File | null,
     @Request() request: AuthenticatedRequest
   ): Promise<GroupListItemResponseDto> {
-    // Disponível para vincular o criador como participante do grupo.
     const userId = request.user?.id;
-    void userId;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
 
     try {
       const group = await this.createGroupUseCase.execute({
@@ -226,6 +241,117 @@ export class GroupsController {
       }
       throw error;
     }
+  }
+
+  @Patch(':groupId')
+  @UseInterceptors(
+    FileInterceptor('profile_pic', { limits: { fileSize: MAX_IMAGE_SIZE_IN_BYTES } })
+  )
+  @ApiOperation({ summary: 'Edita nome e imagem do grupo, somente pelo owner' })
+  @ApiParam({ name: 'groupId', format: 'uuid' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', minLength: 2, maxLength: 100 },
+        profile_pic: { type: 'string', format: 'binary' },
+        removeProfilePicture: { type: 'boolean', description: 'Remove a imagem sem substituí-la.' },
+      },
+    },
+  })
+  @ApiOkResponse({ description: 'Grupo atualizado.', type: GroupListItemResponseDto })
+  @ApiBadRequestResponse({ description: 'Dados inválidos ou nenhuma alteração informada.' })
+  @ApiPayloadTooLargeResponse({ description: 'Imagem maior que 5 MB.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'Somente o owner pode editar.' })
+  @ApiNotFoundResponse({ description: 'Grupo não encontrado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
+  async update(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Body() input: UpdateGroupDto,
+    @UploadedFile() image: Express.Multer.File | undefined,
+    @Request() request: AuthenticatedRequest
+  ): Promise<GroupListItemResponseDto> {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
+    try {
+      const group = await this.updateGroupUseCase.execute({
+        ...input,
+        groupId,
+        userId,
+        image: image
+          ? { originalName: image.originalname, contentType: image.mimetype, bytes: image.buffer }
+          : undefined,
+      });
+      return GroupResponsePresenter.toResponse(group);
+    } catch (error) {
+      if (error instanceof InvalidGroupError) throw new BadRequestException(error.message);
+      this.rethrowManagementError(error);
+    }
+  }
+
+  @Delete(':groupId/members/:userId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove um participante; o owner pode remover a si mesmo' })
+  @ApiParam({ name: 'groupId', format: 'uuid' })
+  @ApiParam({ name: 'userId', format: 'uuid' })
+  @ApiNoContentResponse({
+    description:
+      'Participante removido. Se necessário, outro owner é sorteado; grupo vazio é preservado.',
+  })
+  @ApiBadRequestResponse({ description: 'UUID inválido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'Somente o owner pode remover participantes.' })
+  @ApiNotFoundResponse({ description: 'Grupo ou participante não encontrado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
+  async removeMember(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Param('userId', new ParseUUIDPipe()) memberId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<void> {
+    const ownerId = request.user?.id;
+    if (!ownerId) throw new UnauthorizedException('Authenticated user not found');
+    try {
+      await this.removeGroupMemberUseCase.execute(groupId, memberId, ownerId);
+    } catch (error) {
+      this.rethrowManagementError(error);
+    }
+  }
+
+  @Put(':groupId/leave')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Remove o usuário autenticado do grupo' })
+  @ApiParam({ name: 'groupId', format: 'uuid' })
+  @ApiCreatedResponse({ description: 'Participação removida com sucesso. Resposta sem corpo.' })
+  @ApiBadRequestResponse({
+    description: 'UUID inválido, grupo inexistente ou usuário sem vínculo.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno inesperado.' })
+  async leave(
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<void> {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
+
+    try {
+      await this.leaveGroupUseCase.execute(groupId, userId);
+    } catch (error) {
+      if (error instanceof GroupMembershipNotFoundError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  private rethrowManagementError(error: unknown): never {
+    if (error instanceof GroupManagementError) {
+      if (error.reason === 'forbidden') throw new ForbiddenException(error.message);
+      throw new NotFoundException(error.message);
+    }
+    throw error;
   }
 
   @Get(':groupId/availabilities')

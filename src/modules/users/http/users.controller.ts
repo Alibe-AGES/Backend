@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   ForbiddenException,
   Get,
@@ -45,6 +46,11 @@ import {
   UpdateUserProfilePictureUseCase,
   UserNotFoundForProfilePictureError,
 } from '../application/update-user-profile-picture.use-case';
+import {
+  InvalidCurrentPasswordError,
+  UpdatePasswordUseCase,
+} from '../application/update-password.use-case';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UpdateUserProfilePictureResponseDto } from './dto/update-user-profile-picture-response.dto';
 
 @ApiTags('Users')
@@ -54,7 +60,8 @@ import { UpdateUserProfilePictureResponseDto } from './dto/update-user-profile-p
 export class UsersController {
   constructor(
     private readonly getUserProfilePicture: GetUserProfilePictureUseCase,
-    private readonly updateUserProfilePicture: UpdateUserProfilePictureUseCase
+    private readonly updateUserProfilePicture: UpdateUserProfilePictureUseCase,
+    private readonly updatePassword: UpdatePasswordUseCase
   ) {}
 
   /**
@@ -118,6 +125,42 @@ export class UsersController {
 
       if (error instanceof UserNotFoundForProfilePictureError) {
         throw new NotFoundException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * PUT /users/me/update-password
+   * Altera a senha do usuário da sessão atual após conferir a senha atual.
+   */
+  @Put('me/update-password')
+  @ApiOperation({ summary: 'Altera a senha do usuário autenticado' })
+  @ApiOkResponse({ description: 'Senha alterada com sucesso.' })
+  @ApiBadRequestResponse({
+    description: 'Senha atual incorreta ou nova senha fora do limite de 8 a 128 caracteres.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  async changePassword(
+    @Body() body: UpdatePasswordDto,
+    @Request() request: AuthenticatedRequest
+  ): Promise<void> {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    try {
+      await this.updatePassword.execute({
+        userId,
+        password: body.password,
+        newPassword: body.newPassword,
+      });
+    } catch (error) {
+      if (error instanceof InvalidCurrentPasswordError) {
+        throw new BadRequestException(error.message);
       }
 
       throw error;

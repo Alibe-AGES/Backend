@@ -5,6 +5,7 @@ import { StorageModule } from '../../infrastructure/storage/storage.module';
 import { GetUserProfilePictureUseCase } from './application/get-user-profile-picture.use-case';
 import { UpdateUserProfilePictureUseCase } from './application/update-user-profile-picture.use-case';
 import { GetCurrentUserSummaryUseCase } from './application/get-current-user-summary.use-case';
+import { UpdateUserProfileUseCase } from './application/update-user-profile.use-case';
 import { UserProfileRepository } from './domain/user-profile.repository';
 import { UserImageRepository } from './domain/user-image.repository';
 import { CurrentUserController } from './http/current-user.controller';
@@ -14,6 +15,7 @@ import { PrismaUserImageRepository } from './persistence/prisma-user-image.repos
 import { RegisterPushTokenUseCase } from './application/register-push-token.use-case';
 import { PushTokensController } from './http/push-tokens.controller';
 import { SendTestPushNotificationUseCase } from './application/send-test-push-notification.use-case';
+import { UpdatePasswordUseCase } from './application/update-password.use-case';
 
 @Module({
   imports: [PrismaModule, StorageModule, MessagingModule],
@@ -22,8 +24,10 @@ import { SendTestPushNotificationUseCase } from './application/send-test-push-no
     GetUserProfilePictureUseCase,
     UpdateUserProfilePictureUseCase,
     GetCurrentUserSummaryUseCase,
+    UpdateUserProfileUseCase,
     RegisterPushTokenUseCase,
     SendTestPushNotificationUseCase,
+    UpdatePasswordUseCase,
     {
       provide: UserProfileRepository,
       useClass: PrismaUserProfileRepository,

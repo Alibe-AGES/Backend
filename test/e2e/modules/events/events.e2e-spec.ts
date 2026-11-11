@@ -196,7 +196,9 @@ describe('Events endpoint (e2e)', () => {
         .get(`/api/events/${EVENT_ID}/memories`)
         .expect(200);
 
-      expect(response.body).toEqual([memory]);
+      expect(response.body).toEqual([
+        { ...memory, picture: `/api/events/${EVENT_ID}/memories/${memory.id}/image` },
+      ]);
     });
 
     it('rejects requests for non-existent events', async () => {

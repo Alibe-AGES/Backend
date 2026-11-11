@@ -58,7 +58,7 @@ import {
   UpdateEventUseCase,
 } from '../application/update-event.use-case';
 import { Event } from '../domain/event.entity';
-import type { CreatedEvent, EventDetails } from '../domain/event.repository';
+import type { CreatedEvent, EventDetails, EventMemoryDetails } from '../domain/event.repository';
 import { CreateEventDto } from './dto/create-event.dto';
 import { CreatedEventResponseDto, EventResponseDto } from './dto/event-response.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -78,6 +78,11 @@ import {
   CreateMemoryUseCase,
   InvalidMemoryCreationError,
 } from '../application/create-memory.use-case';
+import { GetMemoryUseCase, MemoryNotFoundError } from '../application/get-memory.use-case';
+import {
+  GetMemoryImageUseCase,
+  MemoryImageNotFoundError,
+} from '../application/get-memory-image.use-case';
 
 const MAX_IMAGE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
@@ -92,7 +97,9 @@ export class EventController {
     private readonly updateEventUseCase: UpdateEventUseCase,
     private readonly createEventUseCase: CreateEventUseCase,
     private readonly getMemoriesUseCase: GetEventMemoriesUseCase,
-    private readonly createMemoryUseCase: CreateMemoryUseCase
+    private readonly createMemoryUseCase: CreateMemoryUseCase,
+    private readonly getMemoryUseCase: GetMemoryUseCase,
+    private readonly getMemoryImageUseCase: GetMemoryImageUseCase
   ) {}
 
   @Post('groups/:groupId/events')
@@ -374,7 +381,7 @@ export class EventController {
         userId
       );
 
-      return created;
+      return this.toMemoryResponse(created);
     } catch (error) {
       if (error instanceof InvalidMemoryCreationError) {
         throw new BadRequestException(error.message);
@@ -387,6 +394,14 @@ export class EventController {
       }
       throw error;
     }
+  }
+
+  private toMemoryResponse(memory: EventMemoryDetails): EventMemoriesResponseDto {
+    return {
+      id: memory.id,
+      picture: `/api/events/${memory.eventId}/memories/${memory.id}/image`,
+      eventId: memory.eventId,
+    };
   }
 
   private toDetailsResponse(event: EventDetails): EventDetailsResponseDto {
@@ -495,7 +510,7 @@ export class EventController {
 
     try {
       const memories = await this.getMemoriesUseCase.execute(eventId, userId);
-      return memories;
+      return memories.map((memory) => this.toMemoryResponse(memory));
     } catch (error) {
       if (error instanceof GetEventNotFoundError) {
         throw new NotFoundException(error.message);
@@ -505,6 +520,81 @@ export class EventController {
         throw new ForbiddenException(error.message);
       }
 
+      throw error;
+    }
+  }
+
+  @Get('/api/events/:eventId/memories/:memoryId')
+  @ApiOperation({ summary: 'Consulta os dados de uma memória' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
+  @ApiParam({ name: 'memoryId', format: 'uuid' })
+  @ApiOkResponse({ type: EventMemoriesResponseDto })
+  @ApiBadRequestResponse({ description: 'Identificador do evento ou memória inválido.' })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
+  @ApiNotFoundResponse({ description: 'Evento ou memória não encontrado.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar a memória.' })
+  async getMemory(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Param('memoryId', new ParseUUIDPipe()) memoryId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<EventMemoriesResponseDto> {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user not found');
+    }
+
+    try {
+      const memory = await this.getMemoryUseCase.execute(eventId, memoryId, userId);
+      return this.toMemoryResponse(memory);
+    } catch (error) {
+      if (error instanceof MemoryNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+
+      if (error instanceof EventDetailsAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  @Get('api/events/:eventId/memories/:memoryId/image')
+  @ApiOperation({ summary: 'Consulta a imagem de uma memória' })
+  @ApiParam({ name: 'eventId', format: 'uuid' })
+  @ApiParam({ name: 'memoryId', format: 'uuid' })
+  @ApiOkResponse({ type: StreamableFile })
+  @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
+  @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
+  @ApiBadRequestResponse({ description: 'eventId ou memoryId não são UUIDs válidos.' })
+  @ApiNotFoundResponse({ description: 'Evento ou imagem não encontrados.' })
+  @ApiInternalServerErrorResponse({ description: 'Erro interno ao consultar o evento.' })
+  async getMemoryImage(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Param('memoryId', new ParseUUIDPipe()) memoryId: string,
+    @Request() request: AuthenticatedRequest
+  ): Promise<StreamableFile> {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('Authenticated user not found');
+    try {
+      const image = await this.getMemoryImageUseCase.execute(eventId, memoryId, userId);
+      return new StreamableFile(Buffer.from(image.bytes), {
+        type: image.contentType,
+        disposition: 'inline',
+        length: image.bytes.byteLength,
+      });
+    } catch (error) {
+      if (error instanceof EventImageAccessDeniedError) {
+        throw new ForbiddenException(error.message);
+      }
+      if (error instanceof GetEventNotFoundError) {
+        throw new NotFoundException('Evento não encontrado');
+      }
+      if (error instanceof MemoryImageNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
       throw error;
     }
   }

@@ -6,6 +6,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { GroupsController } from '../../../../src/modules/groups/http/groups.controller';
+import { UpdateGroupUseCase } from '../../../../src/modules/groups/application/update-group.use-case';
+import { RemoveGroupMemberUseCase } from '../../../../src/modules/groups/application/remove-group-member.use-case';
+import { LeaveGroupUseCase } from '../../../../src/modules/groups/application/leave-group.use-case';
 import {
   CreateGroupUseCase,
   InvalidGroupError,
@@ -46,6 +49,9 @@ describe('GroupsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GroupsController],
       providers: [
+        { provide: UpdateGroupUseCase, useValue: { execute: jest.fn() } },
+        { provide: RemoveGroupMemberUseCase, useValue: { execute: jest.fn() } },
+        { provide: LeaveGroupUseCase, useValue: { execute: jest.fn() } },
         {
           provide: CreateGroupUseCase,
           useValue: createGroupUseCaseMock,

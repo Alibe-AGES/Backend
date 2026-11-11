@@ -1,5 +1,28 @@
 # Alibe Backend
 
+## Sair de um grupo
+
+`PUT /groups/:groupId/leave` remove somente o vínculo do usuário autenticado com o grupo, sem body na requisição. Retorna `201` sem corpo em caso de sucesso; `400` para UUID inválido ou vínculo inexistente (incluindo grupo inexistente e saída repetida); `401` sem autenticação; `500` para falhas inesperadas. O grupo e os demais dados são preservados, inclusive quando o último membro sai.
+
+## Edição de grupo (ALI-49)
+
+Somente o owner pode editar o grupo ou remover participantes. O usuário autenticado que cria um grupo passa a ser seu owner. `GET /groups/:groupId` informa `ownerId` (nulo para grupos vazios).
+
+| Método | Rota                               | Entrada                                                                                             | Sucesso               |
+| ------ | ---------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------- |
+| PATCH  | `/groups/:groupId`                 | `multipart/form-data`: `name` e/ou `profile_pic`; `removeProfilePicture=true` para remover a imagem | `200`, dados do grupo |
+| DELETE | `/groups/:groupId/members/:userId` | Sem body                                                                                            | `204`, sem corpo      |
+
+Na edição, campos omitidos são preservados. O nome segue os limites do DTO de criação (2–100 caracteres). A imagem segue os formatos/extensões atuais de criação, com limite de 5 MB. Não é permitido enviar uma nova imagem junto com a solicitação de removê-la. Retornos: `400` para dados inválidos ou edição vazia, `401` sem autenticação, `403` para quem não é owner, `404` para grupo/participante inexistente e `413` para upload maior que o limite; falhas inesperadas retornam `500`.
+
+O owner pode remover a si mesmo: outro participante é escolhido aleatoriamente e persistido como owner na mesma transação. Se não restar ninguém, o grupo permanece com `ownerId=null`. Se alguém voltar por um convite válido, o primeiro membro a entrar assume o grupo. A remoção preserva o usuário, os demais grupos e os dados históricos.
+
+A migration `20261106180000_add_group_owner` atribui uma única vez um participante aleatório a cada grupo existente com membros e preserva grupos vazios sem owner. O seed também atribui owners aos seus grupos. A migration deve ser aplicada pelo fluxo normal de deploy; não é necessário resetar dados.
+
+A ALI-112 ainda não está nesta base. O método compartilhado `GroupRepository.removeMember(groupId, userId)` já transfere ownership para a saída voluntária; na integração da ALI-112 deve ser preservada esta implementação, substituindo a remoção simples daquela branch. Nenhuma rota de saída foi duplicada aqui.
+
+Os testes de PostgreSQL são opcionais via `TEST_DATABASE_URL`, limitado a banco local cujo nome termina com `_test`, com migrations previamente aplicadas. A suíte de ownership cobre permissões, troca de owner, grupo vazio, concorrência, rollback e a migration de grupos existentes. Ela não deve usar o banco de desenvolvimento.
+
 API do projeto Alibe construída com NestJS, TypeScript, Prisma e PostgreSQL.
 
 O projeto adota uma arquitetura modular inspirada em Clean Architecture e SOLID, mantendo as convenções e o sistema de injeção de dependências do NestJS. O objetivo é separar regras de negócio, casos de uso, entrada HTTP e persistência sem transformar cada funcionalidade em um conjunto desnecessário de camadas.
@@ -93,6 +116,8 @@ Variáveis atuais:
 | `BETTER_AUTH_SECRET`                | Segredo de alta entropia usado para assinar dados de autenticação.   |
 | `BETTER_AUTH_URL`                   | URL pública da API utilizada pelo Better Auth.                       |
 | `BETTER_AUTH_TRUSTED_ORIGINS`       | Origens web e schemes Expo aceitos, separados por vírgula.           |
+| `GOOGLE_CLIENT_ID`                  | Client ID OAuth Web do Google; vazio desativa o login com Google.    |
+| `GOOGLE_CLIENT_SECRET`              | Client secret OAuth Web do Google; exigido junto com o Client ID.    |
 | `AWS_REGION`                        | Região usada pelo MiniStack e pelos comandos da AWS CLI.             |
 | `AWS_S3_BUCKET`                     | Nome do bucket utilizado pela aplicação.                             |
 | `AWS_SQS_NOTIFICATION_QUEUE_URL`    | URL da fila usada para publicar notificações.                        |
@@ -779,6 +804,37 @@ opcionalmente, `rememberMe`. Em caso de sucesso, o Better Auth cria o registro e
 o cookie `better-auth.session_token`. No aplicativo, o plugin cliente Better Auth Expo guarda e
 reenvia esse cookie; o campo `token` do JSON não deve ser salvo manualmente. Credenciais inválidas
 retornam `401` com a mesma mensagem para e-mail inexistente ou senha incorreta.
+
+#### Login com Google
+
+O provider Google do Better Auth é habilitado quando `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`
+estão preenchidos; com os dois vazios, a API inicia normalmente e `POST /api/auth/sign-in/social`
+responde `404`. Preencher apenas um deles impede a inicialização.
+
+O aplicativo usa o fluxo de redirecionamento do Better Auth Expo, sem SDK nativo do Google:
+
+```ts
+await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
+```
+
+1. o cliente chama `POST /api/auth/sign-in/social` e abre a URL do Google com `expo-web-browser`;
+2. o Google redireciona para `GET /api/auth/callback/google`;
+3. o Better Auth cria o usuário no primeiro acesso (com `emailVerified: true`) ou entra na conta já
+   vinculada, cria a sessão e devolve o app pelo scheme `alibe://`, onde o plugin Expo salva o cookie.
+
+Para obter as credenciais, crie no Google Cloud Console um cliente OAuth do tipo **Aplicativo da Web**
+e cadastre como URI de redirecionamento autorizado `${BETTER_AUTH_URL}/api/auth/callback/google`, por
+exemplo `http://localhost:3000/api/auth/callback/google`. O Google aceita `http` somente para
+`localhost`; em outros ambientes, `BETTER_AUTH_URL` precisa ser HTTPS com domínio, não IP. Em um
+celular físico, `localhost` não é alcançável: use um túnel HTTPS e ajuste `BETTER_AUTH_URL` e o URI.
+
+A foto do Google não é importada para `profilePic`, porque esse campo guarda a chave do S3 servida por
+`GET /users/:id/profile-picture`; o usuário pode enviar uma foto pelo endpoint de upload.
+
+Um e-mail já cadastrado com senha não é vinculado automaticamente à conta Google, porque o cadastro por
+e-mail ainda não verifica o endereço (`requireLocalEmailVerified`, padrão do Better Auth). Nesse caso,
+o callback redireciona com `error=account_not_linked`. Isso impede que alguém cadastre o e-mail de
+outra pessoa com uma senha conhecida e passe a compartilhar a conta quando ela entrar pelo Google.
 
 ### Endpoints mockados de grupos
 

@@ -105,8 +105,18 @@ export interface EventImageAccess {
   userIsMember: boolean;
 }
 
+export interface MemoryImageAccess {
+  imageKey: string | null;
+  userIsMember: boolean;
+}
+
 export interface EventMemories {
   memories: EventMemoryDetails[];
+  userIsMember: boolean;
+}
+
+export interface EventMemoryAccess {
+  memory: EventMemoryDetails;
   userIsMember: boolean;
 }
 
@@ -136,4 +146,16 @@ export abstract class EventRepository {
   abstract findMemories(eventId: string, userId: string): Promise<EventMemories | null>;
 
   abstract createMemory(data: CreateMemoryData): Promise<EventMemoryDetails | null>;
+
+  abstract findMemoryById(
+    id: string,
+    eventId: string,
+    userId: string
+  ): Promise<EventMemoryAccess | null>;
+
+  abstract findMemoryImageAccess(
+    eventId: string,
+    memoryId: string,
+    userId: string
+  ): Promise<MemoryImageAccess | null>;
 }
