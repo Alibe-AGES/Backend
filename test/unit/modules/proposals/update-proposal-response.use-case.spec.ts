@@ -1,4 +1,7 @@
-import { ProposalAccessDeniedError } from '../../../../src/modules/proposals/application/resolve-proposal';
+import {
+  ProposalAccessDeniedError,
+  ProposalEventAlreadyHappenedError,
+} from '../../../../src/modules/proposals/application/resolve-proposal';
 import {
   ProposalResponseNotFoundError,
   UpdateProposalResponseUseCase,
@@ -43,6 +46,18 @@ describe('UpdateProposalResponseUseCase', () => {
     const result = await useCase.execute({ eventId: EVENT_ID, userId: USER_ID, answer: 'no' });
 
     expect(result).toEqual({ response: { ...original.response, answer: 'no' }, matched: false });
+  });
+
+  it('does not let a member cancel the attendance after the event happened', async () => {
+    await responses.create({ proposalId: PROPOSAL_ID, userId: USER_ID, answer: 'yes', createdAt });
+    responses.setEvent(EVENT_ID, PROPOSAL_ID, [USER_ID], new Date(Date.now() - 60_000));
+
+    await expect(
+      useCase.execute({ eventId: EVENT_ID, userId: USER_ID, answer: 'no' })
+    ).rejects.toBeInstanceOf(ProposalEventAlreadyHappenedError);
+    await expect(
+      useCase.execute({ proposalId: PROPOSAL_ID, userId: USER_ID, answer: 'no' })
+    ).rejects.toBeInstanceOf(ProposalEventAlreadyHappenedError);
   });
 
   it('rejects a user who has not answered yet', async () => {

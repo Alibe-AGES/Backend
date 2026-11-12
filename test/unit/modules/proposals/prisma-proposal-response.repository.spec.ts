@@ -57,7 +57,9 @@ describe('PrismaProposalResponseRepository', () => {
   });
 
   it('loads the latest proposal and the user membership of the event group', async () => {
+    const timeslot = new Date('2026-12-20T20:00:00.000Z');
     prisma.event.findUnique.mockResolvedValue({
+      timeslot,
       proposals: [{ id: PROPOSAL_ID }],
       group: { users: [{ userId: USER_ID }] },
     });
@@ -65,10 +67,12 @@ describe('PrismaProposalResponseRepository', () => {
     await expect(repository.findEventProposalContext(EVENT_ID, USER_ID)).resolves.toEqual({
       proposalId: PROPOSAL_ID,
       isGroupMember: true,
+      eventTimeslot: timeslot,
     });
     expect(prisma.event.findUnique).toHaveBeenCalledWith({
       where: { id: EVENT_ID },
       select: {
+        timeslot: true,
         proposals: { select: { id: true }, orderBy: { createdAt: 'desc' }, take: 1 },
         group: {
           select: { users: { where: { userId: USER_ID }, select: { userId: true }, take: 1 } },
@@ -79,6 +83,7 @@ describe('PrismaProposalResponseRepository', () => {
 
   it('returns null for an unknown event and a null proposal when the event has none', async () => {
     prisma.event.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      timeslot: null,
       proposals: [],
       group: { users: [] },
     });
@@ -87,13 +92,23 @@ describe('PrismaProposalResponseRepository', () => {
     await expect(repository.findEventProposalContext(EVENT_ID, USER_ID)).resolves.toEqual({
       proposalId: null,
       isGroupMember: false,
+      eventTimeslot: null,
     });
   });
 
   it.each([
     [null, null],
-    [{ group: { users: [] } }, { isGroupMember: false }],
-    [{ group: { users: [{ userId: USER_ID }] } }, { isGroupMember: true }],
+    [
+      { event: null, group: { users: [] } },
+      { isGroupMember: false, eventTimeslot: null },
+    ],
+    [
+      {
+        event: { timeslot: new Date('2026-12-20T20:00:00.000Z') },
+        group: { users: [{ userId: USER_ID }] },
+      },
+      { isGroupMember: true, eventTimeslot: new Date('2026-12-20T20:00:00.000Z') },
+    ],
   ])('maps the proposal lookup %p to the context %p', async (proposal, expected) => {
     prisma.proposal.findUnique.mockResolvedValue(proposal);
 
@@ -101,6 +116,7 @@ describe('PrismaProposalResponseRepository', () => {
     expect(prisma.proposal.findUnique).toHaveBeenCalledWith({
       where: { id: PROPOSAL_ID },
       select: {
+        event: { select: { timeslot: true } },
         group: {
           select: { users: { where: { userId: USER_ID }, select: { userId: true }, take: 1 } },
         },

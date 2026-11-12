@@ -1,6 +1,7 @@
 import { CreateProposalResponseUseCase } from '../../../../src/modules/proposals/application/create-proposal-response.use-case';
 import {
   ProposalAccessDeniedError,
+  ProposalEventAlreadyHappenedError,
   ProposalEventNotFoundError,
   ProposalNotFoundError,
 } from '../../../../src/modules/proposals/application/resolve-proposal';
@@ -58,6 +59,26 @@ describe('CreateProposalResponseUseCase', () => {
       await expect(
         useCase.execute({ eventId: EVENT_ID, userId: USER_ID, answer: 'no' })
       ).rejects.toBeInstanceOf(ProposalResponseAlreadyExistsError);
+    });
+
+    it('rejects any answer once the event already happened, by event or by proposal', async () => {
+      responses.setEvent(EVENT_ID, PROPOSAL_ID, [USER_ID], new Date(Date.now() - 60_000));
+
+      await expect(
+        useCase.execute({ eventId: EVENT_ID, userId: USER_ID, answer: 'yes' })
+      ).rejects.toBeInstanceOf(ProposalEventAlreadyHappenedError);
+      await expect(
+        useCase.execute({ proposalId: PROPOSAL_ID, userId: USER_ID, answer: 'no' })
+      ).rejects.toBeInstanceOf(ProposalEventAlreadyHappenedError);
+      expect(sendToGroup).not.toHaveBeenCalled();
+    });
+
+    it('accepts answers while the event has not happened yet', async () => {
+      responses.setEvent(EVENT_ID, PROPOSAL_ID, [USER_ID], new Date(Date.now() + 60_000));
+
+      const result = await useCase.execute({ eventId: EVENT_ID, userId: USER_ID, answer: 'yes' });
+
+      expect(result.response).toMatchObject({ proposalId: PROPOSAL_ID, answer: 'yes' });
     });
 
     it('rejects an unknown event', async () => {

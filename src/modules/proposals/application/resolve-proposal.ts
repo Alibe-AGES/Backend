@@ -6,6 +6,16 @@ import { ProposalResponseRepository } from '../domain/proposal-response.reposito
 export class ProposalEventNotFoundError extends Error {}
 export class ProposalNotFoundError extends Error {}
 export class ProposalAccessDeniedError extends Error {}
+export class ProposalEventAlreadyHappenedError extends Error {}
+
+/** Depois que o evento acontece, a presença fica congelada: ninguém confirma nem cancela. */
+function ensureEventHasNotHappened(eventTimeslot: Date | null): void {
+  if (eventTimeslot && eventTimeslot.getTime() <= Date.now()) {
+    throw new ProposalEventAlreadyHappenedError(
+      'O evento já aconteceu; a presença não pode mais ser alterada'
+    );
+  }
+}
 
 /** A proposta é encontrada pelo evento ao qual pertence ou diretamente, no caso de sugestões. */
 export type ProposalTarget = { eventId: string } | { proposalId: string };
@@ -26,6 +36,8 @@ export async function resolveProposalId(
       throw new ProposalAccessDeniedError('O usuário não pertence ao grupo da proposta');
     }
 
+    ensureEventHasNotHappened(context.eventTimeslot);
+
     return target.proposalId;
   }
 
@@ -42,6 +54,8 @@ export async function resolveProposalId(
   if (!context.proposalId) {
     throw new ProposalNotFoundError('O evento não possui proposta');
   }
+
+  ensureEventHasNotHappened(context.eventTimeslot);
 
   return context.proposalId;
 }

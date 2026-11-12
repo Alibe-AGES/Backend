@@ -3,10 +3,14 @@ import { ProposalResponse, type UserProposalAnswer } from './proposal-response.e
 export interface EventProposalContext {
   proposalId: string | null;
   isGroupMember: boolean;
+  /** Data e hora do evento; null quando não definida. */
+  eventTimeslot: Date | null;
 }
 
 export interface ProposalContext {
   isGroupMember: boolean;
+  /** Data e hora do evento da proposta; null para sugestões ou evento sem data. */
+  eventTimeslot: Date | null;
 }
 
 export interface CreateProposalResponseData {
