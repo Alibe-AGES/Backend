@@ -39,6 +39,7 @@ describe('PrismaProposalResponseRepository', () => {
     proposal: { findUniqueOrThrow: jest.fn(), update: jest.fn() },
     proposalResponse: { create: jest.fn(), update: jest.fn() },
     groupNotification: { create: jest.fn() },
+    event: { update: jest.fn() },
   };
   const prisma = {
     event: { findUnique: jest.fn() },
@@ -171,6 +172,42 @@ describe('PrismaProposalResponseRepository', () => {
     expect(transaction.proposalResponse.update).toHaveBeenCalledWith({
       where: { proposalId_userId: { proposalId: PROPOSAL_ID, userId: USER_ID } },
       data: { answer: 'no' },
+    });
+  });
+
+  it('returns the event to pending when a member cancels the attendance', async () => {
+    transaction.proposalResponse.update.mockResolvedValue({ ...record, answer: 'no' });
+    transaction.proposal.findUniqueOrThrow.mockResolvedValue({
+      ...suggestion([OWNER_ID]),
+      type: 'event',
+      event: { id: EVENT_ID, status: 'confirmed' },
+    });
+
+    await repository.updateAnswer(PROPOSAL_ID, USER_ID, 'no', ANSWERED_AT);
+
+    expect(transaction.event.update).toHaveBeenCalledWith({
+      where: { id: EVENT_ID },
+      data: { status: 'pending' },
+      select: { id: true },
+    });
+  });
+
+  it('confirms the event when the last member accepts', async () => {
+    transaction.proposalResponse.create.mockResolvedValue(record);
+    transaction.proposal.findUniqueOrThrow.mockResolvedValue({
+      ...suggestion([OWNER_ID, USER_ID]),
+      type: 'event',
+      event: { id: EVENT_ID, status: 'pending' },
+    });
+
+    await expect(repository.create({ ...record })).resolves.toEqual({
+      response: record,
+      matched: false,
+    });
+    expect(transaction.event.update).toHaveBeenCalledWith({
+      where: { id: EVENT_ID },
+      data: { status: 'confirmed' },
+      select: { id: true },
     });
   });
 

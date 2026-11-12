@@ -10,7 +10,11 @@ import {
   ProposalResponseAlreadyExistsError,
   ProposalResponseRepository,
 } from '../domain/proposal-response.repository';
-import { lockProposal, registerMatchIfComplete } from './proposal-match.transaction';
+import {
+  lockProposal,
+  registerMatchIfComplete,
+  syncEventStatus,
+} from './proposal-match.transaction';
 
 const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 const RECORD_NOT_FOUND = 'P2025';
@@ -60,6 +64,7 @@ export class PrismaProposalResponseRepository extends ProposalResponseRepository
         await lockProposal(transaction, data.proposalId);
         const record = await transaction.proposalResponse.create({ data });
         const matched = await registerMatchIfComplete(transaction, data.proposalId, data.createdAt);
+        await syncEventStatus(transaction, data.proposalId);
         return { response: new ProposalResponse(record), matched };
       });
     } catch (error) {
@@ -84,6 +89,7 @@ export class PrismaProposalResponseRepository extends ProposalResponseRepository
           data: { answer },
         });
         const matched = await registerMatchIfComplete(transaction, proposalId, answeredAt);
+        await syncEventStatus(transaction, proposalId);
         return { response: new ProposalResponse(record), matched };
       });
     } catch (error) {

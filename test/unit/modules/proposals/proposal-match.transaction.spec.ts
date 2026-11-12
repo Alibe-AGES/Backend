@@ -2,6 +2,7 @@ import { Prisma } from '../../../../generated/prisma/client';
 import {
   lockProposal,
   registerMatchIfComplete,
+  syncEventStatus,
 } from '../../../../src/modules/proposals/persistence/proposal-match.transaction';
 
 const PROPOSAL_ID = '55555555-5555-4555-8555-555555555555';
@@ -84,5 +85,81 @@ describe('proposal match transaction', () => {
 
     expect(transaction.proposal.update).not.toHaveBeenCalled();
     expect(transaction.groupNotification.create).not.toHaveBeenCalled();
+  });
+
+  describe('syncEventStatus', () => {
+    function eventSetup(status: string, accepted: string[]) {
+      const transaction = {
+        proposal: {
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
+            event: { id: 'event-id', status },
+            group: { users: [{ userId: 'ana' }, { userId: 'bruno' }] },
+            responses: accepted.map((userId) => ({ userId })),
+          }),
+        },
+        event: { update: jest.fn() },
+      };
+      return { transaction, tx: transaction as unknown as Prisma.TransactionClient };
+    }
+
+    it('confirms the event when every member accepted', async () => {
+      const { transaction, tx } = eventSetup('pending', ['ana', 'bruno']);
+
+      await syncEventStatus(tx, PROPOSAL_ID);
+
+      expect(transaction.proposal.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: PROPOSAL_ID },
+        select: {
+          event: { select: { id: true, status: true } },
+          group: { select: { users: { select: { userId: true } } } },
+          responses: { where: { answer: 'yes' }, select: { userId: true } },
+        },
+      });
+      expect(transaction.event.update).toHaveBeenCalledWith({
+        where: { id: 'event-id' },
+        data: { status: 'confirmed' },
+        select: { id: true },
+      });
+    });
+
+    it('returns the event to pending when a member cancels the attendance', async () => {
+      const { transaction, tx } = eventSetup('confirmed', ['ana']);
+
+      await syncEventStatus(tx, PROPOSAL_ID);
+
+      expect(transaction.event.update).toHaveBeenCalledWith({
+        where: { id: 'event-id' },
+        data: { status: 'pending' },
+        select: { id: true },
+      });
+    });
+
+    it.each([
+      ['the status is already right', 'pending', ['ana']],
+      ['the event was declined', 'declined', ['ana', 'bruno']],
+    ])('does not update when %s', async (_case, status, accepted) => {
+      const { transaction, tx } = eventSetup(status, accepted);
+
+      await syncEventStatus(tx, PROPOSAL_ID);
+
+      expect(transaction.event.update).not.toHaveBeenCalled();
+    });
+
+    it('ignores a suggestion, which has no event', async () => {
+      const transaction = {
+        proposal: {
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
+            event: null,
+            group: { users: [{ userId: 'ana' }] },
+            responses: [{ userId: 'ana' }],
+          }),
+        },
+        event: { update: jest.fn() },
+      };
+
+      await syncEventStatus(transaction as unknown as Prisma.TransactionClient, PROPOSAL_ID);
+
+      expect(transaction.event.update).not.toHaveBeenCalled();
+    });
   });
 });

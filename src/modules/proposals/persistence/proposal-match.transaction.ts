@@ -1,5 +1,9 @@
 import { Prisma } from '../../../../generated/prisma/client';
-import { isProposalMatch, proposalMatchNotificationMessage } from '../domain/proposal-match';
+import {
+  isEventConfirmed,
+  isProposalMatch,
+  proposalMatchNotificationMessage,
+} from '../domain/proposal-match';
 
 /**
  * Serializa as respostas de uma mesma proposta. Sem o lock, dois últimos aceites simultâneos
@@ -59,4 +63,42 @@ export async function registerMatchIfComplete(
   });
 
   return true;
+}
+
+/**
+ * Recalcula o status do evento da proposta: `confirmed` quando todos os membros atuais do grupo
+ * aceitaram, `pending` caso contrário (por exemplo, quando alguém cancela a presença). Eventos
+ * `declined` e propostas de sugestão não mudam.
+ */
+export async function syncEventStatus(
+  transaction: Prisma.TransactionClient,
+  proposalId: string
+): Promise<void> {
+  const proposal = await transaction.proposal.findUniqueOrThrow({
+    where: { id: proposalId },
+    select: {
+      event: { select: { id: true, status: true } },
+      group: { select: { users: { select: { userId: true } } } },
+      responses: { where: { answer: 'yes' }, select: { userId: true } },
+    },
+  });
+
+  if (!proposal.event || proposal.event.status === 'declined') {
+    return;
+  }
+
+  const status = isEventConfirmed(
+    proposal.group.users.map(({ userId }) => userId),
+    proposal.responses.map(({ userId }) => userId)
+  )
+    ? 'confirmed'
+    : 'pending';
+
+  if (status !== proposal.event.status) {
+    await transaction.event.update({
+      where: { id: proposal.event.id },
+      data: { status },
+      select: { id: true },
+    });
+  }
 }
