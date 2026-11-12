@@ -32,6 +32,7 @@ import type { AuthenticatedRequest } from '../../auth/http/authenticated-user';
 import { CreateProposalResponseUseCase } from '../application/create-proposal-response.use-case';
 import {
   ProposalAccessDeniedError,
+  ProposalEventAlreadyHappenedError,
   ProposalEventNotFoundError,
   ProposalNotFoundError,
   type ProposalTarget,
@@ -82,7 +83,9 @@ export class ProposalResponseController {
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
   @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo do evento.' })
   @ApiNotFoundResponse({ description: 'Evento ou proposta não encontrados.' })
-  @ApiConflictResponse({ description: 'O usuário já respondeu esta proposta.' })
+  @ApiConflictResponse({
+    description: 'O usuário já respondeu esta proposta ou o evento já aconteceu.',
+  })
   create(
     @Param('eventId', new ParseUUIDPipe()) eventId: string,
     @Body() input: ProposalAnswerDto,
@@ -102,6 +105,7 @@ export class ProposalResponseController {
   @ApiNotFoundResponse({
     description: 'Evento, proposta ou resposta do usuário não encontrados.',
   })
+  @ApiConflictResponse({ description: 'O evento já aconteceu.' })
   update(
     @Param('eventId', new ParseUUIDPipe()) eventId: string,
     @Body() input: ProposalAnswerDto,
@@ -124,7 +128,9 @@ export class ProposalResponseController {
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
   @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo da proposta.' })
   @ApiNotFoundResponse({ description: 'Proposta não encontrada.' })
-  @ApiConflictResponse({ description: 'O usuário já respondeu esta proposta.' })
+  @ApiConflictResponse({
+    description: 'O usuário já respondeu esta proposta ou o evento já aconteceu.',
+  })
   createForProposal(
     @Param('proposalId', new ParseUUIDPipe()) proposalId: string,
     @Body() input: ProposalAnswerDto,
@@ -146,6 +152,7 @@ export class ProposalResponseController {
   @ApiUnauthorizedResponse({ description: 'Usuário não autenticado.' })
   @ApiForbiddenResponse({ description: 'O usuário não pertence ao grupo da proposta.' })
   @ApiNotFoundResponse({ description: 'Proposta ou resposta do usuário não encontradas.' })
+  @ApiConflictResponse({ description: 'O evento da proposta já aconteceu.' })
   updateForProposal(
     @Param('proposalId', new ParseUUIDPipe()) proposalId: string,
     @Body() input: ProposalAnswerDto,
@@ -194,7 +201,10 @@ export class ProposalResponseController {
       return new ForbiddenException(error.message);
     }
 
-    if (error instanceof ProposalResponseAlreadyExistsError) {
+    if (
+      error instanceof ProposalResponseAlreadyExistsError ||
+      error instanceof ProposalEventAlreadyHappenedError
+    ) {
       return new ConflictException(error.message);
     }
 

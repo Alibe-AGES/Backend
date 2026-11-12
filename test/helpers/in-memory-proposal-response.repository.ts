@@ -22,6 +22,7 @@ export const IN_MEMORY_GROUP_ID = '33333333-3333-4333-8333-333333333333';
 interface StoredEvent {
   proposalId: string | null;
   memberIds: Set<string>;
+  timeslot: Date | null;
 }
 
 interface StoredProposal {
@@ -30,6 +31,7 @@ interface StoredProposal {
   memberIds: Set<string>;
   locationId: string | null;
   matchedAt: Date | null;
+  eventTimeslot: Date | null;
 }
 
 export class InMemoryProposalResponseRepository extends ProposalResponseRepository {
@@ -44,14 +46,24 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
     const event = this.events.get(eventId);
 
     return Promise.resolve(
-      event ? { proposalId: event.proposalId, isGroupMember: event.memberIds.has(userId) } : null
+      event
+        ? {
+            proposalId: event.proposalId,
+            isGroupMember: event.memberIds.has(userId),
+            eventTimeslot: event.timeslot,
+          }
+        : null
     );
   }
 
   findProposalContext(proposalId: string, userId: string): Promise<ProposalContext | null> {
     const proposal = this.proposals.get(proposalId);
 
-    return Promise.resolve(proposal ? { isGroupMember: proposal.memberIds.has(userId) } : null);
+    return Promise.resolve(
+      proposal
+        ? { isGroupMember: proposal.memberIds.has(userId), eventTimeslot: proposal.eventTimeslot }
+        : null
+    );
   }
 
   findProposalGroup(proposalId: string): Promise<ProposalGroup | null> {
@@ -99,8 +111,13 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
     });
   }
 
-  setEvent(eventId: string, proposalId: string | null, memberIds: string[]): void {
-    this.events.set(eventId, { proposalId, memberIds: new Set(memberIds) });
+  setEvent(
+    eventId: string,
+    proposalId: string | null,
+    memberIds: string[],
+    timeslot: Date | null = null
+  ): void {
+    this.events.set(eventId, { proposalId, memberIds: new Set(memberIds), timeslot });
     if (proposalId) {
       this.proposals.set(proposalId, {
         type: 'event',
@@ -108,6 +125,7 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
         memberIds: new Set(memberIds),
         locationId: null,
         matchedAt: null,
+        eventTimeslot: timeslot,
       });
     }
   }
@@ -124,6 +142,7 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
       memberIds: new Set(memberIds),
       locationId,
       matchedAt: null,
+      eventTimeslot: null,
     });
   }
 

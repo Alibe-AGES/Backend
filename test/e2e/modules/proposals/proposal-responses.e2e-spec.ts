@@ -63,6 +63,23 @@ describe('Proposal responses endpoints (e2e)', () => {
     sendToGroup.mockReset().mockResolvedValue({ attempted: 1, sent: 1, failed: 0 });
   });
 
+  it('responds 409 to any answer once the event already happened', async () => {
+    responses.setEvent(EVENT_ID, PROPOSAL_ID, [USER_ID], new Date(Date.now() - 60_000));
+
+    const created = await request(app.getHttpServer())
+      .post(RESPONSES_PATH)
+      .send({ answer: 'yes' })
+      .expect(409);
+    await request(app.getHttpServer())
+      .patch(`${RESPONSES_PATH}/me`)
+      .send({ answer: 'no' })
+      .expect(409);
+
+    expect(created.body.message).toBe(
+      'O evento já aconteceu; a presença não pode mais ser alterada'
+    );
+  });
+
   it('creates the response and then allows the user to edit it', async () => {
     const created = await request(app.getHttpServer())
       .post(RESPONSES_PATH)
@@ -231,6 +248,7 @@ describe('Proposal responses endpoints (e2e)', () => {
         '401',
         '403',
         '404',
+        '409',
       ]);
       for (const operation of [
         swagger.body.paths[base].post,

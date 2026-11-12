@@ -33,6 +33,7 @@ export class PrismaProposalResponseRepository extends ProposalResponseRepository
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
       select: {
+        timeslot: true,
         proposals: { select: { id: true }, orderBy: { createdAt: 'desc' }, take: 1 },
         group: { select: { users: { where: { userId }, select: { userId: true }, take: 1 } } },
       },
@@ -45,6 +46,7 @@ export class PrismaProposalResponseRepository extends ProposalResponseRepository
     return {
       proposalId: event.proposals[0]?.id ?? null,
       isGroupMember: event.group.users.length > 0,
+      eventTimeslot: event.timeslot,
     };
   }
 
@@ -52,11 +54,17 @@ export class PrismaProposalResponseRepository extends ProposalResponseRepository
     const proposal = await this.prisma.proposal.findUnique({
       where: { id: proposalId },
       select: {
+        event: { select: { timeslot: true } },
         group: { select: { users: { where: { userId }, select: { userId: true }, take: 1 } } },
       },
     });
 
-    return proposal ? { isGroupMember: proposal.group.users.length > 0 } : null;
+    return proposal
+      ? {
+          isGroupMember: proposal.group.users.length > 0,
+          eventTimeslot: proposal.event?.timeslot ?? null,
+        }
+      : null;
   }
 
   findProposalGroup(proposalId: string): Promise<ProposalGroup | null> {
