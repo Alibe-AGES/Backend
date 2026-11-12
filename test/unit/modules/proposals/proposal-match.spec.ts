@@ -1,4 +1,5 @@
 import {
+  isEventConfirmed,
   isProposalMatch,
   proposalMatchNotificationMessage,
 } from '../../../../src/modules/proposals/domain/proposal-match';
@@ -6,6 +7,20 @@ import {
 const ANA = '11111111-1111-4111-8111-111111111111';
 const BRUNO = '22222222-2222-4222-8222-222222222222';
 const CAIO = '33333333-3333-4333-8333-333333333333';
+
+describe('isEventConfirmed', () => {
+  it('confirms when every current group member accepted', () => {
+    expect(isEventConfirmed([ANA, BRUNO], [ANA, BRUNO])).toBe(true);
+  });
+
+  it('stays pending while a member has not accepted', () => {
+    expect(isEventConfirmed([ANA, BRUNO, CAIO], [ANA, BRUNO])).toBe(false);
+  });
+
+  it('does not confirm a group without members', () => {
+    expect(isEventConfirmed([], [])).toBe(false);
+  });
+});
 
 describe('isProposalMatch', () => {
   const state = {

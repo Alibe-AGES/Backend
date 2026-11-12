@@ -27,7 +27,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Quantidade acumulada de requisições HTTP desde o início do processo.",
+      "description": "Requisições recebidas pela API no período selecionado (canto superior direito), sem health checks e sem a coleta do Prometheus.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -71,14 +71,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(http_requests_total) or vector(0)",
+          "expr": "sum(increase(http_requests_total{instance=~\".+:3000\", route!~\"/health.*|/metrics.*\"}[$__range])) or vector(0)",
           "instant": true,
           "legendFormat": "Total",
           "range": false,
           "refId": "A"
         }
       ],
-      "title": "HTTP requests total",
+      "title": "Requisições do app no período",
       "type": "stat"
     },
     {
@@ -86,7 +86,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Quantidade de requisições HTTP registradas em cada intervalo do gráfico.",
+      "description": "Requisições recebidas pela API em cada intervalo do gráfico, sem health checks e sem a coleta do Prometheus.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -147,13 +147,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(increase(http_requests_total[$__rate_interval])) or vector(0)",
+          "expr": "sum(increase(http_requests_total{instance=~\".+:3000\", route!~\"/health.*|/metrics.*\"}[$__rate_interval])) or vector(0)",
           "legendFormat": "Requests no intervalo",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "HTTP requests over time",
+      "title": "Requisições do app por intervalo",
       "type": "timeseries"
     },
     {
@@ -161,7 +161,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Quantidade acumulada de respostas HTTP 4xx e 5xx.",
+      "description": "Respostas 4xx e 5xx no período selecionado. 401 (sem login) também conta como erro.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -209,14 +209,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(http_errors_total) or vector(0)",
+          "expr": "sum(increase(http_errors_total{instance=~\".+:3000\", route!~\"/health.*|/metrics.*\"}[$__range])) or vector(0)",
           "instant": true,
           "legendFormat": "Errors",
           "range": false,
           "refId": "A"
         }
       ],
-      "title": "HTTP errors total",
+      "title": "Erros no período",
       "type": "stat"
     },
     {
@@ -296,7 +296,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "100 * ((sum(rate(http_errors_total[$__rate_interval])) or vector(0)) / clamp_min((sum(rate(http_requests_total[$__rate_interval])) or vector(0)), 0.000001))",
+          "expr": "100 * ((sum(rate(http_errors_total{instance=~\".+:3000\", route!~\"/health.*|/metrics.*\"}[$__rate_interval])) or vector(0)) / clamp_min((sum(rate(http_requests_total{instance=~\".+:3000\", route!~\"/health.*|/metrics.*\"}[$__rate_interval])) or vector(0)), 0.000001))",
           "instant": false,
           "legendFormat": "Error rate",
           "range": true,
@@ -371,7 +371,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[$__rate_interval]))) or vector(0)",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{instance=~\".+:3000\", route!~\"/health.*|/metrics.*\"}[$__rate_interval]))) or vector(0)",
           "legendFormat": "p95",
           "range": true,
           "refId": "A"
@@ -445,8 +445,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "100 * (rate(process_cpu_seconds_total[$__rate_interval]) or vector(0))",
-          "legendFormat": "CPU",
+          "expr": "100 * sum by (instance) (rate(process_cpu_seconds_total{instance=~\".+:3000\"}[$__rate_interval]))",
+          "legendFormat": "CPU {{instance}}",
           "range": true,
           "refId": "A"
         }
@@ -519,8 +519,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "max(nodejs_heap_size_used_bytes) or vector(0)",
-          "legendFormat": "Heap used",
+          "expr": "max by (instance) (nodejs_heap_size_used_bytes{instance=~\".+:3000\"})",
+          "legendFormat": "Heap {{instance}}",
           "range": true,
           "refId": "A"
         }
@@ -593,8 +593,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "max(nodejs_eventloop_lag_seconds) or vector(0)",
-          "legendFormat": "Event loop lag",
+          "expr": "max by (instance) (nodejs_eventloop_lag_seconds{instance=~\".+:3000\"})",
+          "legendFormat": "Lag {{instance}}",
           "range": true,
           "refId": "A"
         }
@@ -607,7 +607,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Tempo decorrido desde que o processo atual do Backend iniciou.",
+      "description": "Tempo desde que o pod mais recente da API iniciou.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -651,7 +651,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "time() - max(process_start_time_seconds)",
+          "expr": "time() - max(process_start_time_seconds{instance=~\".+:3000\"})",
           "instant": true,
           "legendFormat": "Uptime",
           "range": false,
@@ -663,7 +663,7 @@
     }
   ],
   "preload": false,
-  "refresh": "5s",
+  "refresh": "1m",
   "schemaVersion": 42,
   "tags": ["alibe", "backend", "nestjs"],
   "templating": {

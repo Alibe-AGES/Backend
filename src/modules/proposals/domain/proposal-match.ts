@@ -17,6 +17,12 @@ export function isProposalMatch(state: ProposalMatchState): boolean {
   return state.memberIds.every((memberId) => accepted.has(memberId));
 }
 
+/** Um evento só fica confirmado quando todos os membros atuais do grupo aceitaram participar. */
+export function isEventConfirmed(memberIds: string[], acceptedUserIds: string[]): boolean {
+  const accepted = new Set(acceptedUserIds);
+  return memberIds.length > 0 && memberIds.every((memberId) => accepted.has(memberId));
+}
+
 // group_notification.message é VARCHAR(255); o nome é cortado para a mensagem sempre caber.
 const MAX_NAME_LENGTH = 120;
 

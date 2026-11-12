@@ -1,0 +1,105 @@
+# Stack mínima do backend para os testes E2E (Maestro) do frontend no CI.
+# Sobe só o que a API precisa para funcionar: PostgreSQL, MiniStack (S3 + SQS)
+# e a própria API. Sem Grafana, Prometheus, Adminer, Lambda ou volumes:
+# os dados vivem em memória e somem quando a stack é derrubada.
+#
+# Uso (a partir da raiz do repositório):
+#   docker compose -f infra/e2e/docker-compose.yml up -d --build --wait
+#   docker compose -f infra/e2e/docker-compose.yml down -v
+
+name: alibe-e2e
+
+x-aws-environment: &aws-environment
+  AWS_REGION: us-east-2
+  AWS_ENDPOINT_URL: http://ministack:4566
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  AWS_S3_BUCKET: alibe-e2e-media
+  AWS_SQS_NOTIFICATION_QUEUE_URL: http://ministack:4566/000000000000/alibe-e2e-notifications
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: alibe
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d alibe']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  ministack:
+    image: ministackorg/ministack:1.5.3
+    environment:
+      AWS_DEFAULT_REGION: us-east-2
+      LOG_LEVEL: WARNING
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Roda uma vez: aplica as migrations, cria o bucket e a fila e, se
+  # SEED_ON_STARTUP=true, popula o banco com os dados de prisma/seed.ts.
+  setup:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: migration
+    depends_on:
+      db:
+        condition: service_healthy
+      ministack:
+        condition: service_healthy
+    environment:
+      <<: *aws-environment
+      DATABASE_URL: postgres://postgres:postgres@db:5432/alibe
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+    command:
+      - sh
+      - -c
+      - >-
+        export PATH="/app/node_modules/.bin:$$PATH" &&
+        prisma migrate deploy &&
+        node infra/e2e/bootstrap-aws.mjs &&
+        if [ "$$SEED_ON_STARTUP" = "true" ]; then prisma db seed; fi
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: production
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    environment:
+      <<: *aws-environment
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgres@db:5432/alibe
+      BETTER_AUTH_SECRET: e2e-only-alibe-secret-not-for-production
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_TRUSTED_ORIGINS: alibe://,alibe://*,http://localhost:8081,exp://,exp://**
+      ENABLE_NOTIFICATION_TEST_ENDPOINT: 'false'
+    ports:
+      - '${APP_PORT:-3000}:3000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/health/ready').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
