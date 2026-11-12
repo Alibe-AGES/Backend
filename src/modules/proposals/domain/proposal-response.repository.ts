@@ -16,6 +16,11 @@ export interface CreateProposalResponseData {
   createdAt: Date;
 }
 
+export interface ProposalGroup {
+  groupId: string;
+  name: string | null;
+}
+
 export interface ProposalAnswerResult {
   response: ProposalResponse;
   /** True somente para a resposta que completou o match da sugestão. */
@@ -32,6 +37,9 @@ export abstract class ProposalResponseRepository {
 
   /** Retorna null quando a proposta não existe. */
   abstract findProposalContext(proposalId: string, userId: string): Promise<ProposalContext | null>;
+
+  /** Grupo e nome da proposta, para o push de match; null quando a proposta não existe. */
+  abstract findProposalGroup(proposalId: string): Promise<ProposalGroup | null>;
 
   /**
    * Grava a resposta e, na mesma transação, registra o match e a notificação `match`

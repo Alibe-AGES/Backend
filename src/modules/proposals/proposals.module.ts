@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { GooglePlacesModule } from '../../infrastructure/api/google-places/google-places.module';
 import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
 import { StorageModule } from '../../infrastructure/storage/storage.module';
+import { EventsModule } from '../events/events.module';
 import { CreateProposalUseCase } from './application/create-proposal.use-case';
 import { ProposalsController } from './http/proposals.controller';
 import { CreateProposalResponseUseCase } from './application/create-proposal-response.use-case';
@@ -16,7 +17,7 @@ import { ProposalQueryController } from './http/proposal-query.controller';
 import { ListActiveProposalsUseCase } from './application/list-active-proposals.use-case';
 
 @Module({
-  imports: [PrismaModule, GooglePlacesModule, StorageModule],
+  imports: [PrismaModule, GooglePlacesModule, StorageModule, EventsModule],
   controllers: [ProposalResponseController, ProposalsController, ProposalQueryController],
   providers: [
     CreateProposalUseCase,

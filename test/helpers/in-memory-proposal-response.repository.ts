@@ -11,9 +11,13 @@ import {
   type EventProposalContext,
   type ProposalAnswerResult,
   type ProposalContext,
+  type ProposalGroup,
   ProposalResponseAlreadyExistsError,
   ProposalResponseRepository,
 } from '../../src/modules/proposals/domain/proposal-response.repository';
+
+/** Grupo de todas as propostas deste repositório. */
+export const IN_MEMORY_GROUP_ID = '33333333-3333-4333-8333-333333333333';
 
 interface StoredEvent {
   proposalId: string | null;
@@ -22,6 +26,7 @@ interface StoredEvent {
 
 interface StoredProposal {
   type: ProposalType;
+  name: string | null;
   memberIds: Set<string>;
   locationId: string | null;
   matchedAt: Date | null;
@@ -47,6 +52,12 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
     const proposal = this.proposals.get(proposalId);
 
     return Promise.resolve(proposal ? { isGroupMember: proposal.memberIds.has(userId) } : null);
+  }
+
+  findProposalGroup(proposalId: string): Promise<ProposalGroup | null> {
+    const proposal = this.proposals.get(proposalId);
+
+    return Promise.resolve(proposal ? { groupId: IN_MEMORY_GROUP_ID, name: proposal.name } : null);
   }
 
   create(data: CreateProposalResponseData): Promise<ProposalAnswerResult> {
@@ -93,6 +104,7 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
     if (proposalId) {
       this.proposals.set(proposalId, {
         type: 'event',
+        name: null,
         memberIds: new Set(memberIds),
         locationId: null,
         matchedAt: null,
@@ -100,9 +112,15 @@ export class InMemoryProposalResponseRepository extends ProposalResponseReposito
     }
   }
 
-  setSuggestion(proposalId: string, memberIds: string[], locationId: string): void {
+  setSuggestion(
+    proposalId: string,
+    memberIds: string[],
+    locationId: string,
+    name: string | null = null
+  ): void {
     this.proposals.set(proposalId, {
       type: 'suggestion',
+      name,
       memberIds: new Set(memberIds),
       locationId,
       matchedAt: null,

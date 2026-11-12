@@ -108,6 +108,19 @@ describe('PrismaProposalResponseRepository', () => {
     });
   });
 
+  it('loads the proposal group and name for the match push', async () => {
+    prisma.proposal.findUnique.mockResolvedValue({ groupId: 'group-id', name: 'Café' });
+
+    await expect(repository.findProposalGroup(PROPOSAL_ID)).resolves.toEqual({
+      groupId: 'group-id',
+      name: 'Café',
+    });
+    expect(prisma.proposal.findUnique).toHaveBeenCalledWith({
+      where: { id: PROPOSAL_ID },
+      select: { groupId: true, name: true },
+    });
+  });
+
   it('locks the proposal, stores the response and reports the match it completed', async () => {
     transaction.proposalResponse.create.mockResolvedValue(record);
     transaction.proposal.findUniqueOrThrow.mockResolvedValue(suggestion([OWNER_ID, USER_ID]));

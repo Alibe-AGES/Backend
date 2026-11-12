@@ -7,6 +7,7 @@ import {
   type EventProposalContext,
   type ProposalAnswerResult,
   type ProposalContext,
+  type ProposalGroup,
   ProposalResponseAlreadyExistsError,
   ProposalResponseRepository,
 } from '../domain/proposal-response.repository';
@@ -56,6 +57,13 @@ export class PrismaProposalResponseRepository extends ProposalResponseRepository
     });
 
     return proposal ? { isGroupMember: proposal.group.users.length > 0 } : null;
+  }
+
+  findProposalGroup(proposalId: string): Promise<ProposalGroup | null> {
+    return this.prisma.proposal.findUnique({
+      where: { id: proposalId },
+      select: { groupId: true, name: true },
+    });
   }
 
   async create(data: CreateProposalResponseData): Promise<ProposalAnswerResult> {

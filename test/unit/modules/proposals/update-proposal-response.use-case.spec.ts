@@ -3,7 +3,11 @@ import {
   ProposalResponseNotFoundError,
   UpdateProposalResponseUseCase,
 } from '../../../../src/modules/proposals/application/update-proposal-response.use-case';
-import { InMemoryProposalResponseRepository } from '../../../helpers/in-memory-proposal-response.repository';
+import { GroupPushNotificationService } from '../../../../src/modules/events/application/group-push-notification.service';
+import {
+  IN_MEMORY_GROUP_ID,
+  InMemoryProposalResponseRepository,
+} from '../../../helpers/in-memory-proposal-response.repository';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const PROPOSAL_ID = '55555555-5555-4555-8555-555555555555';
@@ -17,11 +21,15 @@ const createdAt = new Date('2026-09-22T18:30:00.000Z');
 describe('UpdateProposalResponseUseCase', () => {
   let responses: InMemoryProposalResponseRepository;
   let useCase: UpdateProposalResponseUseCase;
+  let sendToGroup: jest.Mock;
 
   beforeEach(() => {
     responses = new InMemoryProposalResponseRepository();
     responses.setEvent(EVENT_ID, PROPOSAL_ID, [USER_ID]);
-    useCase = new UpdateProposalResponseUseCase(responses);
+    sendToGroup = jest.fn().mockResolvedValue({ attempted: 2, sent: 2, failed: 0 });
+    useCase = new UpdateProposalResponseUseCase(responses, {
+      sendToGroup,
+    } as unknown as GroupPushNotificationService);
   });
 
   it('changes the answer and keeps the original identity and creation date', async () => {
@@ -51,7 +59,7 @@ describe('UpdateProposalResponseUseCase', () => {
 
   describe('by suggestion', () => {
     beforeEach(async () => {
-      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID], LOCATION_ID);
+      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID], LOCATION_ID, 'Café');
       await responses.create({
         proposalId: SUGGESTION_ID,
         userId: OWNER_ID,
@@ -75,6 +83,11 @@ describe('UpdateProposalResponseUseCase', () => {
 
       expect(result).toMatchObject({ matched: true, response: { answer: 'yes' } });
       expect(responses.matchNotifications).toHaveLength(1);
+      expect(sendToGroup).toHaveBeenCalledWith(IN_MEMORY_GROUP_ID, {
+        title: 'Deu match!',
+        body: 'Deu match! Todo o grupo aceitou a sugestão "Café".',
+        data: { type: 'match', proposalId: SUGGESTION_ID, groupId: IN_MEMORY_GROUP_ID },
+      });
     });
 
     it('does not report a second match after the suggestion already matched', async () => {
@@ -89,6 +102,7 @@ describe('UpdateProposalResponseUseCase', () => {
 
       expect(result.matched).toBe(false);
       expect(responses.matchNotifications).toHaveLength(1);
+      expect(sendToGroup).toHaveBeenCalledTimes(1);
     });
   });
 });

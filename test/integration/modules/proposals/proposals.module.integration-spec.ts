@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
+import { SQS_CLIENT } from '../../../../src/infrastructure/messaging/sqs-client.provider';
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
 import type { AuthenticatedRequest } from '../../../../src/modules/auth/http/authenticated-user';
 import { ProposalResponseController } from '../../../../src/modules/proposals/http/proposal-response.controller';
@@ -27,8 +28,10 @@ describe('ProposalsModule integration', () => {
     proposalResponse: { create: jest.fn() },
     groupNotification: { create: jest.fn() },
   };
+  const sqs = { send: jest.fn() };
   const prisma = {
     event: { findUnique: jest.fn() },
+    userGroup: { findMany: jest.fn() },
     group: { findUnique: jest.fn() },
     proposal: { findUnique: jest.fn(), findMany: jest.fn() },
     $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) => callback(transaction)),
@@ -42,6 +45,8 @@ describe('ProposalsModule integration', () => {
       .useValue({ send: jest.fn() })
       .overrideProvider(S3_BUCKET)
       .useValue('alibe-test-media')
+      .overrideProvider(SQS_CLIENT)
+      .useValue(sqs)
       .compile();
   });
 
@@ -96,7 +101,16 @@ describe('ProposalsModule integration', () => {
   });
 
   it('connects the suggestion route to the match registration', async () => {
-    prisma.proposal.findUnique.mockResolvedValue({ group: { users: [{ userId: USER_ID }] } });
+    // A mesma consulta serve ao contexto da resposta e ao grupo do push de match.
+    prisma.proposal.findUnique.mockResolvedValue({
+      group: { users: [{ userId: USER_ID }] },
+      groupId: GROUP_ID,
+      name: 'Café',
+    });
+    prisma.userGroup.findMany.mockResolvedValue([
+      { userId: OWNER_ID, user: { expoPushToken: 'ExpoPushToken[owner]' } },
+    ]);
+    sqs.send.mockResolvedValue({});
     transaction.groupNotification.create.mockClear();
 
     const result = await moduleFixture
@@ -109,6 +123,13 @@ describe('ProposalsModule integration', () => {
     expect(transaction.groupNotification.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ type: 'match', locationId: LOCATION_ID, groupId: GROUP_ID }),
       select: { id: true },
+    });
+    expect(sqs.send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(sqs.send.mock.calls[0][0].input.MessageBody)).toEqual({
+      to: 'ExpoPushToken[owner]',
+      title: 'Deu match!',
+      body: 'Deu match! Todo o grupo aceitou a sugestão "Café".',
+      data: { type: 'match', proposalId: PROPOSAL_ID, groupId: GROUP_ID },
     });
   });
 

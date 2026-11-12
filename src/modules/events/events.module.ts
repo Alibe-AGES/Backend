@@ -26,7 +26,7 @@ import { GetMemoryImageUseCase } from './application/get-memory-image.use-case';
 @Module({
   imports: [PrismaModule, StorageModule, MessagingModule, GroupsModule],
   controllers: [EventController, AttendanceReminderTestController],
-  exports: [EventRepository],
+  exports: [EventRepository, GroupPushNotificationService],
   providers: [
     GetEventUseCase,
     GetMemoryUseCase,

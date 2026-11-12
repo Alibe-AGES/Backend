@@ -5,8 +5,12 @@ import { AppModule } from '../../../../src/app.module';
 import { setupApplication } from '../../../../src/app.setup';
 import { PrismaService } from '../../../../src/infrastructure/prisma/prisma.service';
 import { S3_BUCKET, S3_CLIENT } from '../../../../src/infrastructure/storage/s3-client.provider';
+import { GroupPushNotificationService } from '../../../../src/modules/events/application/group-push-notification.service';
 import { ProposalResponseRepository } from '../../../../src/modules/proposals/domain/proposal-response.repository';
-import { InMemoryProposalResponseRepository } from '../../../helpers/in-memory-proposal-response.repository';
+import {
+  IN_MEMORY_GROUP_ID,
+  InMemoryProposalResponseRepository,
+} from '../../../helpers/in-memory-proposal-response.repository';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const PROPOSAL_ID = '55555555-5555-4555-8555-555555555555';
@@ -21,6 +25,7 @@ const SUGGESTION_RESPONSES_PATH = `/api/proposals/${SUGGESTION_ID}/responses`;
 describe('Proposal responses endpoints (e2e)', () => {
   let app: INestApplication;
   let responses: InMemoryProposalResponseRepository;
+  const sendToGroup = jest.fn();
   const previousMockAuthEnabled = process.env.MOCK_AUTH_ENABLED;
   const previousMockAuthUserId = process.env.MOCK_AUTH_USER_ID;
 
@@ -34,6 +39,8 @@ describe('Proposal responses endpoints (e2e)', () => {
       .useValue({})
       .overrideProvider(ProposalResponseRepository)
       .useClass(InMemoryProposalResponseRepository)
+      .overrideProvider(GroupPushNotificationService)
+      .useValue({ sendToGroup })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -53,6 +60,7 @@ describe('Proposal responses endpoints (e2e)', () => {
     process.env.MOCK_AUTH_USER_ID = USER_ID;
     responses.clear();
     responses.setEvent(EVENT_ID, PROPOSAL_ID, [USER_ID]);
+    sendToGroup.mockReset().mockResolvedValue({ attempted: 1, sent: 1, failed: 0 });
   });
 
   it('creates the response and then allows the user to edit it', async () => {
@@ -119,7 +127,7 @@ describe('Proposal responses endpoints (e2e)', () => {
 
   describe('suggestion responses', () => {
     beforeEach(async () => {
-      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID], LOCATION_ID);
+      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID], LOCATION_ID, 'Café');
       await responses.create({
         proposalId: SUGGESTION_ID,
         userId: OWNER_ID,
@@ -145,6 +153,11 @@ describe('Proposal responses endpoints (e2e)', () => {
       expect(responses.matchNotifications).toEqual([
         { locationId: LOCATION_ID, createdAt: expect.any(Date) },
       ]);
+      expect(sendToGroup).toHaveBeenCalledWith(IN_MEMORY_GROUP_ID, {
+        title: 'Deu match!',
+        body: 'Deu match! Todo o grupo aceitou a sugestão "Café".',
+        data: { type: 'match', proposalId: SUGGESTION_ID, groupId: IN_MEMORY_GROUP_ID },
+      });
     });
 
     it('stores an acceptance without match while another member has not accepted', async () => {
@@ -157,6 +170,7 @@ describe('Proposal responses endpoints (e2e)', () => {
 
       expect(response.body).toMatchObject({ answer: 'yes', matched: false });
       expect(responses.matchNotifications).toEqual([]);
+      expect(sendToGroup).not.toHaveBeenCalled();
     });
 
     it('reports the match when the last refusal is changed to an acceptance', async () => {
@@ -172,6 +186,7 @@ describe('Proposal responses endpoints (e2e)', () => {
         .expect(200);
 
       expect(updated.body).toMatchObject({ answer: 'yes', matched: true });
+      expect(sendToGroup).toHaveBeenCalledTimes(1);
     });
 
     it('returns 404 for an unknown proposal and 403 for a user outside its group', async () => {

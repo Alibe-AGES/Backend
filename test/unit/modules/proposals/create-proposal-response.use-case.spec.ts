@@ -5,7 +5,11 @@ import {
   ProposalNotFoundError,
 } from '../../../../src/modules/proposals/application/resolve-proposal';
 import { ProposalResponseAlreadyExistsError } from '../../../../src/modules/proposals/domain/proposal-response.repository';
-import { InMemoryProposalResponseRepository } from '../../../helpers/in-memory-proposal-response.repository';
+import { GroupPushNotificationService } from '../../../../src/modules/events/application/group-push-notification.service';
+import {
+  IN_MEMORY_GROUP_ID,
+  InMemoryProposalResponseRepository,
+} from '../../../helpers/in-memory-proposal-response.repository';
 
 const EVENT_ID = '22222222-2222-4222-8222-222222222222';
 const PROPOSAL_ID = '55555555-5555-4555-8555-555555555555';
@@ -18,11 +22,15 @@ const OUTSIDER_ID = '99999999-9999-4999-8999-999999999999';
 describe('CreateProposalResponseUseCase', () => {
   let responses: InMemoryProposalResponseRepository;
   let useCase: CreateProposalResponseUseCase;
+  let sendToGroup: jest.Mock;
 
   beforeEach(() => {
     responses = new InMemoryProposalResponseRepository();
     responses.setEvent(EVENT_ID, PROPOSAL_ID, [USER_ID]);
-    useCase = new CreateProposalResponseUseCase(responses);
+    sendToGroup = jest.fn().mockResolvedValue({ attempted: 2, sent: 2, failed: 0 });
+    useCase = new CreateProposalResponseUseCase(responses, {
+      sendToGroup,
+    } as unknown as GroupPushNotificationService);
   });
 
   describe('by event', () => {
@@ -79,7 +87,7 @@ describe('CreateProposalResponseUseCase', () => {
 
   describe('by suggestion', () => {
     beforeEach(async () => {
-      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID], LOCATION_ID);
+      responses.setSuggestion(SUGGESTION_ID, [OWNER_ID, USER_ID], LOCATION_ID, 'Café');
       await responses.create({
         proposalId: SUGGESTION_ID,
         userId: OWNER_ID,
@@ -100,6 +108,28 @@ describe('CreateProposalResponseUseCase', () => {
       expect(responses.matchNotifications).toEqual([
         { locationId: LOCATION_ID, createdAt: result.response.createdAt },
       ]);
+      expect(sendToGroup).toHaveBeenCalledWith(IN_MEMORY_GROUP_ID, {
+        title: 'Deu match!',
+        body: 'Deu match! Todo o grupo aceitou a sugestão "Café".',
+        data: { type: 'match', proposalId: SUGGESTION_ID, groupId: IN_MEMORY_GROUP_ID },
+      });
+    });
+
+    it('keeps the match when the push cannot be sent, because it is already saved', async () => {
+      sendToGroup.mockRejectedValue(new Error('database unavailable'));
+      const logError = jest.spyOn(useCase['logger'], 'error').mockImplementation(() => undefined);
+
+      const result = await useCase.execute({
+        proposalId: SUGGESTION_ID,
+        userId: USER_ID,
+        answer: 'yes',
+      });
+
+      expect(result.matched).toBe(true);
+      expect(logError).toHaveBeenCalledWith(
+        `Match da proposta ${SUGGESTION_ID} registrado, mas o push não pôde ser enviado`,
+        expect.any(String)
+      );
     });
 
     it('stores the acceptance without a match while other members still have to accept', async () => {
@@ -113,6 +143,7 @@ describe('CreateProposalResponseUseCase', () => {
 
       expect(result).toMatchObject({ matched: false, response: { answer: 'yes' } });
       expect(responses.matchNotifications).toEqual([]);
+      expect(sendToGroup).not.toHaveBeenCalled();
     });
 
     it('does not match when the last member refuses', async () => {
