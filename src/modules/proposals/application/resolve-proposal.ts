@@ -1,3 +1,6 @@
+import { type Logger } from '@nestjs/common';
+import { type GroupPushNotificationService } from '../../events/application/group-push-notification.service';
+import { proposalMatchNotificationMessage } from '../domain/proposal-match';
 import { ProposalResponseRepository } from '../domain/proposal-response.repository';
 
 export class ProposalEventNotFoundError extends Error {}
@@ -41,4 +44,34 @@ export async function resolveProposalId(
   }
 
   return context.proposalId;
+}
+
+/**
+ * Avisa por push todos os membros do grupo que a sugestão deu match. O match já foi salvo
+ * quando isto roda, então uma falha aqui só vai para o log e não desfaz a resposta.
+ */
+export async function notifyProposalMatch(
+  responses: ProposalResponseRepository,
+  groupNotifications: GroupPushNotificationService,
+  logger: Logger,
+  proposalId: string
+): Promise<void> {
+  try {
+    const proposal = await responses.findProposalGroup(proposalId);
+
+    if (!proposal) {
+      return;
+    }
+
+    await groupNotifications.sendToGroup(proposal.groupId, {
+      title: 'Deu match!',
+      body: proposalMatchNotificationMessage(proposal.name),
+      data: { type: 'match', proposalId, groupId: proposal.groupId },
+    });
+  } catch (error) {
+    logger.error(
+      `Match da proposta ${proposalId} registrado, mas o push não pôde ser enviado`,
+      error instanceof Error ? error.stack : undefined
+    );
+  }
 }
