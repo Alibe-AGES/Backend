@@ -176,7 +176,8 @@ async function main() {
 
   console.log('Criando grupos...');
 
-  const groupsData = [
+  // `ownerIndex` fixa o owner; sem ele, um membro aleatório do grupo vira owner.
+  const groupsData: { name: string; createdAt: Date; ownerIndex?: number }[] = [
     {
       name: 'Turma da Faculdade',
       createdAt: new Date('2026-07-12'),
@@ -197,6 +198,23 @@ async function main() {
       name: 'Galera do Cinema',
       createdAt: new Date('2026-08-15'),
     },
+
+    // Grupos da Ana (owner), com eventos que já aconteceram.
+    {
+      name: 'Viagem de Formatura',
+      createdAt: new Date('2026-06-10'),
+      ownerIndex: 0,
+    },
+    {
+      name: 'Clube do Livro',
+      createdAt: new Date('2026-05-02'),
+      ownerIndex: 0,
+    },
+    {
+      name: 'Vôlei de Quarta',
+      createdAt: new Date('2026-04-15'),
+      ownerIndex: 0,
+    },
   ];
 
   const groups = [];
@@ -204,7 +222,8 @@ async function main() {
   for (const groupData of groupsData) {
     const group = await prisma.group.create({
       data: {
-        ...groupData,
+        name: groupData.name,
+        createdAt: groupData.createdAt,
         profilePic: null,
       },
     });
@@ -266,6 +285,27 @@ async function main() {
     [11, 4],
     [13, 4],
     [14, 4],
+
+    // Viagem de Formatura
+    [0, 5],
+    [1, 5],
+    [8, 5],
+    [10, 5],
+    [13, 5],
+
+    // Clube do Livro
+    [0, 6],
+    [2, 6],
+    [9, 6],
+    [11, 6],
+
+    // Vôlei de Quarta
+    [0, 7],
+    [3, 7],
+    [5, 7],
+    [7, 7],
+    [12, 7],
+    [14, 7],
   ];
 
   for (const [userIndex, groupIndex] of groupMemberships) {
@@ -279,7 +319,7 @@ async function main() {
 
   for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
     const members = groupMemberships.filter(([, index]) => index === groupIndex);
-    const [userIndex] = members[randomInt(members.length)];
+    const userIndex = groupsData[groupIndex].ownerIndex ?? members[randomInt(members.length)][0];
     await prisma.group.update({
       where: { id: groups[groupIndex].id },
       data: { ownerId: users[userIndex].id },
@@ -414,6 +454,103 @@ async function main() {
       groupIndex: 0,
       locationIndex: 4,
     },
+
+    // Eventos passados (antes de 12/11/2026) dos grupos da Ana.
+    // Viagem de Formatura
+    {
+      name: 'Reunião do roteiro',
+      timeslot: new Date('2026-07-04T19:00:00'),
+      budgetStart: '15.00',
+      budgetEnd: '35.00',
+      status: StatusEnum.confirmed,
+      createdAt: new Date('2026-06-20'),
+      groupIndex: 5,
+      locationIndex: 0,
+    },
+    {
+      name: 'Churrasco de arrecadação',
+      timeslot: new Date('2026-08-22T13:00:00'),
+      budgetStart: '30.00',
+      budgetEnd: '50.00',
+      status: StatusEnum.confirmed,
+      createdAt: new Date('2026-08-01'),
+      groupIndex: 5,
+      locationIndex: 3,
+    },
+    {
+      name: 'Noite de boliche',
+      timeslot: new Date('2026-10-17T20:00:00'),
+      budgetStart: '40.00',
+      budgetEnd: '70.00',
+      status: StatusEnum.confirmed,
+      createdAt: new Date('2026-10-01'),
+      groupIndex: 5,
+      locationIndex: 5,
+    },
+
+    // Clube do Livro
+    {
+      name: 'Encontro: Torto Arado',
+      timeslot: new Date('2026-06-13T16:00:00'),
+      budgetStart: '20.00',
+      budgetEnd: '40.00',
+      status: StatusEnum.confirmed,
+      createdAt: new Date('2026-05-25'),
+      groupIndex: 6,
+      locationIndex: 0,
+    },
+    {
+      name: 'Piquenique literário',
+      timeslot: new Date('2026-09-20T15:00:00'),
+      budgetStart: '10.00',
+      budgetEnd: '30.00',
+      status: StatusEnum.confirmed,
+      createdAt: new Date('2026-09-02'),
+      groupIndex: 6,
+      locationIndex: 2,
+    },
+    {
+      name: 'Encontro de outubro',
+      timeslot: new Date('2026-10-25T16:00:00'),
+      budgetStart: '20.00',
+      budgetEnd: '40.00',
+      status: StatusEnum.declined,
+      createdAt: new Date('2026-10-08'),
+      groupIndex: 6,
+      locationIndex: 0,
+    },
+
+    // Vôlei de Quarta
+    {
+      name: 'Vôlei no parque',
+      timeslot: new Date('2026-05-20T18:30:00'),
+      budgetStart: '0.00',
+      budgetEnd: '20.00',
+      status: StatusEnum.confirmed,
+      createdAt: new Date('2026-05-05'),
+      groupIndex: 7,
+      locationIndex: 2,
+    },
+    {
+      name: 'Pizza pós-jogo',
+      timeslot: new Date('2026-08-12T21:00:00'),
+      budgetStart: '35.00',
+      budgetEnd: '60.00',
+      status: StatusEnum.confirmed,
+      createdAt: new Date('2026-08-03'),
+      groupIndex: 7,
+      locationIndex: 4,
+    },
+    {
+      name: 'Torneio de duplas',
+      timeslot: new Date('2026-11-04T09:00:00'),
+      budgetStart: '10.00',
+      budgetEnd: '25.00',
+      status: StatusEnum.confirmed,
+      createdAt: new Date('2026-10-20'),
+      groupIndex: 7,
+      locationIndex: 2,
+    },
   ];
 
   const events = [];
@@ -528,13 +665,25 @@ async function main() {
 
   console.log('Criando propostas...');
 
-  const proposalsData = [
+  // Sem `createdAt`, a proposta usa a data padrão de 25/08/2026.
+  const proposalsData: { eventIndex: number; ownerIndex: number; createdAt?: Date }[] = [
     { eventIndex: 0, ownerIndex: 0 },
     { eventIndex: 1, ownerIndex: 6 },
     { eventIndex: 2, ownerIndex: 12 },
     { eventIndex: 3, ownerIndex: 1 },
     { eventIndex: 4, ownerIndex: 7 },
     { eventIndex: 5, ownerIndex: 3 },
+
+    // Eventos passados dos grupos da Ana: a proposta nasce junto com o evento.
+    { eventIndex: 6, ownerIndex: 0, createdAt: new Date('2026-06-20') },
+    { eventIndex: 7, ownerIndex: 1, createdAt: new Date('2026-08-01') },
+    { eventIndex: 8, ownerIndex: 0, createdAt: new Date('2026-10-01') },
+    { eventIndex: 9, ownerIndex: 0, createdAt: new Date('2026-05-25') },
+    { eventIndex: 10, ownerIndex: 2, createdAt: new Date('2026-09-02') },
+    { eventIndex: 11, ownerIndex: 9, createdAt: new Date('2026-10-08') },
+    { eventIndex: 12, ownerIndex: 0, createdAt: new Date('2026-05-05') },
+    { eventIndex: 13, ownerIndex: 3, createdAt: new Date('2026-08-03') },
+    { eventIndex: 14, ownerIndex: 0, createdAt: new Date('2026-10-20') },
   ];
 
   const proposals = [];
@@ -545,7 +694,7 @@ async function main() {
         eventId: events[proposalData.eventIndex].id,
         groupId: events[proposalData.eventIndex].groupId,
         ownerId: users[proposalData.ownerIndex].id,
-        createdAt: new Date('2026-08-25'),
+        createdAt: proposalData.createdAt ?? new Date('2026-08-25'),
       },
     });
 
@@ -603,6 +752,60 @@ async function main() {
     [5, 1, AnswerEnum.yes],
     [5, 4, AnswerEnum.no],
     [5, 6, AnswerEnum.yes],
+
+    // Proposal 6 -> Event 6 -> Viagem (Reunião do roteiro)
+    [6, 1, AnswerEnum.yes],
+    [6, 8, AnswerEnum.yes],
+    [6, 10, AnswerEnum.yes],
+    [6, 13, AnswerEnum.no],
+
+    // Proposal 7 -> Event 7 -> Viagem (Churrasco)
+    [7, 0, AnswerEnum.yes],
+    [7, 8, AnswerEnum.yes],
+    [7, 10, AnswerEnum.yes],
+    [7, 13, AnswerEnum.yes],
+
+    // Proposal 8 -> Event 8 -> Viagem (Boliche)
+    [8, 1, AnswerEnum.yes],
+    [8, 8, AnswerEnum.no],
+    [8, 10, AnswerEnum.yes],
+    [8, 13, AnswerEnum.yes],
+
+    // Proposal 9 -> Event 9 -> Livro (Torto Arado)
+    [9, 2, AnswerEnum.yes],
+    [9, 9, AnswerEnum.yes],
+    [9, 11, AnswerEnum.yes],
+
+    // Proposal 10 -> Event 10 -> Livro (Piquenique)
+    [10, 0, AnswerEnum.yes],
+    [10, 9, AnswerEnum.yes],
+    [10, 11, AnswerEnum.no],
+
+    // Proposal 11 -> Event 11 -> Livro (recusado)
+    [11, 0, AnswerEnum.no],
+    [11, 2, AnswerEnum.no],
+    [11, 11, AnswerEnum.yes],
+
+    // Proposal 12 -> Event 12 -> Vôlei (parque)
+    [12, 3, AnswerEnum.yes],
+    [12, 5, AnswerEnum.yes],
+    [12, 7, AnswerEnum.yes],
+    [12, 12, AnswerEnum.no],
+    [12, 14, AnswerEnum.yes],
+
+    // Proposal 13 -> Event 13 -> Vôlei (pizza)
+    [13, 0, AnswerEnum.yes],
+    [13, 5, AnswerEnum.yes],
+    [13, 7, AnswerEnum.no],
+    [13, 12, AnswerEnum.yes],
+    [13, 14, AnswerEnum.yes],
+
+    // Proposal 14 -> Event 14 -> Vôlei (torneio)
+    [14, 3, AnswerEnum.yes],
+    [14, 5, AnswerEnum.yes],
+    [14, 7, AnswerEnum.yes],
+    [14, 12, AnswerEnum.yes],
+    [14, 14, AnswerEnum.no],
   ];
 
   for (const [proposalIndex, userIndex, answer] of proposalResponses) {
@@ -611,7 +814,8 @@ async function main() {
         proposalId: proposals[proposalIndex].id,
         userId: users[userIndex].id,
         answer: answer as AnswerEnum,
-        createdAt: new Date('2026-08-27'),
+        // As respostas dos eventos passados chegam junto com a proposta, não depois do evento.
+        createdAt: proposalsData[proposalIndex as number].createdAt ?? new Date('2026-08-27'),
       },
     });
   }
